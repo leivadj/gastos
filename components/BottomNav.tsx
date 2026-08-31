@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabaseClient";
+
+const ADMIN_EMAIL = "leivadj@gmail.com";
 
 const items = [
   {
@@ -61,13 +65,37 @@ const items = [
   },
 ];
 
+const adminItem = {
+  href: "/admin",
+  label: "Admin",
+  icon: (active: boolean) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+      <path d="M12 3.5 5 6.5v5c0 4.5 3 7.5 7 8.5 4-1 7-4 7-8.5v-5L12 3.5Z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M9.5 12 11 13.5 14.5 10" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+
 export function BottomNav() {
   const pathname = usePathname();
+  const [esAdmin, setEsAdmin] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setEsAdmin(data.session?.user?.email === ADMIN_EMAIL);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
+      setEsAdmin(s?.user?.email === ADMIN_EMAIL);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const visibles = esAdmin ? [...items, adminItem] : items;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-gray-100 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-3xl">
-        {items.map((item) => {
+        {visibles.map((item) => {
           const active = pathname === item.href;
           return (
             <Link

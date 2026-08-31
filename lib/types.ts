@@ -22,6 +22,16 @@ export interface Entidad {
     | "linea_credito"
     | "credito_hipotecario"
     | "transferencia";
+  marca_id: string | null;
+}
+
+export type TipoMarca = "banco" | "casa_comercial" | "servicio_basico" | "otro";
+
+export interface Marca {
+  id: string;
+  nombre: string;
+  tipo: TipoMarca;
+  logo_url: string | null;
 }
 
 export interface Compra {

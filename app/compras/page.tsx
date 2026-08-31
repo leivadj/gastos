@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { formatCLP } from "@/lib/format";
@@ -85,6 +86,14 @@ export default function ComprasPage() {
           {mostrarForm ? "Cancelar" : "+ Nueva"}
         </button>
       </div>
+
+      <Link
+        href="/tarjetas"
+        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm"
+      >
+        <span className="text-gray-600">Gestionar tus tarjetas y cuentas</span>
+        <span className="text-brand-from">→</span>
+      </Link>
 
       {mostrarForm && (
         <Card>
