@@ -12,13 +12,17 @@ create extension if not exists "pgcrypto";
 -- porcentaje_reparto: se usa solo si algún gasto/compra se reparte en modo
 -- "automatico". Puede quedar en null para personas que solo reciben gastos
 -- asignados manualmente (ej. un hijo/a al que se le asigna una cuota directa).
+-- owner_id: cada usuario autenticado tiene su propio espacio, totalmente
+-- separado del de cualquier otro usuario (ver RLS más abajo).
 -- ---------------------------------------------------------------------------
 create table personas (
   id uuid primary key default gen_random_uuid(),
-  nombre text not null unique,
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  nombre text not null,
   porcentaje_reparto numeric(5,2),
   activo boolean not null default true,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (owner_id, nombre)
 );
 
 -- ---------------------------------------------------------------------------
@@ -37,11 +41,13 @@ create table categorias (
 -- ---------------------------------------------------------------------------
 create table entidades (
   id uuid primary key default gen_random_uuid(),
-  nombre text not null unique,
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  nombre text not null,
   tipo text not null check (
     tipo in ('efectivo', 'tarjeta_credito', 'linea_credito', 'credito_hipotecario', 'transferencia')
   ),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (owner_id, nombre)
 );
 
 -- ---------------------------------------------------------------------------
@@ -52,6 +58,7 @@ create table entidades (
 -- ---------------------------------------------------------------------------
 create table compras (
   id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
   descripcion text not null,
   monto_total numeric(12, 2) not null check (monto_total > 0),
   n_cuotas int not null check (n_cuotas > 0),
@@ -71,6 +78,7 @@ create table compras (
 -- ---------------------------------------------------------------------------
 create table gastos_fijos (
   id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
   descripcion text not null,
   categoria_id uuid references categorias(id),
   entidad_id uuid references entidades(id),
@@ -89,6 +97,7 @@ create table gastos_fijos (
 -- ---------------------------------------------------------------------------
 create table ingresos (
   id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
   persona_id uuid references personas(id),
   monto numeric(12, 2) not null check (monto >= 0),
   mes date not null, -- usar siempre el día 1 del mes, ej '2026-08-01'
@@ -103,6 +112,7 @@ create table ingresos (
 -- ---------------------------------------------------------------------------
 create table pagos (
   id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
   origen text not null check (origen in ('compra', 'gasto_fijo')),
   origen_id uuid not null,
   mes date not null,
@@ -120,7 +130,8 @@ create table pagos (
 -- Para cada compra, calcula en qué cuota va HOY y si sigue vigente este mes.
 -- No requiere ningún proceso mensual ni edición manual: siempre es correcta
 -- porque se recalcula cada vez que se consulta, usando current_date.
-create or replace view vista_cuotas_vigentes as
+create or replace view vista_cuotas_vigentes
+with (security_invoker = true) as
 select
   c.id as compra_id,
   c.descripcion,
@@ -141,13 +152,15 @@ select
 from compras c;
 
 -- Solo las cuotas activas este mes (cuota_actual entre 1 y n_cuotas)
-create or replace view vista_cuotas_mes_actual as
+create or replace view vista_cuotas_mes_actual
+with (security_invoker = true) as
 select *
 from vista_cuotas_vigentes
 where cuota_actual between 1 and n_cuotas;
 
 -- Reparto por persona de las cuotas de este mes (maneja manual y automático)
-create or replace view vista_reparto_cuotas_mes as
+create or replace view vista_reparto_cuotas_mes
+with (security_invoker = true) as
 select
   v.compra_id,
   v.descripcion,
@@ -170,7 +183,8 @@ join personas p on p.activo = true
   );
 
 -- Reparto por persona de los gastos fijos de este mes
-create or replace view vista_reparto_gastos_fijos as
+create or replace view vista_reparto_gastos_fijos
+with (security_invoker = true) as
 select
   g.id as gasto_fijo_id,
   g.descripcion,
@@ -192,7 +206,8 @@ join personas p on p.activo = true
 where g.activo = true;
 
 -- Resumen del mes por categoría (para el gráfico de torta del dashboard)
-create or replace view vista_resumen_categorias_mes as
+create or replace view vista_resumen_categorias_mes
+with (security_invoker = true) as
 select categoria_id, sum(monto_cuota) as total
 from vista_cuotas_mes_actual
 group by categoria_id
@@ -203,7 +218,8 @@ where activo = true
 group by categoria_id;
 
 -- Resumen del mes por persona (para las barras del dashboard)
-create or replace view vista_resumen_personas_mes as
+create or replace view vista_resumen_personas_mes
+with (security_invoker = true) as
 select persona_id, persona_nombre, sum(monto_persona) as total
 from (
   select persona_id, persona_nombre, monto_persona from vista_reparto_cuotas_mes
@@ -213,8 +229,11 @@ from (
 group by persona_id, persona_nombre;
 
 -- ============================================================================
--- SEGURIDAD (RLS) — solo un usuario autenticado (tú) puede leer/escribir.
--- Los datos son del hogar, no hay separación por usuario dentro de la app.
+-- SEGURIDAD (RLS) — cada usuario autenticado tiene su propio espacio,
+-- totalmente separado del de cualquier otro usuario (Felipe, Marian, etc.
+-- cada uno con su login, sin ver los datos del otro). `categorias` es la
+-- única tabla compartida entre todos: es solo una lista de nombres, sin
+-- información privada.
 -- ============================================================================
 alter table personas enable row level security;
 alter table categorias enable row level security;
@@ -224,17 +243,17 @@ alter table gastos_fijos enable row level security;
 alter table ingresos enable row level security;
 alter table pagos enable row level security;
 
-create policy "solo_autenticados" on personas for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "solo_dueno" on personas for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_autenticados" on categorias for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "solo_autenticados" on entidades for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "solo_autenticados" on compras for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "solo_autenticados" on gastos_fijos for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "solo_autenticados" on ingresos for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "solo_autenticados" on pagos for all
-  using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "solo_dueno" on entidades for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on compras for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on gastos_fijos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on ingresos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on pagos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
