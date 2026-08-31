@@ -71,46 +71,46 @@ select 'Carnicería', (select id from categorias where nombre = 'Supermercado'),
 -- A partir de aquí, cada mes la cuota vigente se calcula sola.
 -- ---------------------------------------------------------------------------
 insert into compras (descripcion, monto_total, n_cuotas, fecha_primera_cuota, entidad_id, categoria_id, modo_reparto, persona_id, notas)
-select 'Reestructuración deuda Falabella', 4839109, 24, '2026-03-01',
+select 'Reestructuración deuda Falabella', 4839109, 24, '2026-03-01'::date,
   (select id from entidades where nombre = 'Falabella'),
   (select id from categorias where nombre = 'Casa comercial'),
   'manual', (select id from personas where nombre = 'Marian'),
   'Iba en cuota 6 de 24 en agosto 2026'
 union all
-select 'Pago auto Papá', 2700000, 48, '2026-07-01',
+select 'Pago auto Papá', 2700000, 48, '2026-07-01'::date,
   (select id from entidades where nombre = 'Banco Estado'),
   (select id from categorias where nombre = 'Transporte'),
   'manual', (select id from personas where nombre = 'Papá'),
   'Iba en cuota 2 de 48 en agosto 2026'
 union all
-select 'Chile pasajes', 24000, 3, '2026-08-01',
+select 'Chile pasajes', 24000, 3, '2026-08-01'::date,
   (select id from entidades where nombre = 'Paris'),
   (select id from categorias where nombre = 'Casa comercial'),
   'manual', (select id from personas where nombre = 'Papá'), null
 union all
-select 'Ripley', 25480, 2, '2026-08-01',
+select 'Ripley', 25480, 2, '2026-08-01'::date,
   (select id from entidades where nombre = 'Paris'),
   (select id from categorias where nombre = 'Casa comercial'),
   'manual', (select id from personas where nombre = 'Marian'), null
 union all
-select 'Zapatillas Madi', 144990, 3, '2026-08-01',
+select 'Zapatillas Madi', 144990, 3, '2026-08-01'::date,
   (select id from entidades where nombre = 'Paris'),
   (select id from categorias where nombre = 'Casa comercial'),
   'manual', (select id from personas where nombre = 'Marian'), null
 union all
-select 'Lentes', 89990, 3, '2026-08-01',
+select 'Lentes', 89990, 3, '2026-08-01'::date,
   (select id from entidades where nombre = 'Banco Estado'),
   (select id from categorias where nombre = 'Salud'),
   'manual', (select id from personas where nombre = 'Papá'),
   'Asignación de persona aproximada, revisar'
 union all
-select 'Cuota gira de estudio', 50000, 15, '2025-11-01',
+select 'Cuota gira de estudio', 50000, 15, '2025-11-01'::date,
   (select id from entidades where nombre = 'Efectivo'),
   (select id from categorias where nombre = 'Educación'),
   'manual', (select id from personas where nombre = 'Nicolás'),
   'Iba en cuota 10 de 15 en agosto 2026'
 union all
-select 'Ahorro Madi', 30000, 10, '2026-02-01',
+select 'Ahorro Madi', 30000, 10, '2026-02-01'::date,
   (select id from entidades where nombre = 'Efectivo'),
   (select id from categorias where nombre = 'Ahorro'),
   'manual', (select id from personas where nombre = 'Madi'),
