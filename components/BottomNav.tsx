@@ -111,7 +111,7 @@ export function BottomNav() {
           );
         })}
       </div>
-      <div className="h-[env(safe-area-inset-bottom)] bg-white/95" />
+      <div className="h-[max(env(safe-area-inset-bottom),12px)] bg-white/95" />
     </nav>
   );
 }

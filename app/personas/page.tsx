@@ -11,6 +11,7 @@ export default function PersonasPage() {
   const [guardando, setGuardando] = useState(false);
   const [nombre, setNombre] = useState("");
   const [porcentaje, setPorcentaje] = useState("");
+  const [correo, setCorreo] = useState("");
 
   async function cargar() {
     const { data } = await supabase.from("personas").select("*").order("nombre");
@@ -19,7 +20,12 @@ export default function PersonasPage() {
 
   useEffect(() => {
     cargar();
+    supabase.auth.getSession().then(({ data }) => setCorreo(data.session?.user?.email ?? ""));
   }, []);
+
+  async function cerrarSesion() {
+    await supabase.auth.signOut();
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -134,6 +140,17 @@ export default function PersonasPage() {
             </Card>
           ))}
       </div>
+
+      <Card>
+        <p className="text-xs text-gray-400">Sesión iniciada como</p>
+        <p className="mb-3 truncate text-sm font-semibold text-gray-800">{correo}</p>
+        <button
+          onClick={cerrarSesion}
+          className="w-full rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-500 hover:border-red-200 hover:text-red-500"
+        >
+          Cerrar sesión
+        </button>
+      </Card>
     </div>
   );
 }
