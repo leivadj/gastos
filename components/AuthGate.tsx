@@ -3,7 +3,7 @@
 import { FormEvent, ReactNode, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import { NavBar } from "@/components/NavBar";
+import { BottomNav } from "@/components/BottomNav";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -81,8 +81,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <NavBar />
-      <main className="mx-auto max-w-3xl px-4 py-5">{children}</main>
+      <main className="mx-auto max-w-3xl px-4 pt-4 pb-24">{children}</main>
+      <BottomNav />
     </div>
   );
 }
