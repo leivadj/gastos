@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { Entidad, Marca } from "@/lib/types";
+import { colorFor } from "@/lib/avatarColor";
 
 const TIPOS: { value: Entidad["tipo"]; label: string }[] = [
   { value: "tarjeta_credito", label: "Tarjeta de crédito" },
@@ -41,7 +42,8 @@ export default function TarjetasPage() {
     const m = marcas.find((x) => x.id === id);
     if (m && !nombre) setNombre(m.nombre);
     if (m?.tipo === "banco") setTipo("tarjeta_credito");
-    if (m?.tipo === "servicio_basico") setTipo("efectivo");
+    if (m?.tipo === "servicio_basico" || m?.tipo === "telecom" || m?.tipo === "autopista") setTipo("efectivo");
+    if (m?.tipo === "caja_compensacion") setTipo("linea_credito");
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -100,7 +102,10 @@ export default function TarjetasPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.logo_url} alt={m.nombre} className="h-8 w-8 rounded object-contain" />
                     ) : (
-                      <span className="flex h-8 w-8 items-center justify-center rounded bg-gray-100 text-xs text-gray-400">
+                      <span
+                        className="flex h-8 w-8 items-center justify-center rounded text-xs font-semibold text-white"
+                        style={{ backgroundColor: colorFor(m.nombre) }}
+                      >
                         {m.nombre.charAt(0)}
                       </span>
                     )}
@@ -160,7 +165,10 @@ export default function TarjetasPage() {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={marca.logo_url} alt={e.nombre} className="h-9 w-9 rounded-lg object-contain" />
                   ) : (
-                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-sm font-semibold text-gray-400">
+                    <span
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold text-white"
+                      style={{ backgroundColor: colorFor(e.nombre) }}
+                    >
                       {e.nombre.charAt(0)}
                     </span>
                   )}

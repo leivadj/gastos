@@ -96,15 +96,18 @@ create policy "solo_dueno" on pagos for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ---------------------------------------------------------------------------
--- 5) MARCAS — catálogo compartido de bancos, casas comerciales y servicios
---    básicos (luz, agua, gas...), con su logo. Lo administra SOLO
---    leivadj@gmail.com; cualquier usuario autenticado puede leerlo para
---    elegir marca al crear sus propias tarjetas/entidades.
+-- 5) MARCAS — catálogo compartido de bancos, casas comerciales, cajas de
+--    compensación, autopistas, internet/móvil y servicios básicos (luz,
+--    agua, gas...), con su logo. Lo administra SOLO leivadj@gmail.com;
+--    cualquier usuario autenticado puede leerlo para elegir marca al crear
+--    sus propias tarjetas/entidades.
 -- ---------------------------------------------------------------------------
 create table if not exists marcas (
   id uuid primary key default gen_random_uuid(),
   nombre text not null unique,
-  tipo text not null check (tipo in ('banco', 'casa_comercial', 'servicio_basico', 'otro')),
+  tipo text not null check (tipo in (
+    'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico', 'otro'
+  )),
   logo_url text,
   created_at timestamptz not null default now()
 );

@@ -25,7 +25,14 @@ export interface Entidad {
   marca_id: string | null;
 }
 
-export type TipoMarca = "banco" | "casa_comercial" | "servicio_basico" | "otro";
+export type TipoMarca =
+  | "banco"
+  | "casa_comercial"
+  | "caja_compensacion"
+  | "autopista"
+  | "telecom"
+  | "servicio_basico"
+  | "otro";
 
 export interface Marca {
   id: string;
