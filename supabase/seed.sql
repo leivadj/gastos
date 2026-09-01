@@ -28,15 +28,16 @@ insert into personas (nombre, porcentaje_reparto, activo) values
 -- ---------------------------------------------------------------------------
 -- CATEGORIAS
 -- ---------------------------------------------------------------------------
-insert into categorias (nombre, tipo) values
-  ('Vivienda', 'fijo'),
-  ('Supermercado', 'variable'),
-  ('Casa comercial', 'variable'),
-  ('Transporte', 'variable'),
-  ('Educación', 'variable'),
-  ('Ahorro', 'variable'),
-  ('Salud', 'variable'),
-  ('Otro', 'variable');
+insert into categorias (nombre, tipo, tipo_marca_sugerido) values
+  ('Vivienda', 'fijo', 'servicio_basico'),
+  ('Supermercado', 'variable', 'supermercado'),
+  ('Casa comercial', 'variable', 'casa_comercial'),
+  ('Transporte', 'variable', 'transporte'),
+  ('Suscripciones', 'fijo', 'suscripcion'),
+  ('Educación', 'variable', null),
+  ('Ahorro', 'variable', null),
+  ('Salud', 'variable', null),
+  ('Otro', 'variable', null);
 
 -- ---------------------------------------------------------------------------
 -- ENTIDADES (medios de pago / tarjetas / créditos)

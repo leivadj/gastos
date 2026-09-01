@@ -30,6 +30,7 @@ export function PersonaBreakdown({
   const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "Sin categoría";
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
   const marcaDeEntidad = (id: string | null) => resolverMarca(entidadDe(id), marcas);
+  const marcaDe = (id: string | null) => marcas.find((m) => m.id === id) ?? null;
 
   const items = [
     ...cuotasPersona.map((c) => ({
@@ -37,6 +38,7 @@ export function PersonaBreakdown({
       descripcion: c.descripcion,
       categoria: nombreCategoria(c.categoria_id),
       entidad_id: c.entidad_id,
+      marca_id: c.marca_id,
       icono: c.icono,
       detalle: `Cuota ${c.cuota_actual} de ${c.n_cuotas}`,
       monto: c.monto_persona,
@@ -46,6 +48,7 @@ export function PersonaBreakdown({
       descripcion: g.descripcion,
       categoria: nombreCategoria(g.categoria_id),
       entidad_id: g.entidad_id,
+      marca_id: g.marca_id,
       icono: g.icono,
       detalle: "Gasto fijo",
       monto: g.monto_persona,
@@ -94,7 +97,7 @@ export function PersonaBreakdown({
             <div key={it.key} className="flex items-center gap-3 py-2.5">
               <EntidadAvatar
                 entidad={entidadDe(it.entidad_id) ?? undefined}
-                marca={marcaDeEntidad(it.entidad_id)}
+                marca={marcaDe(it.marca_id) ?? marcaDeEntidad(it.entidad_id)}
                 icono={it.icono}
                 className="h-8 w-8"
               />

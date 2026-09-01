@@ -20,6 +20,7 @@ const TIPOS: { value: TipoMarca; label: string }[] = [
   { value: "transporte", label: "Pasajes (bus, avión)" },
   { value: "compras_online", label: "Compras online" },
   { value: "delivery", label: "Delivery (comida, encargos)" },
+  { value: "suscripcion", label: "Suscripción (streaming, apps...)" },
   { value: "otro", label: "Otro" },
 ];
 
@@ -71,6 +72,18 @@ export default function AdminPage() {
       .eq("id", id);
     if (dbError) {
       setError(dbError.message || "No se pudo guardar el ícono de la categoría.");
+      return;
+    }
+    cargarCategorias();
+  }
+
+  async function guardarTipoSugerido(id: string, tipoSugerido: string) {
+    const { error: dbError } = await supabase
+      .from("categorias")
+      .update({ tipo_marca_sugerido: tipoSugerido || null })
+      .eq("id", id);
+    if (dbError) {
+      setError(dbError.message || "No se pudo guardar la marca sugerida de la categoría.");
       return;
     }
     cargarCategorias();
@@ -187,7 +200,9 @@ export default function AdminPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-800">Catálogo de marcas</h1>
-          <p className="text-xs text-gray-400">Bancos, casas comerciales y servicios — con su logo.</p>
+          <p className="text-xs text-gray-400">
+            Bancos, tiendas, servicios, suscripciones y más — con su logo, para elegir al pagar o al crear un item.
+          </p>
         </div>
         <button
           onClick={() => setMostrarForm((v) => !v)}
@@ -338,8 +353,11 @@ export default function AdminPage() {
 
       <div className="space-y-2 pt-4">
         <div>
-          <h2 className="text-sm font-bold text-gray-800">Íconos de categorías</h2>
-          <p className="text-xs text-gray-400">Se muestran junto a la categoría en los gráficos y listas.</p>
+          <h2 className="text-sm font-bold text-gray-800">Categorías</h2>
+          <p className="text-xs text-gray-400">
+            Ícono, y qué marcas de arriba se ofrecen para elegir al usar esta categoría en un gasto/compra
+            (ej: &quot;Supermercado&quot; → Jumbo, Líder...).
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {categorias.map((c) => (
@@ -374,6 +392,21 @@ export default function AdminPage() {
                   cambiar ícono
                 </button>
               )}
+              <div className="mt-2">
+                <label className="text-[11px] text-gray-400">Marcas sugeridas</label>
+                <select
+                  value={c.tipo_marca_sugerido ?? ""}
+                  onChange={(e) => guardarTipoSugerido(c.id, e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs"
+                >
+                  <option value="">— Ninguna —</option>
+                  {TIPOS.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </Card>
           ))}
         </div>

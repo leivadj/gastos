@@ -35,6 +35,14 @@ create table categorias (
   nombre text not null unique,
   tipo text not null check (tipo in ('fijo', 'variable')),
   icono text, -- emoji corto, ej "🏠" — opcional, editable desde /admin
+  -- tipo de marca que se sugiere al elegir esta categoría en un item (ej:
+  -- categoría "Supermercado" -> tipo_marca_sugerido "supermercado", así el
+  -- formulario ofrece Jumbo/Líder/etc. para elegir y heredar su logo).
+  -- null = no se sugiere ninguna marca para esta categoría.
+  tipo_marca_sugerido text check (tipo_marca_sugerido in (
+    'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico',
+    'supermercado', 'transporte', 'compras_online', 'delivery', 'suscripcion', 'otro'
+  )),
   created_at timestamptz not null default now()
 );
 
@@ -51,7 +59,7 @@ create table marcas (
   nombre text not null unique,
   tipo text not null check (tipo in (
     'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico',
-    'supermercado', 'transporte', 'compras_online', 'delivery', 'otro'
+    'supermercado', 'transporte', 'compras_online', 'delivery', 'suscripcion', 'otro'
   )),
   logo_url text,
   icono text, -- emoji corto, alternativa al logo cuando no hay imagen
@@ -123,7 +131,12 @@ create table compras (
   entidad_id uuid references entidades(id),
   categoria_id uuid references categorias(id),
   grupo_id uuid references grupos(id),
-  icono text, -- emoji propio del item (opcional) — si está, se muestra antes que el logo de la entidad
+  -- marca/servicio específico del item (ej: "Jumbo", "Netflix") — distinto de
+  -- entidad_id (que es el MEDIO DE PAGO, ej. la tarjeta con la que se paga).
+  -- Se sugiere según la categoría elegida (ver categorias.tipo_marca_sugerido)
+  -- y aporta su logo/ícono al mostrar el item.
+  marca_id uuid references marcas(id),
+  icono text, -- emoji propio del item (opcional) — si está, se muestra antes que el logo de la marca/entidad
   notas text,
   created_at timestamptz not null default now()
 );
@@ -138,6 +151,7 @@ create table gastos_fijos (
   categoria_id uuid references categorias(id),
   entidad_id uuid references entidades(id),
   grupo_id uuid references grupos(id),
+  marca_id uuid references marcas(id), -- marca/servicio específico (ver comentario en compras.marca_id)
   icono text,
   monto_estimado numeric(12, 2) not null check (monto_estimado >= 0),
   dia_mes_pago int check (dia_mes_pago between 1 and 31),
@@ -212,6 +226,7 @@ select
   c.entidad_id,
   c.categoria_id,
   c.grupo_id,
+  c.marca_id,
   c.icono,
   c.notas,
   round(c.monto_total / c.n_cuotas, 0) as monto_cuota,
@@ -273,6 +288,7 @@ select
   v.categoria_id,
   v.entidad_id,
   v.grupo_id,
+  v.marca_id,
   v.icono,
   v.monto_cuota,
   v.cuota_actual,
@@ -300,6 +316,7 @@ select
   g.categoria_id,
   g.entidad_id,
   g.grupo_id,
+  g.marca_id,
   g.icono,
   g.monto_estimado,
   r.persona_id,

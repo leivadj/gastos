@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { IconoPicker } from "@/components/IconoPicker";
+import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { formatCLP } from "@/lib/format";
 import { resolverMarca } from "@/lib/resolverMarca";
@@ -30,6 +31,7 @@ export default function GastosFijosPage() {
   const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [grupoId, setGrupoId] = useState("");
+  const [marcaId, setMarcaId] = useState("");
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
 
@@ -71,6 +73,7 @@ export default function GastosFijosPage() {
     setEntidadId("");
     setCategoriaId("");
     setGrupoId("");
+    setMarcaId("");
     setIcono("");
     setParticipantes([]);
     setError("");
@@ -84,6 +87,7 @@ export default function GastosFijosPage() {
     setEntidadId(g.entidad_id ?? "");
     setCategoriaId(g.categoria_id ?? "");
     setGrupoId(g.grupo_id ?? "");
+    setMarcaId(g.marca_id ?? "");
     setIcono(g.icono ?? "");
     setParticipantes(
       (participantesPorItem[g.id] ?? []).map((row) => ({ persona_id: row.persona_id, porcentaje: row.porcentaje }))
@@ -122,6 +126,7 @@ export default function GastosFijosPage() {
         entidad_id: entidadId || null,
         categoria_id: categoriaId || null,
         grupo_id: grupoId || null,
+        marca_id: marcaId || null,
         icono: icono || null,
         activo: true,
       };
@@ -155,9 +160,12 @@ export default function GastosFijosPage() {
 
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
   const marcaDeEntidad = (id: string | null) => resolverMarca(entidadDe(id), marcas);
+  const marcaDe = (id: string | null) => marcas.find((m) => m.id === id) ?? null;
   const nombreEntidad = (id: string | null) => entidadDe(id)?.nombre ?? null;
-  const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "—";
+  const categoriaDe = (id: string | null) => categorias.find((c) => c.id === id) ?? null;
+  const nombreCategoria = (id: string | null) => categoriaDe(id)?.nombre ?? "—";
   const grupoDe = (id: string | null) => grupos.find((g) => g.id === id) ?? null;
+  const categoriaSeleccionada = categoriaDe(categoriaId || null);
   const total = gastos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
 
   function resumenReparto(g: GastoFijo) {
@@ -236,7 +244,13 @@ export default function GastosFijosPage() {
               <label className="text-xs text-gray-500">Categoría</label>
               <select
                 value={categoriaId}
-                onChange={(e) => setCategoriaId(e.target.value)}
+                onChange={(e) => {
+                  const nuevaCategoria = categorias.find((c) => c.id === e.target.value) ?? null;
+                  if (nuevaCategoria?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) {
+                    setMarcaId("");
+                  }
+                  setCategoriaId(e.target.value);
+                }}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               >
                 <option value="">—</option>
@@ -247,6 +261,22 @@ export default function GastosFijosPage() {
                 ))}
               </select>
             </div>
+            {categoriaSeleccionada?.tipo_marca_sugerido && (
+              <div>
+                <label className="text-xs text-gray-500">
+                  ¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)
+                </label>
+                <div className="mt-1">
+                  <MarcaSugeridaPicker
+                    marcas={marcas}
+                    tipo={categoriaSeleccionada.tipo_marca_sugerido}
+                    value={marcaId}
+                    onChange={setMarcaId}
+                    onCatalogoActualizado={cargarTodo}
+                  />
+                </div>
+              </div>
+            )}
             <div>
               <label className="text-xs text-gray-500">Grupo (opcional)</label>
               <select
@@ -306,13 +336,15 @@ export default function GastosFijosPage() {
       </Card>
 
       <div className="space-y-3">
-        {gastos.map((g) => (
+        {gastos.map((g) => {
+          const marcaItem = marcaDe(g.marca_id);
+          return (
           <Card key={g.id}>
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-start gap-3">
                 <EntidadAvatar
                   entidad={entidadDe(g.entidad_id)}
-                  marca={marcaDeEntidad(g.entidad_id)}
+                  marca={marcaItem ?? marcaDeEntidad(g.entidad_id)}
                   icono={g.icono}
                   className="h-9 w-9"
                 />
@@ -320,7 +352,8 @@ export default function GastosFijosPage() {
                   <p className="font-semibold text-gray-800">{g.descripcion}</p>
                   <p className="text-xs text-gray-400">
                     {nombreEntidad(g.entidad_id) ? `${nombreEntidad(g.entidad_id)} · ` : ""}
-                    {nombreCategoria(g.categoria_id)} · día {g.dia_mes_pago ?? "—"} · {resumenReparto(g)}
+                    {nombreCategoria(g.categoria_id)}
+                    {marcaItem ? ` (${marcaItem.nombre})` : ""} · día {g.dia_mes_pago ?? "—"} · {resumenReparto(g)}
                   </p>
                 </div>
               </div>
@@ -335,7 +368,8 @@ export default function GastosFijosPage() {
             </div>
             <p className="mt-2 text-right font-semibold text-gray-800">{formatCLP(g.monto_estimado)}</p>
           </Card>
-        ))}
+          );
+        })}
         {gastos.length === 0 && <p className="text-center text-sm text-gray-400">Aún no hay gastos fijos.</p>}
       </div>
     </div>

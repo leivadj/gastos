@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { IconoPicker } from "@/components/IconoPicker";
+import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { formatCLP } from "@/lib/format";
 import { resolverMarca } from "@/lib/resolverMarca";
@@ -32,6 +33,7 @@ export default function ComprasPage() {
   const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [grupoId, setGrupoId] = useState("");
+  const [marcaId, setMarcaId] = useState("");
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
 
@@ -74,6 +76,7 @@ export default function ComprasPage() {
     setEntidadId("");
     setCategoriaId("");
     setGrupoId("");
+    setMarcaId("");
     setIcono("");
     setParticipantes([]);
     setError("");
@@ -88,6 +91,7 @@ export default function ComprasPage() {
     setEntidadId(c.entidad_id ?? "");
     setCategoriaId(c.categoria_id ?? "");
     setGrupoId(c.grupo_id ?? "");
+    setMarcaId(c.marca_id ?? "");
     setIcono(c.icono ?? "");
     setParticipantes(
       (participantesPorItem[c.compra_id] ?? []).map((row) => ({ persona_id: row.persona_id, porcentaje: row.porcentaje }))
@@ -127,6 +131,7 @@ export default function ComprasPage() {
         entidad_id: entidadId || null,
         categoria_id: categoriaId || null,
         grupo_id: grupoId || null,
+        marca_id: marcaId || null,
         icono: icono || null,
       };
       let compraId = editandoId;
@@ -160,9 +165,12 @@ export default function ComprasPage() {
 
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
   const marcaDeEntidad = (id: string | null) => resolverMarca(entidadDe(id), marcas);
+  const marcaDe = (id: string | null) => marcas.find((m) => m.id === id) ?? null;
   const nombreEntidad = (id: string | null) => entidadDe(id)?.nombre ?? "—";
-  const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "—";
+  const categoriaDe = (id: string | null) => categorias.find((c) => c.id === id) ?? null;
+  const nombreCategoria = (id: string | null) => categoriaDe(id)?.nombre ?? "—";
   const grupoDe = (id: string | null) => grupos.find((g) => g.id === id) ?? null;
+  const categoriaSeleccionada = categoriaDe(categoriaId || null);
 
   function resumenReparto(c: CompraVigente) {
     if (c.grupo_id) return `Grupo: ${grupoDe(c.grupo_id)?.nombre ?? "—"}`;
@@ -258,7 +266,13 @@ export default function ComprasPage() {
               <label className="text-xs text-gray-500">Categoría</label>
               <select
                 value={categoriaId}
-                onChange={(e) => setCategoriaId(e.target.value)}
+                onChange={(e) => {
+                  const nuevaCategoria = categorias.find((c) => c.id === e.target.value) ?? null;
+                  if (nuevaCategoria?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) {
+                    setMarcaId("");
+                  }
+                  setCategoriaId(e.target.value);
+                }}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               >
                 <option value="">—</option>
@@ -269,6 +283,22 @@ export default function ComprasPage() {
                 ))}
               </select>
             </div>
+            {categoriaSeleccionada?.tipo_marca_sugerido && (
+              <div>
+                <label className="text-xs text-gray-500">
+                  ¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)
+                </label>
+                <div className="mt-1">
+                  <MarcaSugeridaPicker
+                    marcas={marcas}
+                    tipo={categoriaSeleccionada.tipo_marca_sugerido}
+                    value={marcaId}
+                    onChange={setMarcaId}
+                    onCatalogoActualizado={cargarTodo}
+                  />
+                </div>
+              </div>
+            )}
             <div>
               <label className="text-xs text-gray-500">Grupo (opcional)</label>
               <select
@@ -324,20 +354,22 @@ export default function ComprasPage() {
         {compras.map((c) => {
           const activa = c.cuota_actual >= 1 && c.cuota_actual <= c.n_cuotas;
           const progreso = Math.min(100, Math.max(0, (c.cuota_actual / c.n_cuotas) * 100));
+          const marcaItem = marcaDe(c.marca_id);
           return (
             <Card key={c.compra_id} className={!activa ? "opacity-50" : ""}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
                   <EntidadAvatar
                     entidad={entidadDe(c.entidad_id)}
-                    marca={marcaDeEntidad(c.entidad_id)}
+                    marca={marcaItem ?? marcaDeEntidad(c.entidad_id)}
                     icono={c.icono}
                     className="h-9 w-9"
                   />
                   <div>
                     <p className="font-semibold text-gray-800">{c.descripcion}</p>
                     <p className="text-xs text-gray-400">
-                      {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)} · {resumenReparto(c)}
+                      {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)}
+                      {marcaItem ? ` (${marcaItem.nombre})` : ""} · {resumenReparto(c)}
                     </p>
                   </div>
                 </div>

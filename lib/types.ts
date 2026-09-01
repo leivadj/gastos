@@ -10,6 +10,10 @@ export interface Categoria {
   nombre: string;
   tipo: "fijo" | "variable";
   icono: string | null;
+  // Tipo de marca que se sugiere al elegir esta categoría en un item (ej:
+  // "Supermercado" -> "supermercado", así se ofrecen Jumbo/Líder/etc.).
+  // null = no se sugiere ninguna.
+  tipo_marca_sugerido: TipoMarca | null;
 }
 
 export interface Entidad {
@@ -36,6 +40,7 @@ export type TipoMarca =
   | "transporte"
   | "compras_online"
   | "delivery"
+  | "suscripcion"
   | "otro";
 
 export interface Marca {
@@ -83,6 +88,9 @@ export interface Compra {
   entidad_id: string | null;
   categoria_id: string | null;
   grupo_id: string | null;
+  // Marca/servicio específico del item (ej: "Jumbo", "Netflix") — distinto
+  // de entidad_id (el MEDIO DE PAGO, ej. la tarjeta con la que se paga).
+  marca_id: string | null;
   icono: string | null;
   notas: string | null;
 }
@@ -105,6 +113,7 @@ export interface RepartoCuota {
   categoria_id: string | null;
   entidad_id: string | null;
   grupo_id: string | null;
+  marca_id: string | null;
   icono: string | null;
   monto_cuota: number;
   cuota_actual: number;
@@ -121,6 +130,7 @@ export interface RepartoGastoFijo {
   categoria_id: string | null;
   entidad_id: string | null;
   grupo_id: string | null;
+  marca_id: string | null;
   icono: string | null;
   monto_estimado: number;
   persona_id: string;
@@ -134,6 +144,7 @@ export interface GastoFijo {
   categoria_id: string | null;
   entidad_id: string | null;
   grupo_id: string | null;
+  marca_id: string | null;
   icono: string | null;
   monto_estimado: number;
   dia_mes_pago: number | null;

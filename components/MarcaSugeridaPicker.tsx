@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Entidad, Marca, TipoMarca } from "@/lib/types";
+import { Marca, TipoMarca } from "@/lib/types";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { IconoPicker } from "@/components/IconoPicker";
-import { resolverMarca } from "@/lib/resolverMarca";
 import { supabase } from "@/lib/supabaseClient";
 
 const TIPOS_MARCA: { value: TipoMarca; label: string }[] = [
@@ -22,88 +21,55 @@ const TIPOS_MARCA: { value: TipoMarca; label: string }[] = [
   { value: "otro", label: "Otro" },
 ];
 
-function tipoEntidadPorMarca(tipoMarca: TipoMarca): Entidad["tipo"] {
-  if (tipoMarca === "banco") return "tarjeta_credito";
-  if (tipoMarca === "caja_compensacion") return "linea_credito";
-  return "efectivo";
-}
-
-// Elegir un medio de pago: entre los que ya tienes, o buscando en el
-// catálogo compartido de marcas (bancos, casas comerciales, servicios como
-// "Aguas Andinas") — y si el catálogo todavía no la tiene, agregarla ahí
-// mismo con su propio ícono, sin salir del formulario.
-export function EntidadPicker({
-  entidades,
+// Elegir la marca/servicio específico de un item (ej: "Jumbo" en un gasto de
+// Supermercado, "Netflix" en uno de Suscripciones) — distinto del medio de
+// pago. Muestra las marcas del catálogo compartido que coinciden con el tipo
+// sugerido por la categoría elegida, y permite agregar una nueva ahí mismo
+// si no está (con su propio ícono), sin salir del formulario.
+export function MarcaSugeridaPicker({
   marcas,
+  tipo,
   value,
   onChange,
   onCatalogoActualizado,
 }: {
-  entidades: Entidad[];
   marcas: Marca[];
+  tipo: TipoMarca;
   value: string;
   onChange: (id: string) => void;
   onCatalogoActualizado?: () => void | Promise<void>;
 }) {
   const [buscando, setBuscando] = useState(false);
   const [texto, setTexto] = useState("");
-  const [tipoNuevaMarca, setTipoNuevaMarca] = useState<TipoMarca>("servicio_basico");
-  const [iconoNuevaMarca, setIconoNuevaMarca] = useState("");
+  const [iconoNueva, setIconoNueva] = useState("");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
-  const nombresYaAgregados = new Set(entidades.map((e) => e.nombre.trim().toLowerCase()));
+  const delTipo = marcas.filter((m) => m.tipo === tipo);
   const textoNorm = texto.trim().toLowerCase();
   const coincidencias = textoNorm
-    ? marcas.filter((m) => m.nombre.toLowerCase().includes(textoNorm) && !nombresYaAgregados.has(m.nombre.trim().toLowerCase()))
+    ? delTipo.filter((m) => m.nombre.toLowerCase().includes(textoNorm) && m.id !== value)
     : [];
-  const marcaExacta = marcas.find((m) => m.nombre.trim().toLowerCase() === textoNorm);
+  const marcaExacta = delTipo.find((m) => m.nombre.trim().toLowerCase() === textoNorm);
 
   function cerrarBusqueda() {
     setBuscando(false);
     setTexto("");
-    setIconoNuevaMarca("");
-    setTipoNuevaMarca("servicio_basico");
+    setIconoNueva("");
     setError("");
   }
 
-  async function crearEntidadDesdeMarca(marca: Marca) {
+  async function agregarMarca() {
     setError("");
     setGuardando(true);
     try {
       const { data, error: insError } = await supabase
-        .from("entidades")
-        .insert({ nombre: marca.nombre, tipo: tipoEntidadPorMarca(marca.tipo), marca_id: marca.id })
+        .from("marcas")
+        .insert({ nombre: texto.trim(), tipo, icono: iconoNueva || null })
         .select()
         .single();
       if (insError) throw insError;
       onChange(data.id);
-      cerrarBusqueda();
-      if (onCatalogoActualizado) await onCatalogoActualizado();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo agregar.");
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  async function agregarMarcaYUsarla() {
-    setError("");
-    setGuardando(true);
-    try {
-      const { data: marca, error: marcaError } = await supabase
-        .from("marcas")
-        .insert({ nombre: texto.trim(), tipo: tipoNuevaMarca, icono: iconoNuevaMarca || null })
-        .select()
-        .single();
-      if (marcaError) throw marcaError;
-      const { data: entidad, error: insError } = await supabase
-        .from("entidades")
-        .insert({ nombre: marca.nombre, tipo: tipoEntidadPorMarca(tipoNuevaMarca), marca_id: marca.id })
-        .select()
-        .single();
-      if (insError) throw insError;
-      onChange(entidad.id);
       cerrarBusqueda();
       if (onCatalogoActualizado) await onCatalogoActualizado();
     } catch (err) {
@@ -112,6 +78,8 @@ export function EntidadPicker({
       setGuardando(false);
     }
   }
+
+  const label = TIPOS_MARCA.find((t) => t.value === tipo)?.label ?? tipo;
 
   return (
     <div>
@@ -127,21 +95,21 @@ export function EntidadPicker({
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
             —
           </span>
-          <span className="text-center text-[10px] text-gray-500">Sin dato</span>
+          <span className="text-center text-[10px] text-gray-500">Ninguna</span>
         </button>
-        {entidades.map((e) => (
+        {delTipo.map((m) => (
           <button
             type="button"
-            key={e.id}
-            onClick={() => onChange(e.id === value ? "" : e.id)}
+            key={m.id}
+            onClick={() => onChange(m.id === value ? "" : m.id)}
             className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-              value === e.id ? "border-brand-from bg-purple-50" : "border-gray-200"
+              value === m.id ? "border-brand-from bg-purple-50" : "border-gray-200"
             }`}
             style={{ width: 64 }}
           >
-            <EntidadAvatar entidad={e} marca={resolverMarca(e, marcas)} className="h-9 w-9" />
+            <EntidadAvatar marca={m} nombreFallback={m.nombre} className="h-9 w-9" />
             <span className="truncate text-center text-[10px] text-gray-600" style={{ maxWidth: 60 }}>
-              {e.nombre}
+              {m.nombre}
             </span>
           </button>
         ))}
@@ -166,7 +134,7 @@ export function EntidadPicker({
             autoFocus
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            placeholder="Ej: Aguas Andinas"
+            placeholder={`Buscar en ${label.toLowerCase()}`}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
           />
 
@@ -176,9 +144,11 @@ export function EntidadPicker({
                 <button
                   type="button"
                   key={m.id}
-                  onClick={() => crearEntidadDesdeMarca(m)}
-                  disabled={guardando}
-                  className="flex w-full items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 text-left hover:border-brand-from disabled:opacity-60"
+                  onClick={() => {
+                    onChange(m.id);
+                    cerrarBusqueda();
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 text-left hover:border-brand-from"
                 >
                   <EntidadAvatar marca={m} nombreFallback={m.nombre} className="h-7 w-7" />
                   <span className="text-sm text-gray-700">{m.nombre}</span>
@@ -187,26 +157,15 @@ export function EntidadPicker({
             </div>
           )}
 
-          {textoNorm && !marcaExacta && !nombresYaAgregados.has(textoNorm) && (
+          {textoNorm && !marcaExacta && (
             <div className="space-y-2 rounded-lg bg-purple-50 p-2">
               <p className="text-xs text-brand-from">
-                &quot;{texto.trim()}&quot; no está en el catálogo — agrégalo:
+                &quot;{texto.trim()}&quot; no está en {label.toLowerCase()} — agrégalo:
               </p>
-              <select
-                value={tipoNuevaMarca}
-                onChange={(e) => setTipoNuevaMarca(e.target.value as TipoMarca)}
-                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs"
-              >
-                {TIPOS_MARCA.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-              <IconoPicker value={iconoNuevaMarca} onChange={setIconoNuevaMarca} />
+              <IconoPicker value={iconoNueva} onChange={setIconoNueva} />
               <button
                 type="button"
-                onClick={agregarMarcaYUsarla}
+                onClick={agregarMarca}
                 disabled={guardando}
                 className="w-full rounded-lg bg-brand-gradient py-2 text-xs font-semibold text-white disabled:opacity-60"
               >
@@ -221,12 +180,6 @@ export function EntidadPicker({
             cerrar
           </button>
         </div>
-      )}
-
-      {entidades.length === 0 && !buscando && (
-        <p className="mt-1 py-1 text-xs text-gray-400">
-          Aún no tienes tarjetas o cuentas — créalas aquí o en &quot;Gestionar tus tarjetas y cuentas&quot;.
-        </p>
       )}
     </div>
   );

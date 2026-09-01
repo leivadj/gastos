@@ -89,6 +89,19 @@ insert into marcas (nombre, tipo) values
   ('PedidosYa', 'delivery'),
   ('Cornershop', 'delivery'),
 
+  -- Suscripciones (streaming, apps, membresías)
+  ('Netflix', 'suscripcion'),
+  ('Disney+', 'suscripcion'),
+  ('HBO Max', 'suscripcion'),
+  ('Amazon Prime Video', 'suscripcion'),
+  ('Spotify', 'suscripcion'),
+  ('YouTube Premium', 'suscripcion'),
+  ('iCloud', 'suscripcion'),
+  ('ChatGPT Plus', 'suscripcion'),
+  ('Claude Pro', 'suscripcion'),
+  ('Paramount+', 'suscripcion'),
+  ('Star+', 'suscripcion'),
+
   -- Otro (pago de cuentas, varios)
   ('Unired', 'otro'),
   ('Servipag', 'otro')
