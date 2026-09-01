@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { Entidad, Marca } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
+import { resolverMarca } from "@/lib/resolverMarca";
 
 const TIPOS: { value: Entidad["tipo"]; label: string }[] = [
   { value: "tarjeta_credito", label: "Tarjeta de crédito" },
@@ -226,7 +227,7 @@ export default function TarjetasPage() {
 
       <div className="space-y-3">
         {entidades.map((e) => {
-          const marca = marcaDe(e.marca_id);
+          const marca = resolverMarca(e, marcas);
           return (
             <Card key={e.id}>
               <div className="flex items-center justify-between">

@@ -2,6 +2,7 @@
 
 import { Entidad, Marca } from "@/lib/types";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { resolverMarca } from "@/lib/resolverMarca";
 
 export function EntidadPicker({
   entidades,
@@ -14,8 +15,6 @@ export function EntidadPicker({
   value: string;
   onChange: (id: string) => void;
 }) {
-  const marcaDe = (id: string | null) => marcas.find((m) => m.id === id) ?? null;
-
   return (
     <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
       <button
@@ -41,7 +40,7 @@ export function EntidadPicker({
           }`}
           style={{ width: 64 }}
         >
-          <EntidadAvatar entidad={e} marca={marcaDe(e.marca_id)} className="h-9 w-9" />
+          <EntidadAvatar entidad={e} marca={resolverMarca(e, marcas)} className="h-9 w-9" />
           <span className="truncate text-center text-[10px] text-gray-600" style={{ maxWidth: 60 }}>
             {e.nombre}
           </span>

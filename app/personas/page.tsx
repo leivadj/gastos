@@ -3,18 +3,27 @@
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
-import { Persona } from "@/lib/types";
+import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
+import { Ingreso, Persona, ResumenPersonaMes } from "@/lib/types";
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [resumen, setResumen] = useState<ResumenPersonaMes[]>([]);
+  const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
 
   async function cargar() {
-    const { data } = await supabase.from("personas").select("*").order("nombre");
-    setPersonas((data as Persona[]) ?? []);
+    const [{ data: p }, { data: r }, { data: i }] = await Promise.all([
+      supabase.from("personas").select("*").order("nombre"),
+      supabase.from("vista_resumen_personas_mes").select("*"),
+      supabase.from("ingresos").select("*"),
+    ]);
+    setPersonas((p as Persona[]) ?? []);
+    setResumen((r as ResumenPersonaMes[]) ?? []);
+    setIngresos((i as Ingreso[]) ?? []);
   }
 
   useEffect(() => {
@@ -41,13 +50,23 @@ export default function PersonasPage() {
     cargar();
   }
 
+  const mesActualPrefix = mesActualISO().slice(0, 7); // "AAAA-MM"
+  function debeEstaPersona(personaId: string) {
+    return resumen.find((r) => r.persona_id === personaId)?.total ?? 0;
+  }
+  function ingresoEstaPersona(personaId: string) {
+    return ingresos
+      .filter((i) => i.persona_id === personaId && i.mes.slice(0, 7) === mesActualPrefix)
+      .reduce((acc, i) => acc + Number(i.monto), 0);
+  }
+
   return (
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-800">Personas</h1>
-          <p className="text-xs text-gray-400">
-            El reparto entre personas ahora se define en cada gasto/compra o en Grupos.
+          <p className="text-xs capitalize text-gray-400">
+            Lo que debe e ingresó cada una en {nombreMes()}. El reparto se define en cada gasto/compra o en Grupos.
           </p>
         </div>
         <button
@@ -91,6 +110,16 @@ export default function PersonasPage() {
                 <button onClick={() => desactivar(p.id)} className="text-xs text-gray-300 hover:text-red-400">
                   quitar
                 </button>
+              </div>
+              <div className="mt-2 flex items-center justify-between text-sm">
+                <div>
+                  <p className="text-[11px] text-gray-400">Debe este mes</p>
+                  <p className="font-semibold text-gray-800">{formatCLP(debeEstaPersona(p.id))}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[11px] text-gray-400">Ingresó este mes</p>
+                  <p className="font-semibold text-gray-800">{formatCLP(ingresoEstaPersona(p.id))}</p>
+                </div>
               </div>
             </Card>
           ))}

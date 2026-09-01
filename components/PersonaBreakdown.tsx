@@ -3,6 +3,7 @@
 import { Categoria, Entidad, Marca, RepartoCuota, RepartoGastoFijo } from "@/lib/types";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { formatCLP } from "@/lib/format";
+import { resolverMarca } from "@/lib/resolverMarca";
 import { exportarDesglosePersonaPdf } from "@/lib/exportarPdf";
 
 export function PersonaBreakdown({
@@ -28,10 +29,7 @@ export function PersonaBreakdown({
 }) {
   const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "Sin categoría";
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
-  const marcaDeEntidad = (id: string | null) => {
-    const e = entidadDe(id);
-    return e?.marca_id ? marcas.find((m) => m.id === e.marca_id) ?? null : null;
-  };
+  const marcaDeEntidad = (id: string | null) => resolverMarca(entidadDe(id), marcas);
 
   const items = [
     ...cuotasPersona.map((c) => ({
@@ -39,6 +37,7 @@ export function PersonaBreakdown({
       descripcion: c.descripcion,
       categoria: nombreCategoria(c.categoria_id),
       entidad_id: c.entidad_id,
+      icono: c.icono,
       detalle: `Cuota ${c.cuota_actual} de ${c.n_cuotas}`,
       monto: c.monto_persona,
     })),
@@ -47,6 +46,7 @@ export function PersonaBreakdown({
       descripcion: g.descripcion,
       categoria: nombreCategoria(g.categoria_id),
       entidad_id: g.entidad_id,
+      icono: g.icono,
       detalle: "Gasto fijo",
       monto: g.monto_persona,
     })),
@@ -92,7 +92,12 @@ export function PersonaBreakdown({
           {items.length === 0 && <p className="py-4 text-sm text-gray-400">Sin ítems este mes.</p>}
           {items.map((it) => (
             <div key={it.key} className="flex items-center gap-3 py-2.5">
-              <EntidadAvatar entidad={entidadDe(it.entidad_id) ?? undefined} marca={marcaDeEntidad(it.entidad_id)} className="h-8 w-8" />
+              <EntidadAvatar
+                entidad={entidadDe(it.entidad_id) ?? undefined}
+                marca={marcaDeEntidad(it.entidad_id)}
+                icono={it.icono}
+                className="h-8 w-8"
+              />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-gray-700">{it.descripcion}</p>
                 <p className="text-xs text-gray-400">

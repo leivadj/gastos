@@ -8,6 +8,7 @@ import { EntidadPicker } from "@/components/EntidadPicker";
 import { IconoPicker } from "@/components/IconoPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { formatCLP } from "@/lib/format";
+import { resolverMarca } from "@/lib/resolverMarca";
 import { Categoria, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
 
 export default function GastosFijosPage() {
@@ -153,10 +154,7 @@ export default function GastosFijosPage() {
   }
 
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
-  const marcaDeEntidad = (id: string | null) => {
-    const e = entidadDe(id);
-    return e?.marca_id ? marcas.find((m) => m.id === e.marca_id) ?? null : null;
-  };
+  const marcaDeEntidad = (id: string | null) => resolverMarca(entidadDe(id), marcas);
   const nombreEntidad = (id: string | null) => entidadDe(id)?.nombre ?? null;
   const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "—";
   const grupoDe = (id: string | null) => grupos.find((g) => g.id === id) ?? null;
