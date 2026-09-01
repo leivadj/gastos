@@ -1,4 +1,8 @@
-export const ADMIN_EMAIL = "leivadj@gmail.com";
+export const ADMIN_EMAILS = ["leivadj@gmail.com", "marianps.260290@gmail.com"];
+
+export function esAdmin(email?: string | null): boolean {
+  return !!email && ADMIN_EMAILS.includes(email);
+}
 
 export const navItems = [
   {

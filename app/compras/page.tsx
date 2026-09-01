@@ -18,6 +18,7 @@ export default function ComprasPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const [descripcion, setDescripcion] = useState("");
   const [montoTotal, setMontoTotal] = useState("");
@@ -58,6 +59,7 @@ export default function ComprasPage() {
     setCategoriaId("");
     setModoReparto("manual");
     setPersonaId("");
+    setError("");
   }
 
   function iniciarEdicion(c: CompraVigente) {
@@ -75,6 +77,7 @@ export default function ComprasPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
     setGuardando(true);
     const payload = {
       descripcion,
@@ -86,18 +89,24 @@ export default function ComprasPage() {
       modo_reparto: modoReparto,
       persona_id: modoReparto === "manual" ? personaId || null : null,
     };
-    if (editandoId) {
-      await supabase.from("compras").update(payload).eq("id", editandoId);
-    } else {
-      await supabase.from("compras").insert(payload);
-    }
+    const { error: dbError } = editandoId
+      ? await supabase.from("compras").update(payload).eq("id", editandoId)
+      : await supabase.from("compras").insert(payload);
     setGuardando(false);
+    if (dbError) {
+      setError(dbError.message || "No se pudo guardar. Intenta de nuevo.");
+      return;
+    }
     cancelarForm();
     cargarTodo();
   }
 
   async function eliminar(id: string) {
-    await supabase.from("compras").delete().eq("id", id);
+    const { error: dbError } = await supabase.from("compras").delete().eq("id", id);
+    if (dbError) {
+      setError(dbError.message || "No se pudo eliminar.");
+      return;
+    }
     cargarTodo();
   }
 
@@ -242,6 +251,7 @@ export default function ComprasPage() {
                 </select>
               </div>
             )}
+            {error && <p className="text-xs text-red-500">{error}</p>}
             <button
               type="submit"
               disabled={guardando}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { ADMIN_EMAIL, adminNavItem, navItems } from "@/components/navItems";
+import { adminNavItem, esAdmin as checkEsAdmin, navItems } from "@/components/navItems";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -12,10 +12,10 @@ export function BottomNav() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setEsAdmin(data.session?.user?.email === ADMIN_EMAIL);
+      setEsAdmin(checkEsAdmin(data.session?.user?.email));
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
-      setEsAdmin(s?.user?.email === ADMIN_EMAIL);
+      setEsAdmin(checkEsAdmin(s?.user?.email));
     });
     return () => sub.subscription.unsubscribe();
   }, []);

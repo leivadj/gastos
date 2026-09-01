@@ -21,6 +21,7 @@ export default function TarjetasPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<Entidad["tipo"]>("tarjeta_credito");
@@ -87,6 +88,7 @@ export default function TarjetasPage() {
     setTipo("tarjeta_credito");
     setMarcaId("");
     setMarcaAutodetectada(false);
+    setError("");
   }
 
   function iniciarEdicion(e: Entidad) {
@@ -100,24 +102,31 @@ export default function TarjetasPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
     setGuardando(true);
     const payload = {
       nombre,
       tipo,
       marca_id: marcaId || null,
     };
-    if (editandoId) {
-      await supabase.from("entidades").update(payload).eq("id", editandoId);
-    } else {
-      await supabase.from("entidades").insert(payload);
-    }
+    const { error: dbError } = editandoId
+      ? await supabase.from("entidades").update(payload).eq("id", editandoId)
+      : await supabase.from("entidades").insert(payload);
     setGuardando(false);
+    if (dbError) {
+      setError(dbError.message || "No se pudo guardar. Intenta de nuevo.");
+      return;
+    }
     cancelarForm();
     cargarTodo();
   }
 
   async function eliminar(id: string) {
-    await supabase.from("entidades").delete().eq("id", id);
+    const { error: dbError } = await supabase.from("entidades").delete().eq("id", id);
+    if (dbError) {
+      setError(dbError.message || "No se pudo eliminar.");
+      return;
+    }
     cargarTodo();
   }
 
@@ -203,6 +212,7 @@ export default function TarjetasPage() {
                 ))}
               </select>
             </div>
+            {error && <p className="text-xs text-red-500">{error}</p>}
             <button
               type="submit"
               disabled={guardando}

@@ -6,8 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { Marca, TipoMarca } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
-
-const ADMIN_EMAIL = "leivadj@gmail.com";
+import { esAdmin as checkEsAdmin } from "@/components/navItems";
 
 const TIPOS: { value: TipoMarca; label: string }[] = [
   { value: "banco", label: "Banco" },
@@ -37,7 +36,7 @@ export default function AdminPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const esAdmin = session?.user?.email === ADMIN_EMAIL;
+  const esAdmin = checkEsAdmin(session?.user?.email);
 
   async function cargarMarcas() {
     const { data } = await supabase.from("marcas").select("*").order("nombre");

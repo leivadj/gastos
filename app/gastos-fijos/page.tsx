@@ -17,6 +17,7 @@ export default function GastosFijosPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
@@ -55,6 +56,7 @@ export default function GastosFijosPage() {
     setCategoriaId("");
     setModoReparto("automatico");
     setPersonaId("");
+    setError("");
   }
 
   function iniciarEdicion(g: GastoFijo) {
@@ -71,6 +73,7 @@ export default function GastosFijosPage() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    setError("");
     setGuardando(true);
     const payload = {
       descripcion,
@@ -82,18 +85,24 @@ export default function GastosFijosPage() {
       persona_id: modoReparto === "manual" ? personaId || null : null,
       activo: true,
     };
-    if (editandoId) {
-      await supabase.from("gastos_fijos").update(payload).eq("id", editandoId);
-    } else {
-      await supabase.from("gastos_fijos").insert(payload);
-    }
+    const { error: dbError } = editandoId
+      ? await supabase.from("gastos_fijos").update(payload).eq("id", editandoId)
+      : await supabase.from("gastos_fijos").insert(payload);
     setGuardando(false);
+    if (dbError) {
+      setError(dbError.message || "No se pudo guardar. Intenta de nuevo.");
+      return;
+    }
     cancelarForm();
     cargarTodo();
   }
 
   async function desactivar(id: string) {
-    await supabase.from("gastos_fijos").update({ activo: false }).eq("id", id);
+    const { error: dbError } = await supabase.from("gastos_fijos").update({ activo: false }).eq("id", id);
+    if (dbError) {
+      setError(dbError.message || "No se pudo quitar.");
+      return;
+    }
     cargarTodo();
   }
 
@@ -221,6 +230,7 @@ export default function GastosFijosPage() {
                 </select>
               </div>
             )}
+            {error && <p className="text-xs text-red-500">{error}</p>}
             <button
               type="submit"
               disabled={guardando}

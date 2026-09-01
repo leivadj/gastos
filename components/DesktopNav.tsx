@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import { ADMIN_EMAIL, adminNavItem, navItems } from "@/components/navItems";
+import { adminNavItem, esAdmin as checkEsAdmin, navItems } from "@/components/navItems";
 
 export function DesktopNav() {
   const pathname = usePathname();
@@ -17,7 +17,7 @@ export function DesktopNav() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const esAdmin = session?.user?.email === ADMIN_EMAIL;
+  const esAdmin = checkEsAdmin(session?.user?.email);
   const visibles = esAdmin ? [...navItems, adminNavItem] : navItems;
 
   async function cerrarSesion() {
