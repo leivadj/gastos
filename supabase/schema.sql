@@ -44,7 +44,7 @@ create table entidades (
   owner_id uuid not null default auth.uid() references auth.users(id),
   nombre text not null,
   tipo text not null check (
-    tipo in ('efectivo', 'tarjeta_credito', 'linea_credito', 'credito_hipotecario', 'transferencia')
+    tipo in ('efectivo', 'tarjeta_credito', 'tarjeta_debito', 'linea_credito', 'credito_hipotecario', 'transferencia')
   ),
   created_at timestamptz not null default now(),
   unique (owner_id, nombre)

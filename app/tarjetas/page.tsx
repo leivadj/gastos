@@ -8,6 +8,7 @@ import { colorFor } from "@/lib/avatarColor";
 
 const TIPOS: { value: Entidad["tipo"]; label: string }[] = [
   { value: "tarjeta_credito", label: "Tarjeta de crédito" },
+  { value: "tarjeta_debito", label: "Tarjeta de débito" },
   { value: "linea_credito", label: "Línea de crédito" },
   { value: "credito_hipotecario", label: "Crédito hipotecario" },
   { value: "efectivo", label: "Efectivo" },

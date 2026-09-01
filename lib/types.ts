@@ -19,6 +19,7 @@ export interface Entidad {
   tipo:
     | "efectivo"
     | "tarjeta_credito"
+    | "tarjeta_debito"
     | "linea_credito"
     | "credito_hipotecario"
     | "transferencia";
