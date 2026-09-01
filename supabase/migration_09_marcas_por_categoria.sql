@@ -85,7 +85,6 @@ select
   c.entidad_id,
   c.categoria_id,
   c.grupo_id,
-  c.marca_id,
   c.icono,
   c.notas,
   round(c.monto_total / c.n_cuotas, 0) as monto_cuota,
@@ -93,7 +92,8 @@ select
     (extract(year from age(date_trunc('month', current_date), date_trunc('month', c.fecha_primera_cuota))) * 12
      + extract(month from age(date_trunc('month', current_date), date_trunc('month', c.fecha_primera_cuota))))
     + 1
-  )::int as cuota_actual
+  )::int as cuota_actual,
+  c.marca_id
 from compras c;
 
 create or replace view vista_cuotas_mes_actual
@@ -110,14 +110,14 @@ select
   v.categoria_id,
   v.entidad_id,
   v.grupo_id,
-  v.marca_id,
   v.icono,
   v.monto_cuota,
   v.cuota_actual,
   v.n_cuotas,
   r.persona_id,
   r.persona_nombre,
-  round(v.monto_cuota * r.porcentaje_efectivo / 100, 0) as monto_persona
+  round(v.monto_cuota * r.porcentaje_efectivo / 100, 0) as monto_persona,
+  v.marca_id
 from vista_cuotas_mes_actual v
 join lateral (
   select persona_id, persona_nombre, porcentaje_efectivo
@@ -137,12 +137,12 @@ select
   g.categoria_id,
   g.entidad_id,
   g.grupo_id,
-  g.marca_id,
   g.icono,
   g.monto_estimado,
   r.persona_id,
   r.persona_nombre,
-  round(g.monto_estimado * r.porcentaje_efectivo / 100, 0) as monto_persona
+  round(g.monto_estimado * r.porcentaje_efectivo / 100, 0) as monto_persona,
+  g.marca_id
 from gastos_fijos g
 join lateral (
   select persona_id, persona_nombre, porcentaje_efectivo
