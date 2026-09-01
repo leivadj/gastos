@@ -3,12 +3,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { EntidadPicker } from "@/components/EntidadPicker";
 import { formatCLP } from "@/lib/format";
-import { Categoria, Entidad, GastoFijo, ModoReparto, Persona } from "@/lib/types";
+import { Categoria, Entidad, GastoFijo, Marca, ModoReparto, Persona } from "@/lib/types";
 
 export default function GastosFijosPage() {
   const [gastos, setGastos] = useState<GastoFijo[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -23,14 +26,16 @@ export default function GastosFijosPage() {
   const [personaId, setPersonaId] = useState("");
 
   async function cargarTodo() {
-    const [{ data: g }, { data: e }, { data: cat }, { data: p }] = await Promise.all([
+    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }] = await Promise.all([
       supabase.from("gastos_fijos").select("*").eq("activo", true).order("descripcion"),
       supabase.from("entidades").select("*").order("nombre"),
+      supabase.from("marcas").select("*").order("nombre"),
       supabase.from("categorias").select("*").order("nombre"),
       supabase.from("personas").select("*").eq("activo", true).order("nombre"),
     ]);
     setGastos((g as GastoFijo[]) ?? []);
     setEntidades((e as Entidad[]) ?? []);
+    setMarcas((m as Marca[]) ?? []);
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
   }
@@ -64,6 +69,12 @@ export default function GastosFijosPage() {
     cargarTodo();
   }
 
+  const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
+  const marcaDeEntidad = (id: string | null) => {
+    const e = entidadDe(id);
+    return e?.marca_id ? marcas.find((m) => m.id === e.marca_id) ?? null : null;
+  };
+  const nombreEntidad = (id: string | null) => entidadDe(id)?.nombre ?? null;
   const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "—";
   const nombrePersona = (id: string | null) => personas.find((p) => p.id === id)?.nombre ?? "—";
   const total = gastos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
@@ -120,37 +131,26 @@ export default function GastosFijosPage() {
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-500">Medio de pago</label>
-                <select
-                  value={entidadId}
-                  onChange={(e) => setEntidadId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                >
-                  <option value="">—</option>
-                  {entidades.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre}
-                    </option>
-                  ))}
-                </select>
+            <div>
+              <label className="text-xs text-gray-500">Medio de pago</label>
+              <div className="mt-1">
+                <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} />
               </div>
-              <div>
-                <label className="text-xs text-gray-500">Categoría</label>
-                <select
-                  value={categoriaId}
-                  onChange={(e) => setCategoriaId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                >
-                  <option value="">—</option>
-                  {categorias.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Categoría</label>
+              <select
+                value={categoriaId}
+                onChange={(e) => setCategoriaId(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              >
+                <option value="">—</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs text-gray-500">¿Cómo se reparte?</label>
@@ -214,15 +214,19 @@ export default function GastosFijosPage() {
       <div className="space-y-3">
         {gastos.map((g) => (
           <Card key={g.id}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-semibold text-gray-800">{g.descripcion}</p>
-                <p className="text-xs text-gray-400">
-                  {nombreCategoria(g.categoria_id)} · día {g.dia_mes_pago ?? "—"} ·{" "}
-                  {g.modo_reparto === "manual" ? nombrePersona(g.persona_id) : "reparto automático"}
-                </p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start gap-3">
+                <EntidadAvatar entidad={entidadDe(g.entidad_id)} marca={marcaDeEntidad(g.entidad_id)} className="h-9 w-9" />
+                <div>
+                  <p className="font-semibold text-gray-800">{g.descripcion}</p>
+                  <p className="text-xs text-gray-400">
+                    {nombreEntidad(g.entidad_id) ? `${nombreEntidad(g.entidad_id)} · ` : ""}
+                    {nombreCategoria(g.categoria_id)} · día {g.dia_mes_pago ?? "—"} ·{" "}
+                    {g.modo_reparto === "manual" ? nombrePersona(g.persona_id) : "reparto automático"}
+                  </p>
+                </div>
               </div>
-              <button onClick={() => desactivar(g.id)} className="text-xs text-gray-300 hover:text-red-400">
+              <button onClick={() => desactivar(g.id)} className="shrink-0 text-xs text-gray-300 hover:text-red-400">
                 quitar
               </button>
             </div>

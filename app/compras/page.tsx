@@ -4,12 +4,15 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { EntidadPicker } from "@/components/EntidadPicker";
 import { formatCLP } from "@/lib/format";
-import { Categoria, CompraVigente, Entidad, ModoReparto, Persona } from "@/lib/types";
+import { Categoria, CompraVigente, Entidad, Marca, ModoReparto, Persona } from "@/lib/types";
 
 export default function ComprasPage() {
   const [compras, setCompras] = useState<CompraVigente[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -25,14 +28,16 @@ export default function ComprasPage() {
   const [personaId, setPersonaId] = useState("");
 
   async function cargarTodo() {
-    const [{ data: c }, { data: e }, { data: cat }, { data: p }] = await Promise.all([
+    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }] = await Promise.all([
       supabase.from("vista_cuotas_vigentes").select("*").order("cuota_actual", { ascending: true }),
       supabase.from("entidades").select("*").order("nombre"),
+      supabase.from("marcas").select("*").order("nombre"),
       supabase.from("categorias").select("*").order("nombre"),
       supabase.from("personas").select("*").eq("activo", true).order("nombre"),
     ]);
     setCompras((c as CompraVigente[]) ?? []);
     setEntidades((e as Entidad[]) ?? []);
+    setMarcas((m as Marca[]) ?? []);
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
   }
@@ -68,7 +73,12 @@ export default function ComprasPage() {
     cargarTodo();
   }
 
-  const nombreEntidad = (id: string | null) => entidades.find((e) => e.id === id)?.nombre ?? "—";
+  const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
+  const marcaDeEntidad = (id: string | null) => {
+    const e = entidadDe(id);
+    return e?.marca_id ? marcas.find((m) => m.id === e.marca_id) ?? null : null;
+  };
+  const nombreEntidad = (id: string | null) => entidadDe(id)?.nombre ?? "—";
   const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "—";
   const nombrePersona = (id: string | null) => personas.find((p) => p.id === id)?.nombre ?? "—";
 
@@ -142,37 +152,26 @@ export default function ComprasPage() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-gray-500">Tarjeta / medio de pago</label>
-                <select
-                  value={entidadId}
-                  onChange={(e) => setEntidadId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                >
-                  <option value="">—</option>
-                  {entidades.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre}
-                    </option>
-                  ))}
-                </select>
+            <div>
+              <label className="text-xs text-gray-500">Tarjeta / medio de pago</label>
+              <div className="mt-1">
+                <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} />
               </div>
-              <div>
-                <label className="text-xs text-gray-500">Categoría</label>
-                <select
-                  value={categoriaId}
-                  onChange={(e) => setCategoriaId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                >
-                  <option value="">—</option>
-                  {categorias.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">Categoría</label>
+              <select
+                value={categoriaId}
+                onChange={(e) => setCategoriaId(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              >
+                <option value="">—</option>
+                {categorias.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="text-xs text-gray-500">¿Cómo se reparte?</label>
@@ -232,15 +231,18 @@ export default function ComprasPage() {
           const progreso = Math.min(100, Math.max(0, (c.cuota_actual / c.n_cuotas) * 100));
           return (
             <Card key={c.id} className={!activa ? "opacity-50" : ""}>
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-gray-800">{c.descripcion}</p>
-                  <p className="text-xs text-gray-400">
-                    {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)} ·{" "}
-                    {c.modo_reparto === "manual" ? nombrePersona(c.persona_id) : "reparto automático"}
-                  </p>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-3">
+                  <EntidadAvatar entidad={entidadDe(c.entidad_id)} marca={marcaDeEntidad(c.entidad_id)} className="h-9 w-9" />
+                  <div>
+                    <p className="font-semibold text-gray-800">{c.descripcion}</p>
+                    <p className="text-xs text-gray-400">
+                      {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)} ·{" "}
+                      {c.modo_reparto === "manual" ? nombrePersona(c.persona_id) : "reparto automático"}
+                    </p>
+                  </div>
                 </div>
-                <button onClick={() => eliminar(c.id)} className="text-xs text-gray-300 hover:text-red-400">
+                <button onClick={() => eliminar(c.id)} className="shrink-0 text-xs text-gray-300 hover:text-red-400">
                   eliminar
                 </button>
               </div>

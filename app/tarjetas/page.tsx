@@ -19,10 +19,12 @@ export default function TarjetasPage() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
 
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<Entidad["tipo"]>("tarjeta_credito");
   const [marcaId, setMarcaId] = useState("");
+  const [marcaAutodetectada, setMarcaAutodetectada] = useState(false);
 
   async function cargarTodo() {
     const [{ data: e }, { data: m }] = await Promise.all([
@@ -37,27 +39,79 @@ export default function TarjetasPage() {
     cargarTodo();
   }, []);
 
+  function aplicarTipoPorMarca(m: Marca) {
+    if (m.tipo === "banco") setTipo("tarjeta_credito");
+    if (m.tipo === "servicio_basico" || m.tipo === "telecom" || m.tipo === "autopista") setTipo("efectivo");
+    if (m.tipo === "caja_compensacion") setTipo("linea_credito");
+  }
+
   function elegirMarca(id: string) {
     setMarcaId(id);
+    setMarcaAutodetectada(false);
     const m = marcas.find((x) => x.id === id);
     if (m && !nombre) setNombre(m.nombre);
-    if (m?.tipo === "banco") setTipo("tarjeta_credito");
-    if (m?.tipo === "servicio_basico" || m?.tipo === "telecom" || m?.tipo === "autopista") setTipo("efectivo");
-    if (m?.tipo === "caja_compensacion") setTipo("linea_credito");
+    if (m) aplicarTipoPorMarca(m);
+  }
+
+  // Si el nombre que escribe coincide con una marca del catálogo (ej: "Ripley"),
+  // la asocia automáticamente en vez de dejarla como una entidad "suelta" sin logo.
+  function onNombreChange(valor: string) {
+    setNombre(valor);
+    const texto = valor.trim().toLowerCase();
+    if (!texto) {
+      if (marcaAutodetectada) {
+        setMarcaId("");
+        setMarcaAutodetectada(false);
+      }
+      return;
+    }
+    const match = marcas.find((m) => m.nombre.trim().toLowerCase() === texto);
+    if (match) {
+      if (marcaId !== match.id) {
+        setMarcaId(match.id);
+        aplicarTipoPorMarca(match);
+      }
+      setMarcaAutodetectada(true);
+    } else if (marcaAutodetectada) {
+      // el usuario siguió escribiendo y ya no matchea ninguna marca conocida
+      setMarcaId("");
+      setMarcaAutodetectada(false);
+    }
+  }
+
+  function cancelarForm() {
+    setMostrarForm(false);
+    setEditandoId(null);
+    setNombre("");
+    setTipo("tarjeta_credito");
+    setMarcaId("");
+    setMarcaAutodetectada(false);
+  }
+
+  function iniciarEdicion(e: Entidad) {
+    setEditandoId(e.id);
+    setNombre(e.nombre);
+    setTipo(e.tipo);
+    setMarcaId(e.marca_id ?? "");
+    setMarcaAutodetectada(false);
+    setMostrarForm(true);
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setGuardando(true);
-    await supabase.from("entidades").insert({
+    const payload = {
       nombre,
       tipo,
       marca_id: marcaId || null,
-    });
+    };
+    if (editandoId) {
+      await supabase.from("entidades").update(payload).eq("id", editandoId);
+    } else {
+      await supabase.from("entidades").insert(payload);
+    }
     setGuardando(false);
-    setMostrarForm(false);
-    setNombre("");
-    setMarcaId("");
+    cancelarForm();
     cargarTodo();
   }
 
@@ -76,7 +130,7 @@ export default function TarjetasPage() {
           <p className="text-xs text-gray-400">Bancos, casas comerciales, efectivo — las que uses para pagar.</p>
         </div>
         <button
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={() => (mostrarForm ? cancelarForm() : setMostrarForm(true))}
           className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
         >
           {mostrarForm ? "Cancelar" : "+ Nueva"}
@@ -124,10 +178,15 @@ export default function TarjetasPage() {
               <input
                 required
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => onNombreChange(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 placeholder="Ej: Falabella"
               />
+              {marcaAutodetectada && (
+                <p className="mt-1 text-[11px] text-emerald-600">
+                  ✓ Coincide con &quot;{marcaDe(marcaId)?.nombre}&quot; del catálogo — se usará su logo.
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs text-gray-500">Tipo</label>
@@ -148,7 +207,7 @@ export default function TarjetasPage() {
               disabled={guardando}
               className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {guardando ? "Guardando…" : "Guardar"}
+              {guardando ? "Guardando…" : editandoId ? "Guardar cambios" : "Guardar"}
             </button>
           </form>
         </Card>
@@ -177,9 +236,14 @@ export default function TarjetasPage() {
                     <p className="text-xs text-gray-400">{TIPOS.find((t) => t.value === e.tipo)?.label ?? e.tipo}</p>
                   </div>
                 </div>
-                <button onClick={() => eliminar(e.id)} className="text-xs text-gray-300 hover:text-red-400">
-                  eliminar
-                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  <button onClick={() => iniciarEdicion(e)} className="text-xs text-brand-from">
+                    editar
+                  </button>
+                  <button onClick={() => eliminar(e.id)} className="text-xs text-gray-300 hover:text-red-400">
+                    eliminar
+                  </button>
+                </div>
               </div>
             </Card>
           );

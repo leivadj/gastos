@@ -81,7 +81,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen">
-      <main className="mx-auto max-w-3xl px-4 pt-4 pb-24">{children}</main>
+      <main className="mx-auto max-w-3xl px-4 pb-24 pt-[max(env(safe-area-inset-top),1rem)]">{children}</main>
       <BottomNav />
     </div>
   );
