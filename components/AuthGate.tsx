@@ -1,11 +1,20 @@
 "use client";
 
 import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { BottomNav } from "@/components/BottomNav";
+import { DesktopNav } from "@/components/DesktopNav";
+import { useDeviceType } from "@/lib/useDeviceType";
 
 export function AuthGate({ children }: { children: ReactNode }) {
+  const deviceType = useDeviceType();
+  const esMobile = deviceType === "mobile";
+  const pathname = usePathname();
+  // El dashboard ("/") usa un layout ancho tipo panel en escritorio; el resto
+  // de las páginas (formularios, listas) se ven mejor en un ancho moderado.
+  const anchoDesktop = pathname === "/" ? "max-w-6xl" : "max-w-2xl";
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
@@ -79,10 +88,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
     );
   }
 
+  if (esMobile) {
+    return (
+      <div className="min-h-screen">
+        <main className="mx-auto max-w-3xl px-4 pb-24 pt-[max(env(safe-area-inset-top),1rem)]">{children}</main>
+        <BottomNav />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen">
-      <main className="mx-auto max-w-3xl px-4 pb-24 pt-[max(env(safe-area-inset-top),1rem)]">{children}</main>
-      <BottomNav />
+    <div className="min-h-screen bg-[#F5F3FB]">
+      <DesktopNav />
+      <main className={`mx-auto ${anchoDesktop} px-6 py-8`}>{children}</main>
     </div>
   );
 }
