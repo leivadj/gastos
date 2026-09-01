@@ -14,6 +14,10 @@ const TIPOS_MARCA: { value: TipoMarca; label: string }[] = [
   { value: "caja_compensacion", label: "Caja de compensación" },
   { value: "autopista", label: "Autopista / TAG" },
   { value: "telecom", label: "Internet / Móvil" },
+  { value: "supermercado", label: "Supermercado" },
+  { value: "transporte", label: "Pasajes (bus, avión)" },
+  { value: "compras_online", label: "Compras online" },
+  { value: "delivery", label: "Delivery (comida, encargos)" },
   { value: "otro", label: "Otro" },
 ];
 

@@ -32,6 +32,10 @@ export type TipoMarca =
   | "autopista"
   | "telecom"
   | "servicio_basico"
+  | "supermercado"
+  | "transporte"
+  | "compras_online"
+  | "delivery"
   | "otro";
 
 export interface Marca {

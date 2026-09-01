@@ -61,6 +61,34 @@ insert into marcas (nombre, tipo) values
   ('Metrogas', 'servicio_basico'),
   ('Lipigas', 'servicio_basico'),
 
+  -- Supermercados
+  ('Jumbo', 'supermercado'),
+  ('Líder', 'supermercado'),
+  ('Santa Isabel', 'supermercado'),
+  ('Tottus', 'supermercado'),
+  ('Unimarc', 'supermercado'),
+  ('Ekono', 'supermercado'),
+
+  -- Pasajes (bus, avión)
+  ('Turbus', 'transporte'),
+  ('Pullman Bus', 'transporte'),
+  ('LATAM', 'transporte'),
+  ('Sky Airline', 'transporte'),
+  ('JetSmart', 'transporte'),
+
+  -- Compras online
+  ('Mercado Libre', 'compras_online'),
+  ('AliExpress', 'compras_online'),
+  ('Shein', 'compras_online'),
+  ('Amazon', 'compras_online'),
+  ('Temu', 'compras_online'),
+
+  -- Delivery (comida, encargos)
+  ('Uber Eats', 'delivery'),
+  ('Rappi', 'delivery'),
+  ('PedidosYa', 'delivery'),
+  ('Cornershop', 'delivery'),
+
   -- Otro (pago de cuentas, varios)
   ('Unired', 'otro'),
   ('Servipag', 'otro')

@@ -50,7 +50,8 @@ create table marcas (
   id uuid primary key default gen_random_uuid(),
   nombre text not null unique,
   tipo text not null check (tipo in (
-    'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico', 'otro'
+    'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico',
+    'supermercado', 'transporte', 'compras_online', 'delivery', 'otro'
   )),
   logo_url text,
   icono text, -- emoji corto, alternativa al logo cuando no hay imagen
