@@ -17,6 +17,7 @@ export default function ComprasPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
 
   const [descripcion, setDescripcion] = useState("");
   const [montoTotal, setMontoTotal] = useState("");
@@ -46,10 +47,36 @@ export default function ComprasPage() {
     cargarTodo();
   }, []);
 
+  function cancelarForm() {
+    setMostrarForm(false);
+    setEditandoId(null);
+    setDescripcion("");
+    setMontoTotal("");
+    setNCuotas("1");
+    setFechaPrimeraCuota(new Date().toISOString().slice(0, 10));
+    setEntidadId("");
+    setCategoriaId("");
+    setModoReparto("manual");
+    setPersonaId("");
+  }
+
+  function iniciarEdicion(c: CompraVigente) {
+    setEditandoId(c.compra_id);
+    setDescripcion(c.descripcion);
+    setMontoTotal(String(c.monto_total));
+    setNCuotas(String(c.n_cuotas));
+    setFechaPrimeraCuota(c.fecha_primera_cuota.slice(0, 10));
+    setEntidadId(c.entidad_id ?? "");
+    setCategoriaId(c.categoria_id ?? "");
+    setModoReparto(c.modo_reparto);
+    setPersonaId(c.persona_id ?? "");
+    setMostrarForm(true);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setGuardando(true);
-    await supabase.from("compras").insert({
+    const payload = {
       descripcion,
       monto_total: Number(montoTotal),
       n_cuotas: Number(nCuotas),
@@ -58,13 +85,14 @@ export default function ComprasPage() {
       categoria_id: categoriaId || null,
       modo_reparto: modoReparto,
       persona_id: modoReparto === "manual" ? personaId || null : null,
-    });
+    };
+    if (editandoId) {
+      await supabase.from("compras").update(payload).eq("id", editandoId);
+    } else {
+      await supabase.from("compras").insert(payload);
+    }
     setGuardando(false);
-    setMostrarForm(false);
-    setDescripcion("");
-    setMontoTotal("");
-    setNCuotas("1");
-    setPersonaId("");
+    cancelarForm();
     cargarTodo();
   }
 
@@ -90,7 +118,7 @@ export default function ComprasPage() {
           <p className="text-xs text-gray-400">La cuota vigente se calcula sola cada mes, con la fecha de hoy.</p>
         </div>
         <button
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={() => (mostrarForm ? cancelarForm() : setMostrarForm(true))}
           className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
         >
           {mostrarForm ? "Cancelar" : "+ Nueva"}
@@ -219,7 +247,7 @@ export default function ComprasPage() {
               disabled={guardando}
               className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {guardando ? "Guardando…" : "Guardar compra"}
+              {guardando ? "Guardando…" : editandoId ? "Guardar cambios" : "Guardar compra"}
             </button>
           </form>
         </Card>
@@ -230,7 +258,7 @@ export default function ComprasPage() {
           const activa = c.cuota_actual >= 1 && c.cuota_actual <= c.n_cuotas;
           const progreso = Math.min(100, Math.max(0, (c.cuota_actual / c.n_cuotas) * 100));
           return (
-            <Card key={c.id} className={!activa ? "opacity-50" : ""}>
+            <Card key={c.compra_id} className={!activa ? "opacity-50" : ""}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
                   <EntidadAvatar entidad={entidadDe(c.entidad_id)} marca={marcaDeEntidad(c.entidad_id)} className="h-9 w-9" />
@@ -242,9 +270,14 @@ export default function ComprasPage() {
                     </p>
                   </div>
                 </div>
-                <button onClick={() => eliminar(c.id)} className="shrink-0 text-xs text-gray-300 hover:text-red-400">
-                  eliminar
-                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  <button onClick={() => iniciarEdicion(c)} className="text-xs text-brand-from">
+                    editar
+                  </button>
+                  <button onClick={() => eliminar(c.compra_id)} className="text-xs text-gray-300 hover:text-red-400">
+                    eliminar
+                  </button>
+                </div>
               </div>
               <div className="mt-3 flex items-center justify-between text-sm">
                 <span className="text-gray-500">

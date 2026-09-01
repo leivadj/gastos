@@ -16,6 +16,7 @@ export default function GastosFijosPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const [editandoId, setEditandoId] = useState<string | null>(null);
 
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
@@ -44,10 +45,34 @@ export default function GastosFijosPage() {
     cargarTodo();
   }, []);
 
+  function cancelarForm() {
+    setMostrarForm(false);
+    setEditandoId(null);
+    setDescripcion("");
+    setMonto("");
+    setDiaMes("1");
+    setEntidadId("");
+    setCategoriaId("");
+    setModoReparto("automatico");
+    setPersonaId("");
+  }
+
+  function iniciarEdicion(g: GastoFijo) {
+    setEditandoId(g.id);
+    setDescripcion(g.descripcion);
+    setMonto(String(g.monto_estimado));
+    setDiaMes(String(g.dia_mes_pago ?? 1));
+    setEntidadId(g.entidad_id ?? "");
+    setCategoriaId(g.categoria_id ?? "");
+    setModoReparto(g.modo_reparto);
+    setPersonaId(g.persona_id ?? "");
+    setMostrarForm(true);
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setGuardando(true);
-    await supabase.from("gastos_fijos").insert({
+    const payload = {
       descripcion,
       monto_estimado: Number(monto),
       dia_mes_pago: Number(diaMes),
@@ -56,11 +81,14 @@ export default function GastosFijosPage() {
       modo_reparto: modoReparto,
       persona_id: modoReparto === "manual" ? personaId || null : null,
       activo: true,
-    });
+    };
+    if (editandoId) {
+      await supabase.from("gastos_fijos").update(payload).eq("id", editandoId);
+    } else {
+      await supabase.from("gastos_fijos").insert(payload);
+    }
     setGuardando(false);
-    setMostrarForm(false);
-    setDescripcion("");
-    setMonto("");
+    cancelarForm();
     cargarTodo();
   }
 
@@ -87,7 +115,7 @@ export default function GastosFijosPage() {
           <p className="text-xs text-gray-400">Se repiten todos los meses (luz, agua, gas, arriendo…)</p>
         </div>
         <button
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={() => (mostrarForm ? cancelarForm() : setMostrarForm(true))}
           className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
         >
           {mostrarForm ? "Cancelar" : "+ Nuevo"}
@@ -198,7 +226,7 @@ export default function GastosFijosPage() {
               disabled={guardando}
               className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {guardando ? "Guardando…" : "Guardar"}
+              {guardando ? "Guardando…" : editandoId ? "Guardar cambios" : "Guardar"}
             </button>
           </form>
         </Card>
@@ -226,9 +254,14 @@ export default function GastosFijosPage() {
                   </p>
                 </div>
               </div>
-              <button onClick={() => desactivar(g.id)} className="shrink-0 text-xs text-gray-300 hover:text-red-400">
-                quitar
-              </button>
+              <div className="flex shrink-0 items-center gap-3">
+                <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from">
+                  editar
+                </button>
+                <button onClick={() => desactivar(g.id)} className="text-xs text-gray-300 hover:text-red-400">
+                  quitar
+                </button>
+              </div>
             </div>
             <p className="mt-2 text-right font-semibold text-gray-800">{formatCLP(g.monto_estimado)}</p>
           </Card>

@@ -55,9 +55,41 @@ export interface Compra {
   notas: string | null;
 }
 
-export interface CompraVigente extends Compra {
+// Viene de las vistas vista_cuotas_vigentes / vista_cuotas_mes_actual, que
+// renombran `compras.id` a `compra_id` (para no chocar con otros ids si se
+// llegan a hacer joins). Ojo: NO tiene `id`, solo `compra_id`.
+export interface CompraVigente extends Omit<Compra, "id"> {
+  compra_id: string;
   monto_cuota: number;
   cuota_actual: number;
+}
+
+// Reparto por persona de una cuota este mes (vista_reparto_cuotas_mes):
+// ya viene con el monto que le corresponde a ESA persona (monto_persona),
+// sea reparto manual o por porcentaje.
+export interface RepartoCuota {
+  compra_id: string;
+  descripcion: string;
+  categoria_id: string | null;
+  entidad_id: string | null;
+  monto_cuota: number;
+  cuota_actual: number;
+  n_cuotas: number;
+  persona_id: string;
+  persona_nombre: string;
+  monto_persona: number;
+}
+
+// Reparto por persona de un gasto fijo este mes (vista_reparto_gastos_fijos).
+export interface RepartoGastoFijo {
+  gasto_fijo_id: string;
+  descripcion: string;
+  categoria_id: string | null;
+  entidad_id: string | null;
+  monto_estimado: number;
+  persona_id: string;
+  persona_nombre: string;
+  monto_persona: number;
 }
 
 export interface GastoFijo {

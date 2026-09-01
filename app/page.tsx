@@ -14,8 +14,19 @@ import {
 } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { PersonaBreakdown } from "@/components/PersonaBreakdown";
 import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
-import { Categoria, CompraVigente, GastoFijo, Persona, ResumenPersonaMes } from "@/lib/types";
+import {
+  Categoria,
+  CompraVigente,
+  Entidad,
+  GastoFijo,
+  Marca,
+  Persona,
+  RepartoCuota,
+  RepartoGastoFijo,
+  ResumenPersonaMes,
+} from "@/lib/types";
 import { useDeviceType } from "@/lib/useDeviceType";
 
 const COLORES = ["#7C3AED", "#EC4899", "#F97316", "#10B981", "#3B82F6", "#F43F5E", "#8B5CF6", "#14B8A6"];
@@ -33,25 +44,49 @@ export default function DashboardPage() {
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [entidades, setEntidades] = useState<Entidad[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [resumenPersonas, setResumenPersonas] = useState<ResumenPersonaMes[]>([]);
+  const [repartoCuotas, setRepartoCuotas] = useState<RepartoCuota[]>([]);
+  const [repartoGastos, setRepartoGastos] = useState<RepartoGastoFijo[]>([]);
   const [ingresosMes, setIngresosMes] = useState(0);
   const [cargando, setCargando] = useState(true);
+  const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: c }, { data: gf }, { data: cat }, { data: per }, { data: rp }, { data: ing }] = await Promise.all([
+      const [
+        { data: c },
+        { data: gf },
+        { data: cat },
+        { data: per },
+        { data: ent },
+        { data: mar },
+        { data: rp },
+        { data: rc },
+        { data: rg },
+        { data: ing },
+      ] = await Promise.all([
         supabase.from("vista_cuotas_mes_actual").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
         supabase.from("categorias").select("*"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
+        supabase.from("entidades").select("*"),
+        supabase.from("marcas").select("*"),
         supabase.from("vista_resumen_personas_mes").select("*"),
+        supabase.from("vista_reparto_cuotas_mes").select("*"),
+        supabase.from("vista_reparto_gastos_fijos").select("*"),
         supabase.from("ingresos").select("monto").eq("mes", mesActualISO()),
       ]);
       setCuotas((c as CompraVigente[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
       setCategorias((cat as Categoria[]) ?? []);
       setPersonas((per as Persona[]) ?? []);
+      setEntidades((ent as Entidad[]) ?? []);
+      setMarcas((mar as Marca[]) ?? []);
       setResumenPersonas((rp as ResumenPersonaMes[]) ?? []);
+      setRepartoCuotas((rc as RepartoCuota[]) ?? []);
+      setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
       setIngresosMes((ing ?? []).reduce((acc, r: any) => acc + Number(r.monto), 0));
       setCargando(false);
     }
@@ -90,7 +125,7 @@ export default function DashboardPage() {
   const restoTotal = restoCategorias.reduce((acc, d) => acc + d.value, 0);
 
   const dataPersonas = resumenPersonas
-    .map((p) => ({ name: p.persona_nombre, total: Number(p.total) }))
+    .map((p) => ({ name: p.persona_nombre, total: Number(p.total), persona_id: p.persona_id }))
     .sort((a, b) => b.total - a.total);
 
   const pctFijo = totalGastos > 0 ? (totalTipoFijo / totalGastos) * 100 : 0;
@@ -173,16 +208,25 @@ export default function DashboardPage() {
       {dataPersonas.length === 0 ? (
         <p className="text-sm text-gray-400">Sin datos este mes todavía.</p>
       ) : (
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dataPersonas}>
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis hide />
-              <Tooltip formatter={(v: number) => formatCLP(v)} />
-              <Bar dataKey="total" radius={[6, 6, 0, 0]} fill="#7C3AED" />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+        <>
+          <div className="h-48">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={dataPersonas}>
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                <YAxis hide />
+                <Tooltip formatter={(v: number) => formatCLP(v)} />
+                <Bar
+                  dataKey="total"
+                  radius={[6, 6, 0, 0]}
+                  fill="#7C3AED"
+                  style={{ cursor: "pointer" }}
+                  onClick={(d: any) => setPersonaSeleccionada(d?.persona_id ?? d?.payload?.persona_id ?? null)}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="mt-1 text-center text-[11px] text-gray-400">Toca una barra para ver el detalle</p>
+        </>
       )}
     </Card>
   );
@@ -195,7 +239,7 @@ export default function DashboardPage() {
       ) : (
         <ul className="divide-y divide-gray-100">
           {cuotas.map((c) => (
-            <li key={c.id} className="flex items-center justify-between py-2.5 text-sm">
+            <li key={c.compra_id} className="flex items-center justify-between py-2.5 text-sm">
               <div>
                 <p className="font-medium text-gray-700">{c.descripcion}</p>
                 <p className="text-xs text-gray-400">
@@ -212,8 +256,7 @@ export default function DashboardPage() {
 
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
-  if (esMobile) {
-    return (
+  const contenido = esMobile ? (
       <div className="space-y-5 pb-10">
         {/* Hero a sangre, fuera del padding del layout */}
         <div className="-mx-4 -mt-4 rounded-b-[2rem] bg-brand-gradient px-5 pb-6 pt-6 text-white">
@@ -255,12 +298,8 @@ export default function DashboardPage() {
         {tarjetaPersonas}
         {tarjetaCuotas}
       </div>
-    );
-  }
-
-  // ---- Layout de escritorio (navegador en PC/tablet) ----
-
-  return (
+  ) : (
+    // ---- Layout de escritorio (navegador en PC/tablet) ----
     <div className="space-y-6 pb-10">
       <div className="flex items-center justify-between">
         <div>
@@ -311,5 +350,26 @@ export default function DashboardPage() {
       {tarjetaFijoVariable}
       {tarjetaCuotas}
     </div>
+  );
+
+  const persona = personas.find((p) => p.id === personaSeleccionada);
+
+  return (
+    <>
+      {contenido}
+      {persona && (
+        <PersonaBreakdown
+          personaNombre={persona.nombre}
+          mesLabel={nombreMes()}
+          total={dataPersonas.find((d) => d.persona_id === persona.id)?.total ?? 0}
+          cuotasPersona={repartoCuotas.filter((r) => r.persona_id === persona.id)}
+          gastosPersona={repartoGastos.filter((r) => r.persona_id === persona.id)}
+          categorias={categorias}
+          entidades={entidades}
+          marcas={marcas}
+          onClose={() => setPersonaSeleccionada(null)}
+        />
+      )}
+    </>
   );
 }
