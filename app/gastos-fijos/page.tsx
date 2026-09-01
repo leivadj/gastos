@@ -223,7 +223,13 @@ export default function GastosFijosPage() {
             <div>
               <label className="text-xs text-gray-500">Medio de pago</label>
               <div className="mt-1">
-                <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} />
+                <EntidadPicker
+                  entidades={entidades}
+                  marcas={marcas}
+                  value={entidadId}
+                  onChange={setEntidadId}
+                  onCatalogoActualizado={cargarTodo}
+                />
               </div>
             </div>
             <div>

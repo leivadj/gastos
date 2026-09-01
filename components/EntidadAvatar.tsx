@@ -19,7 +19,7 @@ export function EntidadAvatar({
   const nombre = nombreFallback ?? entidad?.nombre ?? "?";
 
   // Ícono propio del item/grupo/categoría, si tiene uno — tiene prioridad
-  // sobre el logo de la marca asociada.
+  // sobre el logo/ícono de la marca asociada.
   if (icono) {
     return (
       <span
@@ -39,6 +39,17 @@ export function EntidadAvatar({
         alt={nombre}
         className={`${className} shrink-0 rounded-lg object-contain`}
       />
+    );
+  }
+
+  if (marca?.icono) {
+    return (
+      <span
+        className={`${className} flex shrink-0 items-center justify-center rounded-lg text-lg leading-none text-white`}
+        style={{ backgroundColor: colorFor(nombre) }}
+      >
+        {marca.icono}
+      </span>
     );
   }
 

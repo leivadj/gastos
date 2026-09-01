@@ -245,7 +245,13 @@ export default function ComprasPage() {
             <div>
               <label className="text-xs text-gray-500">Tarjeta / medio de pago</label>
               <div className="mt-1">
-                <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} />
+                <EntidadPicker
+                  entidades={entidades}
+                  marcas={marcas}
+                  value={entidadId}
+                  onChange={setEntidadId}
+                  onCatalogoActualizado={cargarTodo}
+                />
               </div>
             </div>
             <div>

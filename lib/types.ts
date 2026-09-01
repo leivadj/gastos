@@ -39,6 +39,7 @@ export interface Marca {
   nombre: string;
   tipo: TipoMarca;
   logo_url: string | null;
+  icono: string | null;
 }
 
 // Un grupo agrupa varios gastos/compras bajo un mismo reparto (ej: "Casa").

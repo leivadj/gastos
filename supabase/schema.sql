@@ -39,6 +39,25 @@ create table categorias (
 );
 
 -- ---------------------------------------------------------------------------
+-- MARCAS — catálogo COMPARTIDO (no tiene owner_id) de bancos, casas
+-- comerciales, cajas de compensación, autopistas, internet/móvil y
+-- servicios básicos (luz, agua, gas...), con su logo o ícono. Cualquier
+-- usuario autenticado puede leerlo, para elegir marca al crear sus propias
+-- entidades (tarjetas/cuentas); solo las cuentas admin (ver RLS más abajo)
+-- pueden agregar/editar/borrar marcas del catálogo.
+-- ---------------------------------------------------------------------------
+create table marcas (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null unique,
+  tipo text not null check (tipo in (
+    'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico', 'otro'
+  )),
+  logo_url text,
+  icono text, -- emoji corto, alternativa al logo cuando no hay imagen
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- ENTIDADES (medios de pago / tarjetas / créditos: efectivo, Falabella,
 -- Paris, Banco Estado, línea de crédito, crédito hipotecario...)
 -- ---------------------------------------------------------------------------
@@ -49,6 +68,7 @@ create table entidades (
   tipo text not null check (
     tipo in ('efectivo', 'tarjeta_credito', 'tarjeta_debito', 'linea_credito', 'credito_hipotecario', 'transferencia')
   ),
+  marca_id uuid references marcas(id), -- opcional: enlaza al catálogo compartido para heredar logo/ícono
   created_at timestamptz not null default now(),
   unique (owner_id, nombre)
 );
@@ -328,6 +348,7 @@ group by persona_id, persona_nombre;
 -- ============================================================================
 alter table personas enable row level security;
 alter table categorias enable row level security;
+alter table marcas enable row level security;
 alter table entidades enable row level security;
 alter table grupos enable row level security;
 alter table grupo_participantes enable row level security;
@@ -341,6 +362,20 @@ create policy "solo_dueno" on personas for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_autenticados" on categorias for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+
+-- MARCAS: cualquier usuario autenticado puede leer el catálogo; solo las
+-- cuentas admin (leivadj@gmail.com y marianps.260290@gmail.com) pueden
+-- crear/editar/borrar marcas.
+create policy "lectura_todos" on marcas for select
+  using (auth.role() = 'authenticated');
+create policy "escritura_solo_admin" on marcas for insert
+  with check ((auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));
+create policy "actualizacion_solo_admin" on marcas for update
+  using ((auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'))
+  with check ((auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));
+create policy "borrado_solo_admin" on marcas for delete
+  using ((auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));
+
 create policy "solo_dueno" on entidades for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on grupos for all
@@ -357,3 +392,21 @@ create policy "solo_dueno" on ingresos for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on pagos for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+-- ============================================================================
+-- ALMACENAMIENTO (Supabase Storage) — logos del catálogo de marcas.
+-- Lectura pública (para poder mostrar el logo sin sesión), escritura solo
+-- para las cuentas admin.
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('marcas-logos', 'marcas-logos', true)
+on conflict (id) do nothing;
+
+create policy "marcas_logos_lectura_publica" on storage.objects for select
+  using (bucket_id = 'marcas-logos');
+create policy "marcas_logos_admin_insert" on storage.objects for insert
+  with check (bucket_id = 'marcas-logos' and (auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));
+create policy "marcas_logos_admin_update" on storage.objects for update
+  using (bucket_id = 'marcas-logos' and (auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));
+create policy "marcas_logos_admin_delete" on storage.objects for delete
+  using (bucket_id = 'marcas-logos' and (auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));

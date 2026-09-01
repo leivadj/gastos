@@ -24,12 +24,14 @@ export default function AdminPage() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [editandoIconoCat, setEditandoIconoCat] = useState<string | null>(null);
+  const [editandoIconoMarca, setEditandoIconoMarca] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<TipoMarca>("banco");
+  const [icono, setIcono] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendoId, setSubiendoId] = useState<string | null>(null);
 
@@ -70,6 +72,18 @@ export default function AdminPage() {
     cargarCategorias();
   }
 
+  async function guardarIconoMarca(id: string, nuevoIcono: string) {
+    const { error: dbError } = await supabase
+      .from("marcas")
+      .update({ icono: nuevoIcono || null })
+      .eq("id", id);
+    if (dbError) {
+      setError(dbError.message || "No se pudo guardar el ícono de la marca.");
+      return;
+    }
+    cargarMarcas();
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
@@ -92,12 +106,14 @@ export default function AdminPage() {
         nombre,
         tipo,
         logo_url: logoUrl,
+        icono: icono || null,
       });
       if (insertError) throw insertError;
 
       setMostrarForm(false);
       setNombre("");
       setTipo("banco");
+      setIcono("");
       setArchivo(null);
       cargarMarcas();
     } catch (err) {
@@ -213,6 +229,12 @@ export default function AdminPage() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
             </div>
+            <div>
+              <label className="text-xs text-gray-500">
+                O ícono (si no tienes un logo a mano)
+              </label>
+              <IconoPicker value={icono} onChange={setIcono} />
+            </div>
             {error && <p className="text-xs text-red-500">{error}</p>}
             <button
               type="submit"
@@ -242,6 +264,13 @@ export default function AdminPage() {
                     {m.logo_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={m.logo_url} alt={m.nombre} className="h-10 w-10 rounded-lg object-contain" />
+                    ) : m.icono ? (
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-white"
+                        style={{ backgroundColor: colorFor(m.nombre) }}
+                      >
+                        {m.icono}
+                      </span>
                     ) : (
                       <span
                         className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold text-white"
@@ -270,12 +299,32 @@ export default function AdminPage() {
                       />
                     </label>
                     <button
+                      onClick={() => setEditandoIconoMarca(editandoIconoMarca === m.id ? null : m.id)}
+                      className="text-[11px] text-brand-from"
+                    >
+                      cambiar ícono
+                    </button>
+                    <button
                       onClick={() => eliminar(m)}
                       className="text-[11px] text-gray-300 hover:text-red-400"
                     >
                       eliminar
                     </button>
                   </div>
+                  {editandoIconoMarca === m.id && (
+                    <div className="mt-2">
+                      <IconoPicker
+                        value={m.icono ?? ""}
+                        onChange={(v) => guardarIconoMarca(m.id, v)}
+                      />
+                      <button
+                        onClick={() => setEditandoIconoMarca(null)}
+                        className="mt-1 text-[11px] text-gray-400"
+                      >
+                        listo
+                      </button>
+                    </div>
+                  )}
                 </Card>
               ))}
             </div>
