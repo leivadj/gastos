@@ -4,9 +4,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
-import { Marca, TipoMarca } from "@/lib/types";
+import { Categoria, Marca, TipoMarca } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
+import { IconoPicker } from "@/components/IconoPicker";
 
 const TIPOS: { value: TipoMarca; label: string }[] = [
   { value: "banco", label: "Banco" },
@@ -21,6 +22,8 @@ const TIPOS: { value: TipoMarca; label: string }[] = [
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [editandoIconoCat, setEditandoIconoCat] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
@@ -43,9 +46,29 @@ export default function AdminPage() {
     setMarcas((data as Marca[]) ?? []);
   }
 
+  async function cargarCategorias() {
+    const { data } = await supabase.from("categorias").select("*").order("nombre");
+    setCategorias((data as Categoria[]) ?? []);
+  }
+
   useEffect(() => {
-    if (esAdmin) cargarMarcas();
+    if (esAdmin) {
+      cargarMarcas();
+      cargarCategorias();
+    }
   }, [esAdmin]);
+
+  async function guardarIconoCategoria(id: string, icono: string) {
+    const { error: dbError } = await supabase
+      .from("categorias")
+      .update({ icono: icono || null })
+      .eq("id", id);
+    if (dbError) {
+      setError(dbError.message || "No se pudo guardar el ícono de la categoría.");
+      return;
+    }
+    cargarCategorias();
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -259,6 +282,49 @@ export default function AdminPage() {
           </div>
         );
       })}
+
+      <div className="space-y-2 pt-4">
+        <div>
+          <h2 className="text-sm font-bold text-gray-800">Íconos de categorías</h2>
+          <p className="text-xs text-gray-400">Se muestran junto a la categoría en los gráficos y listas.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {categorias.map((c) => (
+            <Card key={c.id}>
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg text-white"
+                  style={{ backgroundColor: colorFor(c.nombre) }}
+                >
+                  {c.icono || c.nombre.charAt(0)}
+                </span>
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800">{c.nombre}</p>
+              </div>
+              {editandoIconoCat === c.id ? (
+                <div className="mt-2">
+                  <IconoPicker
+                    value={c.icono ?? ""}
+                    onChange={(v) => guardarIconoCategoria(c.id, v)}
+                  />
+                  <button
+                    onClick={() => setEditandoIconoCat(null)}
+                    className="mt-1 text-[11px] text-gray-400"
+                  >
+                    listo
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setEditandoIconoCat(c.id)}
+                  className="mt-2 text-[11px] text-brand-from"
+                >
+                  cambiar ícono
+                </button>
+              )}
+            </Card>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -6,13 +6,30 @@ import { colorFor } from "@/lib/avatarColor";
 export function EntidadAvatar({
   entidad,
   marca,
+  icono,
+  nombreFallback,
   className = "h-9 w-9",
 }: {
-  entidad: Entidad | null | undefined;
-  marca: Marca | null | undefined;
+  entidad?: Entidad | null;
+  marca?: Marca | null;
+  icono?: string | null;
+  nombreFallback?: string;
   className?: string;
 }) {
-  const nombre = entidad?.nombre ?? "?";
+  const nombre = nombreFallback ?? entidad?.nombre ?? "?";
+
+  // Ícono propio del item/grupo/categoría, si tiene uno — tiene prioridad
+  // sobre el logo de la marca asociada.
+  if (icono) {
+    return (
+      <span
+        className={`${className} flex shrink-0 items-center justify-center rounded-lg text-lg leading-none text-white`}
+        style={{ backgroundColor: colorFor(nombre) }}
+      >
+        {icono}
+      </span>
+    );
+  }
 
   if (marca?.logo_url) {
     return (

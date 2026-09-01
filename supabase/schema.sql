@@ -3,15 +3,17 @@
 -- ============================================================================
 -- Cómo usar: copia TODO este archivo y pégalo en el Editor SQL de tu proyecto
 -- de Supabase (dashboard → SQL Editor → New query), luego "Run".
+--
+-- Este archivo representa el estado ideal para una instalación NUEVA. Si tu
+-- base ya está en producción, usa las migraciones numeradas en su lugar
+-- (supabase/migration_XX_*.sql) — no vuelvas a correr este archivo completo
+-- sobre una base que ya tiene datos.
 -- ============================================================================
 
 create extension if not exists "pgcrypto";
 
 -- ---------------------------------------------------------------------------
 -- PERSONAS
--- porcentaje_reparto: se usa solo si algún gasto/compra se reparte en modo
--- "automatico". Puede quedar en null para personas que solo reciben gastos
--- asignados manualmente (ej. un hijo/a al que se le asigna una cuota directa).
 -- owner_id: cada usuario autenticado tiene su propio espacio, totalmente
 -- separado del de cualquier otro usuario (ver RLS más abajo).
 -- ---------------------------------------------------------------------------
@@ -19,7 +21,7 @@ create table personas (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null default auth.uid() references auth.users(id),
   nombre text not null,
-  porcentaje_reparto numeric(5,2),
+  porcentaje_reparto numeric(5,2), -- ya no se usa para calcular repartos (ver GRUPOS/ITEM_PARTICIPANTES), se deja solo por compatibilidad histórica
   activo boolean not null default true,
   created_at timestamptz not null default now(),
   unique (owner_id, nombre)
@@ -32,6 +34,7 @@ create table categorias (
   id uuid primary key default gen_random_uuid(),
   nombre text not null unique,
   tipo text not null check (tipo in ('fijo', 'variable')),
+  icono text, -- emoji corto, ej "🏠" — opcional, editable desde /admin
   created_at timestamptz not null default now()
 );
 
@@ -51,10 +54,43 @@ create table entidades (
 );
 
 -- ---------------------------------------------------------------------------
+-- GRUPOS — agrupan varios gastos fijos/compras bajo un mismo reparto
+-- (ej: "Casa" agrupa luz, agua, gas, supermercado, dividendo, y define UNA
+-- vez qué personas participan y en qué proporción — todos los items del
+-- grupo heredan ese mismo reparto).
+-- ---------------------------------------------------------------------------
+create table grupos (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  nombre text not null,
+  icono text, -- emoji corto, ej "🏠" — lo personaliza el usuario
+  created_at timestamptz not null default now(),
+  unique (owner_id, nombre)
+);
+
+-- Personas que participan del reparto de un grupo, y su % (opcional).
+-- porcentaje = null → se reparte en partes iguales el resto que quede
+-- después de restar los % fijos de las demás personas del mismo grupo.
+create table grupo_participantes (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  grupo_id uuid not null references grupos(id) on delete cascade,
+  persona_id uuid not null references personas(id) on delete cascade,
+  porcentaje numeric(5,2),
+  created_at timestamptz not null default now(),
+  unique (grupo_id, persona_id)
+);
+
+-- ---------------------------------------------------------------------------
 -- COMPRAS — EL MOTOR DE CUOTAS AUTOMÁTICO
 -- En vez de guardar "en qué cuota voy" (texto que se edita a mano cada mes),
 -- se guarda CUÁNDO empezó la compra y CUÁNTAS cuotas tiene en total.
 -- La cuota vigente se calcula sola con la fecha de hoy (ver vista más abajo).
+--
+-- El reparto entre personas ya NO se guarda en esta tabla: si `grupo_id` está
+-- definido, el reparto lo hereda del grupo; si no, se define en la tabla
+-- ITEM_PARTICIPANTES (ver más abajo), con las mismas reglas de % / partes
+-- iguales que un grupo.
 -- ---------------------------------------------------------------------------
 create table compras (
   id uuid primary key default gen_random_uuid(),
@@ -65,12 +101,10 @@ create table compras (
   fecha_primera_cuota date not null,
   entidad_id uuid references entidades(id),
   categoria_id uuid references categorias(id),
-  modo_reparto text not null check (modo_reparto in ('manual', 'automatico')),
-  persona_id uuid references personas(id), -- obligatorio solo si modo_reparto = 'manual'
+  grupo_id uuid references grupos(id),
+  icono text, -- emoji propio del item (opcional) — si está, se muestra antes que el logo de la entidad
   notas text,
-  created_at timestamptz not null default now(),
-  constraint chk_manual_requiere_persona
-    check (modo_reparto <> 'manual' or persona_id is not null)
+  created_at timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------------------------
@@ -82,14 +116,30 @@ create table gastos_fijos (
   descripcion text not null,
   categoria_id uuid references categorias(id),
   entidad_id uuid references entidades(id),
+  grupo_id uuid references grupos(id),
+  icono text,
   monto_estimado numeric(12, 2) not null check (monto_estimado >= 0),
   dia_mes_pago int check (dia_mes_pago between 1 and 31),
-  modo_reparto text not null check (modo_reparto in ('manual', 'automatico')),
-  persona_id uuid references personas(id),
   activo boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
+-- ITEM_PARTICIPANTES — reparto propio de una compra o gasto fijo que NO
+-- pertenece a un grupo (si pertenece a un grupo, el reparto viene de
+-- GRUPO_PARTICIPANTES en su lugar y esta tabla no se usa para ese item).
+-- Mismo formato que GRUPO_PARTICIPANTES: porcentaje null = partes iguales
+-- del resto.
+-- ---------------------------------------------------------------------------
+create table item_participantes (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  origen text not null check (origen in ('compra', 'gasto_fijo')),
+  origen_id uuid not null,
+  persona_id uuid not null references personas(id) on delete cascade,
+  porcentaje numeric(5,2),
   created_at timestamptz not null default now(),
-  constraint chk_gf_manual_requiere_persona
-    check (modo_reparto <> 'manual' or persona_id is not null)
+  unique (origen, origen_id, persona_id)
 );
 
 -- ---------------------------------------------------------------------------
@@ -124,7 +174,7 @@ create table pagos (
 );
 
 -- ============================================================================
--- VISTAS — aquí vive la automatización de las cuotas
+-- VISTAS — aquí vive la automatización de las cuotas y del reparto
 -- ============================================================================
 
 -- Para cada compra, calcula en qué cuota va HOY y si sigue vigente este mes.
@@ -140,8 +190,8 @@ select
   c.fecha_primera_cuota,
   c.entidad_id,
   c.categoria_id,
-  c.modo_reparto,
-  c.persona_id,
+  c.grupo_id,
+  c.icono,
   c.notas,
   round(c.monto_total / c.n_cuotas, 0) as monto_cuota,
   (
@@ -158,7 +208,42 @@ select *
 from vista_cuotas_vigentes
 where cuota_actual between 1 and n_cuotas;
 
--- Reparto por persona de las cuotas de este mes (maneja manual y automático)
+-- Resuelve, para cada persona de cada grupo, su % EFECTIVO de reparto: usa
+-- su % fijo si lo tiene, y si no, reparte en partes iguales lo que queda
+-- del 100% entre quienes no tienen % fijo dentro del mismo grupo.
+create or replace view vista_grupo_reparto
+with (security_invoker = true) as
+select
+  gp.grupo_id,
+  p.id as persona_id,
+  p.nombre as persona_nombre,
+  coalesce(
+    gp.porcentaje,
+    greatest(0, 100 - coalesce(sum(gp.porcentaje) filter (where gp.porcentaje is not null) over (partition by gp.grupo_id), 0))
+      / nullif(count(*) filter (where gp.porcentaje is null) over (partition by gp.grupo_id), 0)
+  ) as porcentaje_efectivo
+from grupo_participantes gp
+join personas p on p.id = gp.persona_id and p.activo = true;
+
+-- Igual que la anterior, pero para el reparto propio de un item suelto
+-- (compra o gasto fijo que no pertenece a ningún grupo).
+create or replace view vista_item_reparto
+with (security_invoker = true) as
+select
+  ip.origen,
+  ip.origen_id,
+  p.id as persona_id,
+  p.nombre as persona_nombre,
+  coalesce(
+    ip.porcentaje,
+    greatest(0, 100 - coalesce(sum(ip.porcentaje) filter (where ip.porcentaje is not null) over (partition by ip.origen, ip.origen_id), 0))
+      / nullif(count(*) filter (where ip.porcentaje is null) over (partition by ip.origen, ip.origen_id), 0)
+  ) as porcentaje_efectivo
+from item_participantes ip
+join personas p on p.id = ip.persona_id and p.activo = true;
+
+-- Reparto por persona de las cuotas de este mes: si la compra pertenece a
+-- un grupo, usa el reparto del grupo; si no, usa su propio reparto de item.
 create or replace view vista_reparto_cuotas_mes
 with (security_invoker = true) as
 select
@@ -166,23 +251,26 @@ select
   v.descripcion,
   v.categoria_id,
   v.entidad_id,
+  v.grupo_id,
+  v.icono,
   v.monto_cuota,
   v.cuota_actual,
   v.n_cuotas,
-  p.id as persona_id,
-  p.nombre as persona_nombre,
-  case
-    when v.modo_reparto = 'manual' then v.monto_cuota
-    else round(v.monto_cuota * coalesce(p.porcentaje_reparto, 0) / 100, 0)
-  end as monto_persona
+  r.persona_id,
+  r.persona_nombre,
+  round(v.monto_cuota * r.porcentaje_efectivo / 100, 0) as monto_persona
 from vista_cuotas_mes_actual v
-join personas p on p.activo = true
-  and (
-    (v.modo_reparto = 'manual' and p.id = v.persona_id)
-    or (v.modo_reparto = 'automatico' and p.porcentaje_reparto is not null)
-  );
+join lateral (
+  select persona_id, persona_nombre, porcentaje_efectivo
+  from vista_grupo_reparto gr
+  where gr.grupo_id = v.grupo_id and v.grupo_id is not null
+  union all
+  select persona_id, persona_nombre, porcentaje_efectivo
+  from vista_item_reparto ir
+  where ir.origen = 'compra' and ir.origen_id = v.compra_id and v.grupo_id is null
+) r on true;
 
--- Reparto por persona de los gastos fijos de este mes
+-- Reparto por persona de los gastos fijos de este mes (misma lógica).
 create or replace view vista_reparto_gastos_fijos
 with (security_invoker = true) as
 select
@@ -190,19 +278,22 @@ select
   g.descripcion,
   g.categoria_id,
   g.entidad_id,
+  g.grupo_id,
+  g.icono,
   g.monto_estimado,
-  p.id as persona_id,
-  p.nombre as persona_nombre,
-  case
-    when g.modo_reparto = 'manual' then g.monto_estimado
-    else round(g.monto_estimado * coalesce(p.porcentaje_reparto, 0) / 100, 0)
-  end as monto_persona
+  r.persona_id,
+  r.persona_nombre,
+  round(g.monto_estimado * r.porcentaje_efectivo / 100, 0) as monto_persona
 from gastos_fijos g
-join personas p on p.activo = true
-  and (
-    (g.modo_reparto = 'manual' and p.id = g.persona_id)
-    or (g.modo_reparto = 'automatico' and p.porcentaje_reparto is not null)
-  )
+join lateral (
+  select persona_id, persona_nombre, porcentaje_efectivo
+  from vista_grupo_reparto gr
+  where gr.grupo_id = g.grupo_id and g.grupo_id is not null
+  union all
+  select persona_id, persona_nombre, porcentaje_efectivo
+  from vista_item_reparto ir
+  where ir.origen = 'gasto_fijo' and ir.origen_id = g.id and g.grupo_id is null
+) r on true
 where g.activo = true;
 
 -- Resumen del mes por categoría (para el gráfico de torta del dashboard)
@@ -238,8 +329,11 @@ group by persona_id, persona_nombre;
 alter table personas enable row level security;
 alter table categorias enable row level security;
 alter table entidades enable row level security;
+alter table grupos enable row level security;
+alter table grupo_participantes enable row level security;
 alter table compras enable row level security;
 alter table gastos_fijos enable row level security;
+alter table item_participantes enable row level security;
 alter table ingresos enable row level security;
 alter table pagos enable row level security;
 
@@ -249,9 +343,15 @@ create policy "solo_autenticados" on categorias for all
   using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 create policy "solo_dueno" on entidades for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on grupos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on grupo_participantes for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on compras for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on gastos_fijos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on item_participantes for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on ingresos for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());

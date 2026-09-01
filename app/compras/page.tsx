@@ -6,8 +6,10 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { EntidadPicker } from "@/components/EntidadPicker";
+import { IconoPicker } from "@/components/IconoPicker";
+import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { formatCLP } from "@/lib/format";
-import { Categoria, CompraVigente, Entidad, Marca, ModoReparto, Persona } from "@/lib/types";
+import { Categoria, CompraVigente, Entidad, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
 
 export default function ComprasPage() {
   const [compras, setCompras] = useState<CompraVigente[]>([]);
@@ -15,6 +17,8 @@ export default function ComprasPage() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -26,22 +30,33 @@ export default function ComprasPage() {
   const [fechaPrimeraCuota, setFechaPrimeraCuota] = useState(() => new Date().toISOString().slice(0, 10));
   const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
-  const [modoReparto, setModoReparto] = useState<ModoReparto>("manual");
-  const [personaId, setPersonaId] = useState("");
+  const [grupoId, setGrupoId] = useState("");
+  const [icono, setIcono] = useState("");
+  const [participantes, setParticipantes] = useState<Participante[]>([]);
 
   async function cargarTodo() {
-    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }] = await Promise.all([
-      supabase.from("vista_cuotas_vigentes").select("*").order("cuota_actual", { ascending: true }),
-      supabase.from("entidades").select("*").order("nombre"),
-      supabase.from("marcas").select("*").order("nombre"),
-      supabase.from("categorias").select("*").order("nombre"),
-      supabase.from("personas").select("*").eq("activo", true).order("nombre"),
-    ]);
+    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: ip }] =
+      await Promise.all([
+        supabase.from("vista_cuotas_vigentes").select("*").order("cuota_actual", { ascending: true }),
+        supabase.from("entidades").select("*").order("nombre"),
+        supabase.from("marcas").select("*").order("nombre"),
+        supabase.from("categorias").select("*").order("nombre"),
+        supabase.from("personas").select("*").eq("activo", true).order("nombre"),
+        supabase.from("grupos").select("*").order("nombre"),
+        supabase.from("item_participantes").select("*").eq("origen", "compra"),
+      ]);
     setCompras((c as CompraVigente[]) ?? []);
     setEntidades((e as Entidad[]) ?? []);
     setMarcas((m as Marca[]) ?? []);
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
+    setGrupos((gr as Grupo[]) ?? []);
+    const agrupado: Record<string, ItemParticipante[]> = {};
+    ((ip as ItemParticipante[]) ?? []).forEach((row) => {
+      if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
+      agrupado[row.origen_id].push(row);
+    });
+    setParticipantesPorItem(agrupado);
   }
 
   useEffect(() => {
@@ -57,8 +72,9 @@ export default function ComprasPage() {
     setFechaPrimeraCuota(new Date().toISOString().slice(0, 10));
     setEntidadId("");
     setCategoriaId("");
-    setModoReparto("manual");
-    setPersonaId("");
+    setGrupoId("");
+    setIcono("");
+    setParticipantes([]);
     setError("");
   }
 
@@ -70,35 +86,65 @@ export default function ComprasPage() {
     setFechaPrimeraCuota(c.fecha_primera_cuota.slice(0, 10));
     setEntidadId(c.entidad_id ?? "");
     setCategoriaId(c.categoria_id ?? "");
-    setModoReparto(c.modo_reparto);
-    setPersonaId(c.persona_id ?? "");
+    setGrupoId(c.grupo_id ?? "");
+    setIcono(c.icono ?? "");
+    setParticipantes(
+      (participantesPorItem[c.compra_id] ?? []).map((row) => ({ persona_id: row.persona_id, porcentaje: row.porcentaje }))
+    );
     setMostrarForm(true);
+  }
+
+  async function guardarParticipantes(compraId: string) {
+    const { error: delError } = await supabase
+      .from("item_participantes")
+      .delete()
+      .eq("origen", "compra")
+      .eq("origen_id", compraId);
+    if (delError) throw delError;
+    if (!grupoId && participantes.length > 0) {
+      const { error: insError } = await supabase.from("item_participantes").insert(
+        participantes.map((p) => ({ origen: "compra", origen_id: compraId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+      );
+      if (insError) throw insError;
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
-    setGuardando(true);
-    const payload = {
-      descripcion,
-      monto_total: Number(montoTotal),
-      n_cuotas: Number(nCuotas),
-      fecha_primera_cuota: fechaPrimeraCuota,
-      entidad_id: entidadId || null,
-      categoria_id: categoriaId || null,
-      modo_reparto: modoReparto,
-      persona_id: modoReparto === "manual" ? personaId || null : null,
-    };
-    const { error: dbError } = editandoId
-      ? await supabase.from("compras").update(payload).eq("id", editandoId)
-      : await supabase.from("compras").insert(payload);
-    setGuardando(false);
-    if (dbError) {
-      setError(dbError.message || "No se pudo guardar. Intenta de nuevo.");
+    if (!grupoId && participantes.length === 0) {
+      setError("Elige al menos una persona, o asocia la compra a un grupo.");
       return;
     }
-    cancelarForm();
-    cargarTodo();
+    setGuardando(true);
+    try {
+      const payload = {
+        descripcion,
+        monto_total: Number(montoTotal),
+        n_cuotas: Number(nCuotas),
+        fecha_primera_cuota: fechaPrimeraCuota,
+        entidad_id: entidadId || null,
+        categoria_id: categoriaId || null,
+        grupo_id: grupoId || null,
+        icono: icono || null,
+      };
+      let compraId = editandoId;
+      if (editandoId) {
+        const { error: updError } = await supabase.from("compras").update(payload).eq("id", editandoId);
+        if (updError) throw updError;
+      } else {
+        const { data, error: insError } = await supabase.from("compras").insert(payload).select().single();
+        if (insError) throw insError;
+        compraId = data.id;
+      }
+      if (compraId) await guardarParticipantes(compraId);
+      cancelarForm();
+      cargarTodo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+    } finally {
+      setGuardando(false);
+    }
   }
 
   async function eliminar(id: string) {
@@ -107,6 +153,7 @@ export default function ComprasPage() {
       setError(dbError.message || "No se pudo eliminar.");
       return;
     }
+    await supabase.from("item_participantes").delete().eq("origen", "compra").eq("origen_id", id);
     cargarTodo();
   }
 
@@ -117,7 +164,15 @@ export default function ComprasPage() {
   };
   const nombreEntidad = (id: string | null) => entidadDe(id)?.nombre ?? "—";
   const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "—";
-  const nombrePersona = (id: string | null) => personas.find((p) => p.id === id)?.nombre ?? "—";
+  const grupoDe = (id: string | null) => grupos.find((g) => g.id === id) ?? null;
+
+  function resumenReparto(c: CompraVigente) {
+    if (c.grupo_id) return `Grupo: ${grupoDe(c.grupo_id)?.nombre ?? "—"}`;
+    const filas = participantesPorItem[c.compra_id] ?? [];
+    if (filas.length === 0) return "Sin personas asignadas";
+    const nombres = filas.map((f) => personas.find((p) => p.id === f.persona_id)?.nombre ?? "?");
+    return nombres.join(", ");
+  }
 
   return (
     <div className="space-y-4 pb-10">
@@ -211,46 +266,44 @@ export default function ComprasPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500">¿Cómo se reparte?</label>
-              <div className="mt-1 flex gap-2 text-sm">
-                <button
-                  type="button"
-                  onClick={() => setModoReparto("manual")}
-                  className={`flex-1 rounded-lg border px-3 py-2 ${
-                    modoReparto === "manual" ? "border-brand-from bg-purple-50 font-semibold" : "border-gray-200"
-                  }`}
-                >
-                  A una persona
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setModoReparto("automatico")}
-                  className={`flex-1 rounded-lg border px-3 py-2 ${
-                    modoReparto === "automatico" ? "border-brand-from bg-purple-50 font-semibold" : "border-gray-200"
-                  }`}
-                >
-                  % automático
-                </button>
-              </div>
+              <label className="text-xs text-gray-500">Grupo (opcional)</label>
+              <select
+                value={grupoId}
+                onChange={(e) => setGrupoId(e.target.value)}
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              >
+                <option value="">— Sin grupo —</option>
+                {grupos.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.nombre}
+                  </option>
+                ))}
+              </select>
             </div>
-            {modoReparto === "manual" && (
+            {grupoId ? (
+              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from">
+                El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;. Para cambiarlo, ve a Grupos.
+              </p>
+            ) : (
               <div>
-                <label className="text-xs text-gray-500">Persona responsable</label>
-                <select
-                  required
-                  value={personaId}
-                  onChange={(e) => setPersonaId(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                >
-                  <option value="">Selecciona…</option>
-                  {personas.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
+                <label className="text-xs text-gray-500">¿Quiénes participan?</label>
+                <p className="mb-1 text-[11px] text-gray-400">
+                  Deja el % en blanco para repartir en partes iguales el resto.
+                </p>
+                <ParticipantesPicker
+                  personas={personas}
+                  value={participantes}
+                  onChange={setParticipantes}
+                  montoTotal={montoTotal ? Math.round(Number(montoTotal) / Number(nCuotas || "1")) : undefined}
+                />
               </div>
             )}
+            <div>
+              <label className="text-xs text-gray-500">Ícono del item (opcional)</label>
+              <div className="mt-1">
+                <IconoPicker value={icono} onChange={setIcono} />
+              </div>
+            </div>
             {error && <p className="text-xs text-red-500">{error}</p>}
             <button
               type="submit"
@@ -271,12 +324,16 @@ export default function ComprasPage() {
             <Card key={c.compra_id} className={!activa ? "opacity-50" : ""}>
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-3">
-                  <EntidadAvatar entidad={entidadDe(c.entidad_id)} marca={marcaDeEntidad(c.entidad_id)} className="h-9 w-9" />
+                  <EntidadAvatar
+                    entidad={entidadDe(c.entidad_id)}
+                    marca={marcaDeEntidad(c.entidad_id)}
+                    icono={c.icono}
+                    className="h-9 w-9"
+                  />
                   <div>
                     <p className="font-semibold text-gray-800">{c.descripcion}</p>
                     <p className="text-xs text-gray-400">
-                      {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)} ·{" "}
-                      {c.modo_reparto === "manual" ? nombrePersona(c.persona_id) : "reparto automático"}
+                      {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)} · {resumenReparto(c)}
                     </p>
                   </div>
                 </div>

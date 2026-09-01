@@ -10,7 +10,6 @@ export default function PersonasPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [nombre, setNombre] = useState("");
-  const [porcentaje, setPorcentaje] = useState("");
   const [correo, setCorreo] = useState("");
 
   async function cargar() {
@@ -30,21 +29,10 @@ export default function PersonasPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setGuardando(true);
-    await supabase.from("personas").insert({
-      nombre,
-      porcentaje_reparto: porcentaje ? Number(porcentaje) : null,
-      activo: true,
-    });
+    await supabase.from("personas").insert({ nombre, activo: true });
     setGuardando(false);
     setMostrarForm(false);
     setNombre("");
-    setPorcentaje("");
-    cargar();
-  }
-
-  async function actualizarPorcentaje(id: string, valor: string) {
-    const n = valor === "" ? null : Number(valor);
-    await supabase.from("personas").update({ porcentaje_reparto: n }).eq("id", id);
     cargar();
   }
 
@@ -53,16 +41,14 @@ export default function PersonasPage() {
     cargar();
   }
 
-  const sumaPorcentajes = personas
-    .filter((p) => p.activo && p.porcentaje_reparto != null)
-    .reduce((acc, p) => acc + Number(p.porcentaje_reparto), 0);
-
   return (
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-bold text-gray-800">Personas</h1>
-          <p className="text-xs text-gray-400">El % se usa solo en los gastos con reparto automático.</p>
+          <p className="text-xs text-gray-400">
+            El reparto entre personas ahora se define en cada gasto/compra o en Grupos.
+          </p>
         </div>
         <button
           onClick={() => setMostrarForm((v) => !v)}
@@ -71,13 +57,6 @@ export default function PersonasPage() {
           {mostrarForm ? "Cancelar" : "+ Nueva"}
         </button>
       </div>
-
-      {sumaPorcentajes !== 0 && sumaPorcentajes !== 100 && (
-        <div className="rounded-xl bg-amber-50 px-4 py-2 text-xs text-amber-700">
-          Los porcentajes de reparto automático suman {sumaPorcentajes}%, no 100%. Ajusta para que los gastos
-          compartidos calcen exactos.
-        </div>
-      )}
 
       {mostrarForm && (
         <Card>
@@ -89,18 +68,6 @@ export default function PersonasPage() {
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500">% de reparto automático (opcional)</label>
-              <input
-                type="number"
-                min={0}
-                max={100}
-                value={porcentaje}
-                onChange={(e) => setPorcentaje(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                placeholder="Déjalo vacío si no participa del reparto automático"
               />
             </div>
             <button
@@ -121,21 +88,9 @@ export default function PersonasPage() {
             <Card key={p.id}>
               <div className="flex items-center justify-between gap-3">
                 <p className="font-semibold text-gray-800">{p.nombre}</p>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min={0}
-                    max={100}
-                    defaultValue={p.porcentaje_reparto ?? ""}
-                    onBlur={(e) => actualizarPorcentaje(p.id, e.target.value)}
-                    placeholder="—"
-                    className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-right text-sm"
-                  />
-                  <span className="text-sm text-gray-400">%</span>
-                  <button onClick={() => desactivar(p.id)} className="text-xs text-gray-300 hover:text-red-400">
-                    quitar
-                  </button>
-                </div>
+                <button onClick={() => desactivar(p.id)} className="text-xs text-gray-300 hover:text-red-400">
+                  quitar
+                </button>
               </div>
             </Card>
           ))}
