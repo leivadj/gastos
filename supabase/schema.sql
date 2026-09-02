@@ -85,7 +85,9 @@ create table entidades (
   color_hex text,
   imagen_fondo_url text,
   created_at timestamptz not null default now(),
-  unique (owner_id, nombre)
+  -- nombre + tipo (no solo nombre): permite tener "Banco Estado" como
+  -- tarjeta de débito Y como tarjeta de crédito a la vez, por ejemplo.
+  unique (owner_id, nombre, tipo)
 );
 
 -- ---------------------------------------------------------------------------
