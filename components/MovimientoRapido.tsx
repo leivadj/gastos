@@ -107,7 +107,8 @@ export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante"
     >
       <button
         onClick={() => abrir("transferencia")}
-        className="flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        className="animate-pop-resorte flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        style={{ animationDelay: "120ms" }}
       >
         Transferencia
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600">
@@ -116,7 +117,8 @@ export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante"
       </button>
       <button
         onClick={() => abrir("ingreso")}
-        className="flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        className="animate-pop-resorte flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        style={{ animationDelay: "60ms" }}
       >
         Ingreso
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
@@ -125,7 +127,7 @@ export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante"
       </button>
       <button
         onClick={() => abrir("gasto")}
-        className="flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        className="animate-pop-resorte flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
       >
         Gasto
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600">
@@ -141,10 +143,10 @@ export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante"
       aria-label="Agregar movimiento"
       className={
         variante === "en-nav"
-          ? `-mt-7 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl ring-4 ring-white transition-transform ${
+          ? `-mt-7 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl ring-4 ring-white transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
               abierto ? "rotate-45" : ""
             }`
-          : `flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl transition-transform ${
+          : `flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
               abierto ? "rotate-45" : ""
             }`
       }

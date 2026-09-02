@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { BottomNav } from "@/components/BottomNav";
 import { DesktopNav } from "@/components/DesktopNav";
 import { MovimientoFab } from "@/components/MovimientoRapido";
+import { TransicionPagina } from "@/components/TransicionPagina";
 import { useDeviceType } from "@/lib/useDeviceType";
 
 export function AuthGate({ children }: { children: ReactNode }) {
@@ -94,7 +95,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
     // no flotando encima del contenido — por eso no se agrega acá también.
     return (
       <div className="min-h-screen">
-        <main className="mx-auto max-w-3xl px-4 pb-24 pt-[max(env(safe-area-inset-top),1rem)]">{children}</main>
+        <main className="mx-auto max-w-3xl px-4 pb-24 pt-[max(env(safe-area-inset-top),1rem)]">
+          <TransicionPagina>{children}</TransicionPagina>
+        </main>
         <BottomNav />
       </div>
     );
@@ -103,7 +106,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-[#F5F3FB]">
       <DesktopNav />
-      <main className={`mx-auto ${anchoDesktop} px-6 py-8`}>{children}</main>
+      <main className={`mx-auto ${anchoDesktop} px-6 py-8`}>
+        <TransicionPagina>{children}</TransicionPagina>
+      </main>
       <MovimientoFab />
     </div>
   );

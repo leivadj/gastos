@@ -73,6 +73,23 @@ export const navItems = [
   },
 ];
 
+// "Más" agrupa Fijos, Grupos, Personas y Admin en el celular — las guías de
+// iOS recomiendan un máximo de ~5 destinos en la barra inferior, y con 6-7
+// items sueltos quedaba muy apretado. En escritorio (DesktopNav) hay
+// espacio de sobra, así que ahí se siguen mostrando todos sueltos.
+export const masNavItem = {
+  href: "/mas",
+  label: "Más",
+  icon: (active: boolean) => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+      <rect x="4" y="4" width="7" height="7" rx="1.8" />
+      <rect x="13" y="4" width="7" height="7" rx="1.8" />
+      <rect x="4" y="13" width="7" height="7" rx="1.8" />
+      <rect x="13" y="13" width="7" height="7" rx="1.8" />
+    </svg>
+  ),
+};
+
 export const adminNavItem = {
   href: "/admin",
   label: "Admin",
