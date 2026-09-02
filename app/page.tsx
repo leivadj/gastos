@@ -39,6 +39,43 @@ function formatCompacto(valor: number): string {
   return new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 1 }).format(valor);
 }
 
+function IconoDisponible({ className = "" }: { className?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="6" width="18" height="13" rx="2.5" />
+      <path d="M3 10h18" />
+      <path d="M16.5 15h1" />
+    </svg>
+  );
+}
+
+function IconoIngresos({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M4 16 10 10l4 4 6-7" />
+      <path d="M15 8h5v5" />
+    </svg>
+  );
+}
+
+function IconoGastos({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M4 8 10 14l4-4 6 7" />
+      <path d="M15 16h5v-5" />
+    </svg>
+  );
+}
+
+function IconoComprometido({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="M12 7.5v5l3.2 1.8" />
+    </svg>
+  );
+}
+
 export default function DashboardPage() {
   const deviceType = useDeviceType();
   const esMobile = deviceType === "mobile";
@@ -304,7 +341,8 @@ export default function DashboardPage() {
           </div>
 
           <p className="mt-5 flex items-center gap-1.5 text-sm opacity-85">
-            💰 Disponible este mes
+            <IconoDisponible className="text-white" />
+            Disponible este mes
           </p>
           <p className="text-4xl font-bold tracking-tight">
             <ContadorOdometro texto={formatCLP(disponible)} />
@@ -312,19 +350,28 @@ export default function DashboardPage() {
 
           <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">↑ Ingresos</p>
+              <p className="flex items-center gap-1 text-[11px] opacity-85">
+                <IconoIngresos className="text-white" />
+                Ingresos
+              </p>
               <p className="text-sm font-semibold">
                 <ContadorOdometro texto={formatCLP(ingresosMes)} />
               </p>
             </div>
             <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">↓ Gastos</p>
+              <p className="flex items-center gap-1 text-[11px] opacity-85">
+                <IconoGastos className="text-white" />
+                Gastos
+              </p>
               <p className="text-sm font-semibold">
                 <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
               </p>
             </div>
             <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">⏳ Comprometido</p>
+              <p className="flex items-center gap-1 text-[11px] opacity-85">
+                <IconoComprometido className="text-white" />
+                Comprometido
+              </p>
               <p className="text-sm font-semibold">
                 <ContadorOdometro texto={formatCLP(comprometido)} />
               </p>
@@ -367,20 +414,29 @@ export default function DashboardPage() {
           </p>
         </Card>
         <Card>
-          <p className="text-xs font-medium text-gray-400">↓ Gastos</p>
+          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
+            <IconoGastos className="text-gray-400" />
+            Gastos
+          </p>
           <p className="mt-1 text-2xl font-bold text-gray-800">
             <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
           </p>
         </Card>
         <Card>
-          <p className="text-xs font-medium text-gray-400">⏳ Comprometido</p>
+          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
+            <IconoComprometido className="text-gray-400" />
+            Comprometido
+          </p>
           <p className="mt-1 text-2xl font-bold text-gray-800">
             <ContadorOdometro texto={formatCLP(comprometido)} />
           </p>
           <p className="text-[11px] text-gray-400">vence más adelante este mes</p>
         </Card>
         <Card>
-          <p className="text-xs font-medium text-gray-400">💰 Disponible</p>
+          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
+            <IconoDisponible className="text-gray-400" />
+            Disponible
+          </p>
           <p className="mt-1 text-2xl font-bold text-brand-from">
             <ContadorOdometro texto={formatCLP(disponible)} />
           </p>

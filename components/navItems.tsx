@@ -4,6 +4,10 @@ export function esAdmin(email?: string | null): boolean {
   return !!email && ADMIN_EMAILS.includes(email);
 }
 
+// "Presupuesto" apunta por ahora a /gastos-fijos como mapeo interino: la
+// pantalla de Calendario de pagos / promedio móvil del rediseño todavía no
+// existe, así que esta pestaña sigue mostrando la vista de gastos fijos
+// actual hasta que se construya esa fase.
 export const navItems = [
   {
     href: "/",
@@ -12,6 +16,17 @@ export const navItems = [
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
         <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/tarjetas",
+    label: "Cuentas",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <rect x="3" y="6" width="18" height="13" rx="2.5" />
+        <path d="M3 10h18" strokeLinecap="round" />
+        <path d="M7 15h4" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -27,13 +42,11 @@ export const navItems = [
   },
   {
     href: "/gastos-fijos",
-    label: "Fijos",
+    label: "Presupuesto",
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
-        <path d="M4 7h11.5a3.5 3.5 0 0 1 0 7H8" strokeLinecap="round" />
-        <path d="M11 11 8 14l3 3" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M20 17H8.5a3.5 3.5 0 0 1 0-7H16" strokeLinecap="round" />
-        <path d="M13 13l3-3-3-3" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12 3v9l7.5 4.3" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="12" cy="12" r="9" />
       </svg>
     ),
   },

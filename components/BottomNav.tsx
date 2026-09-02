@@ -6,21 +6,22 @@ import { navItems, masNavItem } from "@/components/navItems";
 import { MovimientoFab } from "@/components/MovimientoRapido";
 
 // Rutas que "pertenecen" a la pestaña Más, para que se marque activa aunque
-// el usuario esté en /grupos, /admin, etc. (no solo en /mas mismo).
-const RUTAS_MAS = ["/mas", "/ingresos", "/grupos", "/personas", "/admin"];
+// el usuario esté en /compras, /grupos, /admin, etc. (no solo en /mas mismo).
+const RUTAS_MAS = ["/mas", "/compras", "/ingresos", "/grupos", "/personas", "/admin"];
 
-// Barra inferior rediseñada: solo 4 destinos + el botón central "+" (antes
-// eran 6-7 iconos apretados) — Inicio, Cuotas, Fijos y Más (que agrupa
-// Ingresos/Grupos/Personas/Admin, ver /mas). Cada ítem activo muestra una
-// "chip" redondeada detrás del ícono que aparece con una animación tipo
-// resorte (leve rebote), inspirada en las micro-interacciones de
-// transitions.dev, en vez de solo cambiar de color de golpe.
+// Barra inferior rediseñada (rediseño "cuotas"): 4 destinos + el botón
+// central "+" — Inicio, Cuentas, Presupuesto y Más (que agrupa
+// Cuotas/Ingresos/Grupos/Personas/Admin, ver /mas). Cada ítem activo
+// muestra una "chip" redondeada detrás del ícono que aparece con una
+// animación tipo resorte (leve rebote), inspirada en las
+// micro-interacciones de transitions.dev, en vez de solo cambiar de color
+// de golpe.
 export function BottomNav() {
   const pathname = usePathname();
 
-  const inicio = navItems[0];
-  const cuotas = navItems[1];
-  const fijos = navItems[2];
+  const inicio = navItems.find((item) => item.href === "/")!;
+  const cuentas = navItems.find((item) => item.href === "/tarjetas")!;
+  const presupuesto = navItems.find((item) => item.href === "/gastos-fijos")!;
 
   function renderItem(item: (typeof navItems)[number], active: boolean) {
     return (
@@ -50,9 +51,9 @@ export function BottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-20 rounded-t-3xl bg-white/90 shadow-[0_-8px_30px_rgba(17,24,39,0.06)] backdrop-blur-xl">
       <div className="mx-auto flex max-w-3xl">
         {renderItem(inicio, pathname === inicio.href)}
-        {renderItem(cuotas, pathname === cuotas.href)}
+        {renderItem(cuentas, pathname === cuentas.href)}
         <MovimientoFab variante="en-nav" />
-        {renderItem(fijos, pathname === fijos.href)}
+        {renderItem(presupuesto, pathname === presupuesto.href)}
         {renderItem(masNavItem, RUTAS_MAS.includes(pathname))}
       </div>
       <div className="h-[max(env(safe-area-inset-bottom),12px)] bg-white/90" />
