@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Entidad, Marca, TipoMarca } from "@/lib/types";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { IconoPicker } from "@/components/IconoPicker";
+import { TIPO_CORTO } from "@/components/TarjetaVisual";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { supabase } from "@/lib/supabaseClient";
 import { mensajeError } from "@/lib/supabaseError";
@@ -141,8 +142,13 @@ export function EntidadPicker({
             style={{ width: 64 }}
           >
             <EntidadAvatar entidad={e} marca={resolverMarca(e, marcas)} className="h-9 w-9" />
-            <span className="truncate text-center text-[10px] text-gray-600" style={{ maxWidth: 60 }}>
+            <span className="truncate text-center text-[10px] leading-tight text-gray-600" style={{ maxWidth: 60 }}>
               {e.nombre}
+            </span>
+            {/* Para diferenciar, ej., "Banco Estado" débito de "Banco Estado"
+                crédito cuando comparten el mismo nombre y logo. */}
+            <span className="truncate text-center text-[9px] leading-tight text-gray-400" style={{ maxWidth: 60 }}>
+              {TIPO_CORTO[e.tipo]}
             </span>
           </button>
         ))}

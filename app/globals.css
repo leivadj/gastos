@@ -21,3 +21,18 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Safari en iPhone hace zoom automático de toda la página al enfocar un
+   campo (input/select/textarea) cuyo tamaño de letra sea menor a 16px —
+   eso es lo que se veía como "la app se hace zoom y se corta el fondo o
+   se sale de la pantalla" al escribir. Muchos campos usan clases de
+   Tailwind (text-xs, text-sm) más chicas que eso, así que se sube el
+   tamaño mínimo con !important solo en pantallas angostas (celular);
+   en escritorio no hace falta, ahí no hay zoom automático. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

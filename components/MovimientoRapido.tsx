@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
-import { useDeviceType } from "@/lib/useDeviceType";
+import { TIPO_CORTO } from "@/components/TarjetaVisual";
 import { mensajeError } from "@/lib/supabaseError";
 import { Categoria, Entidad, Marca } from "@/lib/types";
 
@@ -65,8 +65,7 @@ function HojaInferior({ titulo, onClose, children }: { titulo: string; onClose: 
   );
 }
 
-export function MovimientoFab() {
-  const esMobile = useDeviceType() === "mobile";
+export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante" | "en-nav" }) {
   const [abierto, setAbierto] = useState(false);
   const [modal, setModal] = useState<ModalActivo>(null);
 
@@ -94,51 +93,79 @@ export function MovimientoFab() {
     setModal(m);
   }
 
+  // "en-nav": el botón vive DENTRO de la barra inferior (como en el mockup),
+  // en vez de flotar encima del contenido y taparlo. "flotante": el botón
+  // clásico fijo abajo a la derecha — se usa solo en escritorio, donde no
+  // hay barra inferior debajo de la que taparse.
+  const menuAbierto = abierto && (
+    <div
+      className={
+        variante === "en-nav"
+          ? "absolute bottom-full left-1/2 z-30 mb-3 flex -translate-x-1/2 flex-col items-center gap-2"
+          : "mb-3 flex flex-col items-end gap-2"
+      }
+    >
+      <button
+        onClick={() => abrir("transferencia")}
+        className="flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+      >
+        Transferencia
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+          <IconoTransferencia />
+        </span>
+      </button>
+      <button
+        onClick={() => abrir("ingreso")}
+        className="flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+      >
+        Ingreso
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+          <IconoIngreso />
+        </span>
+      </button>
+      <button
+        onClick={() => abrir("gasto")}
+        className="flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+      >
+        Gasto
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600">
+          <IconoGasto />
+        </span>
+      </button>
+    </div>
+  );
+
+  const boton = (
+    <button
+      onClick={() => setAbierto((v) => !v)}
+      aria-label="Agregar movimiento"
+      className={
+        variante === "en-nav"
+          ? `-mt-7 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl ring-4 ring-white transition-transform ${
+              abierto ? "rotate-45" : ""
+            }`
+          : `flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl transition-transform ${
+              abierto ? "rotate-45" : ""
+            }`
+      }
+    >
+      +
+    </button>
+  );
+
   return (
     <>
-      <div className={`fixed right-4 z-30 ${esMobile ? "bottom-24" : "bottom-6"}`}>
-        {abierto && (
-          <div className="mb-3 flex flex-col items-end gap-2">
-            <button
-              onClick={() => abrir("transferencia")}
-              className="flex items-center gap-2 rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
-            >
-              Transferencia
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600">
-                <IconoTransferencia />
-              </span>
-            </button>
-            <button
-              onClick={() => abrir("ingreso")}
-              className="flex items-center gap-2 rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
-            >
-              Ingreso
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-                <IconoIngreso />
-              </span>
-            </button>
-            <button
-              onClick={() => abrir("gasto")}
-              className="flex items-center gap-2 rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
-            >
-              Gasto
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600">
-                <IconoGasto />
-              </span>
-            </button>
-          </div>
-        )}
-
-        <button
-          onClick={() => setAbierto((v) => !v)}
-          aria-label="Agregar movimiento"
-          className={`flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl transition-transform ${
-            abierto ? "rotate-45" : ""
-          }`}
-        >
-          +
-        </button>
-      </div>
+      {variante === "en-nav" ? (
+        <div className="relative flex flex-1 flex-col items-center justify-end pb-2.5">
+          {menuAbierto}
+          {boton}
+        </div>
+      ) : (
+        <div className="fixed bottom-6 right-4 z-30">
+          {menuAbierto}
+          {boton}
+        </div>
+      )}
 
       {abierto && <div className="fixed inset-0 z-20" onClick={() => setAbierto(false)} />}
 
@@ -434,7 +461,7 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
             <option value="">—</option>
             {entidades.map((e) => (
               <option key={e.id} value={e.id}>
-                {e.nombre}
+                {e.nombre} · {TIPO_CORTO[e.tipo]}
               </option>
             ))}
           </select>
@@ -445,7 +472,7 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
             <option value="">—</option>
             {entidades.map((e) => (
               <option key={e.id} value={e.id}>
-                {e.nombre}
+                {e.nombre} · {TIPO_CORTO[e.tipo]}
               </option>
             ))}
           </select>

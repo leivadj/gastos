@@ -14,6 +14,18 @@ export const TIPO_LABEL: Record<Entidad["tipo"], string> = {
   transferencia: "Transferencia",
 };
 
+// Versión corta de TIPO_LABEL para espacios chicos (ej. debajo del nombre en
+// EntidadPicker) — para poder distinguir "Banco Estado" débito de "Banco
+// Estado" crédito sin espacio para el label largo.
+export const TIPO_CORTO: Record<Entidad["tipo"], string> = {
+  efectivo: "Efectivo",
+  tarjeta_credito: "Crédito",
+  tarjeta_debito: "Débito",
+  linea_credito: "Línea créd.",
+  credito_hipotecario: "Hipotecario",
+  transferencia: "Transferencia",
+};
+
 // La "cara" visual de una tarjeta/cuenta, estilo wallet: si el usuario subió
 // una imagen del diseño real (ej. una captura de su tarjeta), se usa como
 // fondo; si no, se genera un degradado a partir de su color (elegido o

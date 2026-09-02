@@ -90,11 +90,12 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   if (esMobile) {
+    // El botón "+" va integrado en BottomNav (en el medio de la barra),
+    // no flotando encima del contenido — por eso no se agrega acá también.
     return (
       <div className="min-h-screen">
         <main className="mx-auto max-w-3xl px-4 pb-24 pt-[max(env(safe-area-inset-top),1rem)]">{children}</main>
         <BottomNav />
-        <MovimientoFab />
       </div>
     );
   }
