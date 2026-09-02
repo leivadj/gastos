@@ -161,7 +161,25 @@ export interface GastoFijo {
   icono: string | null;
   monto_estimado: number;
   dia_mes_pago: number | null;
+  // 'fijo' = siempre cobra lo mismo (arriendo, suscripción). 'variable' =
+  // fecha de vencimiento fija pero el monto cambia cada mes (luz, agua,
+  // gas) — ver lib/promedioMovil.ts.
+  tipo_monto: "fijo" | "variable";
   activo: boolean;
+}
+
+// Marca si el cargo del mes (cuota o gasto fijo) ya se pagó, y el monto
+// real si difiere del estimado — de acá sale el promedio móvil de los
+// gastos fijos de monto variable (ver lib/promedioMovil.ts) y el estado
+// pagado/pendiente del Calendario de pagos (/calendario-pagos).
+export interface Pago {
+  id: string;
+  origen: OrigenItem;
+  origen_id: string;
+  mes: string; // primer día del mes, ej. "2026-09-01"
+  monto_real: number | null;
+  pagado: boolean;
+  fecha_pago: string | null;
 }
 
 export interface Ingreso {

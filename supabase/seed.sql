@@ -59,16 +59,18 @@ insert into entidades (nombre, tipo) values
 -- ---------------------------------------------------------------------------
 -- GASTOS FIJOS — recurrentes cada mes, reparto automático por %
 -- ---------------------------------------------------------------------------
-insert into gastos_fijos (descripcion, categoria_id, entidad_id, monto_estimado, dia_mes_pago, modo_reparto, activo)
-select 'Luz', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Efectivo'), 71100, 5, 'automatico', true
+-- Luz/Agua/Gas: 'variable' — la fecha de vencimiento es fija pero el monto
+-- cambia cada mes (ver migration_19). El resto queda 'fijo' (default).
+insert into gastos_fijos (descripcion, categoria_id, entidad_id, monto_estimado, dia_mes_pago, tipo_monto, modo_reparto, activo)
+select 'Luz', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Efectivo'), 71100, 5, 'variable', 'automatico', true
 union all
-select 'Agua', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Efectivo'), 22000, 5, 'automatico', true
+select 'Agua', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Efectivo'), 22000, 5, 'variable', 'automatico', true
 union all
-select 'Gas', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Efectivo'), 46400, 5, 'automatico', true
+select 'Gas', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Efectivo'), 46400, 5, 'variable', 'automatico', true
 union all
-select 'Crédito hipotecario', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Crédito Hipotecario'), 150000, 5, 'automatico', true
+select 'Crédito hipotecario', (select id from categorias where nombre = 'Servicio básico (luz, agua, gas...)'), (select id from entidades where nombre = 'Crédito Hipotecario'), 150000, 5, 'fijo', 'automatico', true
 union all
-select 'Mercadería (supermercado)', (select id from categorias where nombre = 'Supermercado'), (select id from entidades where nombre = 'Efectivo'), 250000, 1, 'automatico', true
+select 'Mercadería (supermercado)', (select id from categorias where nombre = 'Supermercado'), (select id from entidades where nombre = 'Efectivo'), 250000, 1, 'fijo', 'automatico', true
 union all
 select 'Carnicería', (select id from categorias where nombre = 'Supermercado'), (select id from entidades where nombre = 'Efectivo'), 20000, 1, 'automatico', true;
 

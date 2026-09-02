@@ -176,6 +176,11 @@ create table gastos_fijos (
   icono text,
   monto_estimado numeric(12, 2) not null check (monto_estimado >= 0),
   dia_mes_pago int check (dia_mes_pago between 1 and 31),
+  -- 'fijo' = siempre cobra lo mismo (arriendo, suscripción). 'variable' =
+  -- fecha de vencimiento fija pero el monto cambia cada mes (luz, agua,
+  -- gas) — se le muestra el promedio móvil de los últimos pagos reales
+  -- registrados en vez de monto_estimado (ver /gastos-fijos y pagos).
+  tipo_monto text not null default 'fijo' check (tipo_monto in ('fijo', 'variable')),
   activo boolean not null default true,
   created_at timestamptz not null default now()
 );

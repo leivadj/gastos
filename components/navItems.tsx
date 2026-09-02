@@ -5,9 +5,12 @@ export function esAdmin(email?: string | null): boolean {
 }
 
 // "Presupuesto" apunta por ahora a /gastos-fijos como mapeo interino: la
-// pantalla de Calendario de pagos / promedio móvil del rediseño todavía no
-// existe, así que esta pestaña sigue mostrando la vista de gastos fijos
-// actual hasta que se construya esa fase.
+// pantalla real de Presupuesto del rediseño (barras de gasto vs. presupuesto
+// por categoría) todavía no existe, así que esta pestaña sigue mostrando la
+// vista de gastos fijos actual hasta que se construya esa fase. El
+// Calendario de pagos (con el promedio móvil de luz/agua/gas) ya existe
+// como pantalla propia, agrupada en "Más" — igual que en el mockup, que la
+// deja fuera de la barra inferior.
 export const navItems = [
   {
     href: "/",
@@ -47,6 +50,17 @@ export const navItems = [
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
         <path d="M12 3v9l7.5 4.3" strokeLinecap="round" strokeLinejoin="round" />
         <circle cx="12" cy="12" r="9" />
+      </svg>
+    ),
+  },
+  {
+    href: "/calendario-pagos",
+    label: "Calendario",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+        <path d="M3.5 9.5h17" strokeLinecap="round" />
+        <path d="M8 3v3M16 3v3" strokeLinecap="round" />
       </svg>
     ),
   },

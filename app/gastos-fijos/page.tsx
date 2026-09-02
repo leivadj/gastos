@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
@@ -9,10 +10,11 @@ import { IconoPicker } from "@/components/IconoPicker";
 import { ItemDesplegable } from "@/components/ItemDesplegable";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, mesActualISO } from "@/lib/format";
+import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
+import { Categoria, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
 
 export default function GastosFijosPage() {
   const [gastos, setGastos] = useState<GastoFijo[]>([]);
@@ -21,6 +23,7 @@ export default function GastosFijosPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [pagos, setPagos] = useState<Pago[]>([]);
   const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -30,6 +33,7 @@ export default function GastosFijosPage() {
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [diaMes, setDiaMes] = useState("1");
+  const [tipoMonto, setTipoMonto] = useState<"fijo" | "variable">("fijo");
   const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [grupoId, setGrupoId] = useState("");
@@ -38,7 +42,7 @@ export default function GastosFijosPage() {
   const [participantes, setParticipantes] = useState<Participante[]>([]);
 
   async function cargarTodo() {
-    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: ip }] =
+    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: ip }, { data: pg }] =
       await Promise.all([
         supabase.from("gastos_fijos").select("*").eq("activo", true).order("descripcion"),
         supabase.from("entidades").select("*").order("nombre"),
@@ -47,6 +51,7 @@ export default function GastosFijosPage() {
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
         supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
+        supabase.from("pagos").select("*").eq("origen", "gasto_fijo"),
       ]);
     setGastos((g as GastoFijo[]) ?? []);
     setEntidades((e as Entidad[]) ?? []);
@@ -54,6 +59,7 @@ export default function GastosFijosPage() {
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
+    setPagos((pg as Pago[]) ?? []);
     const agrupado: Record<string, ItemParticipante[]> = {};
     ((ip as ItemParticipante[]) ?? []).forEach((row) => {
       if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
@@ -72,6 +78,7 @@ export default function GastosFijosPage() {
     setDescripcion("");
     setMonto("");
     setDiaMes("1");
+    setTipoMonto("fijo");
     setEntidadId("");
     setCategoriaId("");
     setGrupoId("");
@@ -86,6 +93,7 @@ export default function GastosFijosPage() {
     setDescripcion(g.descripcion);
     setMonto(String(g.monto_estimado));
     setDiaMes(String(g.dia_mes_pago ?? 1));
+    setTipoMonto(g.tipo_monto);
     setEntidadId(g.entidad_id ?? "");
     setCategoriaId(g.categoria_id ?? "");
     setGrupoId(g.grupo_id ?? "");
@@ -125,6 +133,7 @@ export default function GastosFijosPage() {
         descripcion,
         monto_estimado: Number(monto),
         dia_mes_pago: Number(diaMes),
+        tipo_monto: tipoMonto,
         entidad_id: entidadId || null,
         categoria_id: categoriaId || null,
         grupo_id: grupoId || null,
@@ -168,7 +177,19 @@ export default function GastosFijosPage() {
   const nombreCategoria = (id: string | null) => categoriaDe(id)?.nombre ?? "—";
   const grupoDe = (id: string | null) => grupos.find((g) => g.id === id) ?? null;
   const categoriaSeleccionada = categoriaDe(categoriaId || null);
-  const total = gastos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
+
+  // Para un gasto de monto variable (luz, agua, gas...) el "monto vigente"
+  // es el promedio móvil de sus últimos pagos reales, no monto_estimado
+  // (que solo se usa como estimación inicial hasta que exista historial).
+  function montoVigente(g: GastoFijo) {
+    if (g.tipo_monto !== "variable") return { monto: Number(g.monto_estimado), esPromedio: false };
+    const { promedio, meses } = promedioMovil(pagos, g.id, mesActualISO(), Number(g.monto_estimado));
+    return { monto: promedio, esPromedio: meses > 0 };
+  }
+
+  const total = gastos.reduce((acc, g) => acc + montoVigente(g).monto, 0);
+  const gastosFijosMonto = gastos.filter((g) => g.tipo_monto === "fijo");
+  const gastosMontoVariable = gastos.filter((g) => g.tipo_monto === "variable");
 
   function resumenReparto(g: GastoFijo) {
     if (g.grupo_id) return `Grupo: ${grupoDe(g.grupo_id)?.nombre ?? "—"}`;
@@ -193,6 +214,16 @@ export default function GastosFijosPage() {
         </button>
       </div>
 
+      <Link
+        href="/calendario-pagos"
+        className="flex items-center justify-between rounded-2xl bg-purple-50 px-4 py-3 text-sm font-semibold text-brand-from"
+      >
+        Ver calendario de pagos
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="m9 6 6 6-6 6" />
+        </svg>
+      </Link>
+
       {mostrarForm && (
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -208,7 +239,9 @@ export default function GastosFijosPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500">Monto estimado</label>
+                <label className="text-xs text-gray-500">
+                  {tipoMonto === "variable" ? "Monto estimado (inicial)" : "Monto"}
+                </label>
                 <input
                   required
                   type="number"
@@ -229,6 +262,41 @@ export default function GastosFijosPage() {
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-500">¿Cobra siempre lo mismo?</label>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTipoMonto("fijo")}
+                  className={`rounded-lg border px-3 py-2 text-left text-xs font-medium ${
+                    tipoMonto === "fijo"
+                      ? "border-brand-from bg-purple-50 text-brand-from"
+                      : "border-gray-200 text-gray-500"
+                  }`}
+                >
+                  Monto fijo
+                  <span className="block text-[10.5px] font-normal opacity-80">Ej: arriendo, suscripción</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTipoMonto("variable")}
+                  className={`rounded-lg border px-3 py-2 text-left text-xs font-medium ${
+                    tipoMonto === "variable"
+                      ? "border-brand-from bg-purple-50 text-brand-from"
+                      : "border-gray-200 text-gray-500"
+                  }`}
+                >
+                  Monto variable
+                  <span className="block text-[10.5px] font-normal opacity-80">Ej: luz, agua, gas</span>
+                </button>
+              </div>
+              {tipoMonto === "variable" && (
+                <p className="mt-1.5 rounded-lg bg-purple-50 px-3 py-2 text-[11px] text-brand-from">
+                  Vence siempre el mismo día, pero el monto cambia cada mes. Una vez que registres pagos reales en el
+                  Calendario de pagos, acá se va a mostrar el promedio móvil en vez del monto estimado.
+                </p>
+              )}
             </div>
             <div>
               <label className="text-xs text-gray-500">Medio de pago</label>
@@ -337,10 +405,28 @@ export default function GastosFijosPage() {
         </div>
       </Card>
 
+      {renderSeccion("Monto fijo", "Siempre cobran lo mismo.", gastosFijosMonto)}
+      {renderSeccion(
+        "Obligatorio, monto variable",
+        "Vencimiento fijo, pero el monto cambia cada mes.",
+        gastosMontoVariable
+      )}
+      {gastos.length === 0 && <p className="text-center text-sm text-gray-400">Aún no hay gastos fijos.</p>}
+    </div>
+  );
+
+  function renderSeccion(titulo: string, subtitulo: string, lista: GastoFijo[]) {
+    if (lista.length === 0) return null;
+    return (
       <div className="space-y-3">
-        {gastos.map((g) => {
+        <div className="px-1">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{titulo}</p>
+          <p className="text-[11px] text-gray-400">{subtitulo}</p>
+        </div>
+        {lista.map((g) => {
           const marcaItem = marcaDe(g.marca_id);
           const filasReparto = participantesPorItem[g.id] ?? [];
+          const { monto: montoActual, esPromedio } = montoVigente(g);
           return (
             <Card key={g.id}>
               <ItemDesplegable
@@ -372,7 +458,11 @@ export default function GastosFijosPage() {
                         </button>
                       </div>
                     </div>
-                    <p className="mt-2 text-right font-semibold text-gray-800">{formatCLP(g.monto_estimado)}</p>
+                    <p className="mt-2 text-right font-semibold text-gray-800">
+                      {esPromedio && <span className="mr-1 text-xs font-normal text-gray-400">~</span>}
+                      {formatCLP(montoActual)}
+                    </p>
+                    {esPromedio && <p className="text-right text-[10.5px] text-gray-400">promedio móvil</p>}
                   </div>
                 )}
                 detalle={({ onClick }) => (
@@ -393,8 +483,8 @@ export default function GastosFijosPage() {
                     </div>
                     <dl className="mt-3 space-y-1.5 text-xs">
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Monto estimado</dt>
-                        <dd className="font-medium text-gray-700">{formatCLP(g.monto_estimado)}</dd>
+                        <dt className="text-gray-400">{esPromedio ? "Promedio móvil" : g.tipo_monto === "variable" ? "Monto estimado" : "Monto"}</dt>
+                        <dd className="font-medium text-gray-700">{formatCLP(montoActual)}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
                         <dt className="text-gray-400">Día de pago</dt>
@@ -447,8 +537,7 @@ export default function GastosFijosPage() {
             </Card>
           );
         })}
-        {gastos.length === 0 && <p className="text-center text-sm text-gray-400">Aún no hay gastos fijos.</p>}
       </div>
-    </div>
-  );
+    );
+  }
 }
