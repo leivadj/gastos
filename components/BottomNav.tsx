@@ -7,11 +7,11 @@ import { MovimientoFab } from "@/components/MovimientoRapido";
 
 // Rutas que "pertenecen" a la pestaña Más, para que se marque activa aunque
 // el usuario esté en /grupos, /admin, etc. (no solo en /mas mismo).
-const RUTAS_MAS = ["/mas", "/gastos-fijos", "/grupos", "/personas", "/admin"];
+const RUTAS_MAS = ["/mas", "/ingresos", "/grupos", "/personas", "/admin"];
 
 // Barra inferior rediseñada: solo 4 destinos + el botón central "+" (antes
-// eran 6-7 iconos apretados) — Inicio, Cuotas, Ingresos y Más (que agrupa
-// Fijos/Grupos/Personas/Admin, ver /mas). Cada ítem activo muestra una
+// eran 6-7 iconos apretados) — Inicio, Cuotas, Fijos y Más (que agrupa
+// Ingresos/Grupos/Personas/Admin, ver /mas). Cada ítem activo muestra una
 // "chip" redondeada detrás del ícono que aparece con una animación tipo
 // resorte (leve rebote), inspirada en las micro-interacciones de
 // transitions.dev, en vez de solo cambiar de color de golpe.
@@ -20,7 +20,7 @@ export function BottomNav() {
 
   const inicio = navItems[0];
   const cuotas = navItems[1];
-  const ingresos = navItems[4];
+  const fijos = navItems[2];
 
   function renderItem(item: (typeof navItems)[number], active: boolean) {
     return (
@@ -52,7 +52,7 @@ export function BottomNav() {
         {renderItem(inicio, pathname === inicio.href)}
         {renderItem(cuotas, pathname === cuotas.href)}
         <MovimientoFab variante="en-nav" />
-        {renderItem(ingresos, pathname === ingresos.href)}
+        {renderItem(fijos, pathname === fijos.href)}
         {renderItem(masNavItem, RUTAS_MAS.includes(pathname))}
       </div>
       <div className="h-[max(env(safe-area-inset-bottom),12px)] bg-white/90" />
