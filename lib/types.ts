@@ -27,6 +27,13 @@ export interface Entidad {
     | "credito_hipotecario"
     | "transferencia";
   marca_id: string | null;
+  // Personalización visual de la tarjeta en /tarjetas. color_hex: color base
+  // del degradado (si es null, se usa un color determinístico por nombre,
+  // ver lib/avatarColor.ts). imagen_fondo_url: foto/diseño real de la
+  // tarjeta que el usuario sube (ej. una captura del diseño de su banco) —
+  // si existe, se usa como fondo en vez del degradado.
+  color_hex: string | null;
+  imagen_fondo_url: string | null;
 }
 
 export type TipoMarca =

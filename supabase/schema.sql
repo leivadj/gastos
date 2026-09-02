@@ -78,6 +78,12 @@ create table entidades (
     tipo in ('efectivo', 'tarjeta_credito', 'tarjeta_debito', 'linea_credito', 'credito_hipotecario', 'transferencia')
   ),
   marca_id uuid references marcas(id), -- opcional: enlaza al catálogo compartido para heredar logo/ícono
+  -- Personalización visual de la tarjeta en /tarjetas (estilo wallet): color
+  -- base del degradado (null = color determinístico por nombre), y/o una
+  -- imagen real subida por el usuario (ej. captura del diseño de su banco)
+  -- que reemplaza al degradado cuando existe.
+  color_hex text,
+  imagen_fondo_url text,
   created_at timestamptz not null default now(),
   unique (owner_id, nombre)
 );
@@ -428,3 +434,24 @@ create policy "marcas_logos_admin_update" on storage.objects for update
   using (bucket_id = 'marcas-logos' and (auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));
 create policy "marcas_logos_admin_delete" on storage.objects for delete
   using (bucket_id = 'marcas-logos' and (auth.jwt() ->> 'email') in ('leivadj@gmail.com', 'marianps.260290@gmail.com'));
+
+-- ============================================================================
+-- ALMACENAMIENTO — imágenes de fondo de tarjetas (/tarjetas), personales.
+-- A diferencia de marcas-logos (catálogo compartido, solo admin escribe),
+-- cada usuario sube y administra SOLO sus propias imágenes: se guardan bajo
+-- una carpeta con su propio user id (auth.uid()/archivo.ext), y la política
+-- exige que esa carpeta coincida con el usuario autenticado. Lectura pública
+-- para poder mostrar la imagen sin volver a pedir sesión.
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('tarjetas-fondos', 'tarjetas-fondos', true)
+on conflict (id) do nothing;
+
+create policy "tarjetas_fondos_lectura_publica" on storage.objects for select
+  using (bucket_id = 'tarjetas-fondos');
+create policy "tarjetas_fondos_dueno_insert" on storage.objects for insert
+  with check (bucket_id = 'tarjetas-fondos' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "tarjetas_fondos_dueno_update" on storage.objects for update
+  using (bucket_id = 'tarjetas-fondos' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "tarjetas_fondos_dueno_delete" on storage.objects for delete
+  using (bucket_id = 'tarjetas-fondos' and (storage.foldername(name))[1] = auth.uid()::text);

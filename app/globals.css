@@ -11,3 +11,13 @@ body {
   width: 8px;
   height: 8px;
 }
+
+/* Oculta la barra de scroll en el carrusel de tarjetas (/tarjetas) sin
+   perder el deslizamiento nativo (scroll-snap) con el dedo o el mouse. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

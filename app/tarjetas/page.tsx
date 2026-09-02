@@ -1,11 +1,15 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
-import { Entidad, Marca } from "@/lib/types";
+import { TarjetasCarousel } from "@/components/TarjetasCarousel";
+import { TarjetaVisual, TIPO_LABEL } from "@/components/TarjetaVisual";
+import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { Categoria, CompraVigente, Entidad, GastoFijo, Marca } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
 import { resolverMarca } from "@/lib/resolverMarca";
+import { formatCLP, nombreMes } from "@/lib/format";
 
 const TIPOS: { value: Entidad["tipo"]; label: string }[] = [
   { value: "tarjeta_credito", label: "Tarjeta de crédito" },
@@ -19,6 +23,13 @@ const TIPOS: { value: Entidad["tipo"]; label: string }[] = [
 export default function TarjetasPage() {
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [cuotas, setCuotas] = useState<CompraVigente[]>([]);
+  const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
+  const [cargando, setCargando] = useState(true);
+
+  const [activaId, setActivaId] = useState<string | null>(null);
+
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -28,19 +39,44 @@ export default function TarjetasPage() {
   const [tipo, setTipo] = useState<Entidad["tipo"]>("tarjeta_credito");
   const [marcaId, setMarcaId] = useState("");
   const [marcaAutodetectada, setMarcaAutodetectada] = useState(false);
+  const [colorHex, setColorHex] = useState<string | null>(null);
+  const [imagenFondoUrl, setImagenFondoUrl] = useState<string | null>(null);
+  const [archivoFondo, setArchivoFondo] = useState<File | null>(null);
+  const [previewFondo, setPreviewFondo] = useState<string | null>(null);
+  const [subiendoFondo, setSubiendoFondo] = useState(false);
 
   async function cargarTodo() {
-    const [{ data: e }, { data: m }] = await Promise.all([
+    const [{ data: e }, { data: m }, { data: cat }, { data: c }, { data: gf }] = await Promise.all([
       supabase.from("entidades").select("*").order("nombre"),
       supabase.from("marcas").select("*").order("nombre"),
+      supabase.from("categorias").select("*"),
+      supabase.from("vista_cuotas_mes_actual").select("*"),
+      supabase.from("gastos_fijos").select("*").eq("activo", true),
     ]);
-    setEntidades((e as Entidad[]) ?? []);
+    const listaEntidades = (e as Entidad[]) ?? [];
+    setEntidades(listaEntidades);
     setMarcas((m as Marca[]) ?? []);
+    setCategorias((cat as Categoria[]) ?? []);
+    setCuotas((c as CompraVigente[]) ?? []);
+    setGastosFijos((gf as GastoFijo[]) ?? []);
+    setCargando(false);
+    setActivaId((actual) => {
+      if (actual && listaEntidades.some((x) => x.id === actual)) return actual;
+      return listaEntidades[0]?.id ?? null;
+    });
   }
 
   useEffect(() => {
     cargarTodo();
   }, []);
+
+  // Revoca el object URL de la previsualización local cuando cambia o se
+  // desmonta, para no dejar memoria colgando.
+  useEffect(() => {
+    return () => {
+      if (previewFondo) URL.revokeObjectURL(previewFondo);
+    };
+  }, [previewFondo]);
 
   function aplicarTipoPorMarca(m: Marca) {
     if (m.tipo === "banco") setTipo("tarjeta_credito");
@@ -82,6 +118,19 @@ export default function TarjetasPage() {
     }
   }
 
+  function onElegirArchivo(file: File | null) {
+    setArchivoFondo(file);
+    setPreviewFondo((anterior) => {
+      if (anterior) URL.revokeObjectURL(anterior);
+      return file ? URL.createObjectURL(file) : null;
+    });
+  }
+
+  function quitarImagenFondo() {
+    onElegirArchivo(null);
+    setImagenFondoUrl(null);
+  }
+
   function cancelarForm() {
     setMostrarForm(false);
     setEditandoId(null);
@@ -89,6 +138,9 @@ export default function TarjetasPage() {
     setTipo("tarjeta_credito");
     setMarcaId("");
     setMarcaAutodetectada(false);
+    setColorHex(null);
+    setImagenFondoUrl(null);
+    onElegirArchivo(null);
     setError("");
   }
 
@@ -98,6 +150,9 @@ export default function TarjetasPage() {
     setTipo(e.tipo);
     setMarcaId(e.marca_id ?? "");
     setMarcaAutodetectada(false);
+    setColorHex(e.color_hex ?? null);
+    setImagenFondoUrl(e.imagen_fondo_url ?? null);
+    onElegirArchivo(null);
     setMostrarForm(true);
   }
 
@@ -105,21 +160,45 @@ export default function TarjetasPage() {
     e.preventDefault();
     setError("");
     setGuardando(true);
-    const payload = {
-      nombre,
-      tipo,
-      marca_id: marcaId || null,
-    };
-    const { error: dbError } = editandoId
-      ? await supabase.from("entidades").update(payload).eq("id", editandoId)
-      : await supabase.from("entidades").insert(payload);
-    setGuardando(false);
-    if (dbError) {
-      setError(dbError.message || "No se pudo guardar. Intenta de nuevo.");
-      return;
+    try {
+      let fondoUrlFinal = imagenFondoUrl;
+
+      if (archivoFondo) {
+        setSubiendoFondo(true);
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("Sesión expirada, vuelve a iniciar sesión.");
+        const ext = archivoFondo.name.split(".").pop() || "jpg";
+        const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("tarjetas-fondos")
+          .upload(path, archivoFondo, { upsert: false });
+        if (uploadError) throw uploadError;
+        const { data: pub } = supabase.storage.from("tarjetas-fondos").getPublicUrl(path);
+        fondoUrlFinal = pub.publicUrl;
+        setSubiendoFondo(false);
+      }
+
+      const payload = {
+        nombre,
+        tipo,
+        marca_id: marcaId || null,
+        color_hex: colorHex || null,
+        imagen_fondo_url: fondoUrlFinal,
+      };
+      const { error: dbError } = editandoId
+        ? await supabase.from("entidades").update(payload).eq("id", editandoId)
+        : await supabase.from("entidades").insert(payload);
+      if (dbError) throw dbError;
+      cancelarForm();
+      cargarTodo();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+    } finally {
+      setSubiendoFondo(false);
+      setGuardando(false);
     }
-    cancelarForm();
-    cargarTodo();
   }
 
   async function eliminar(id: string) {
@@ -131,7 +210,56 @@ export default function TarjetasPage() {
     cargarTodo();
   }
 
-  const marcaDe = (id: string | null) => marcas.find((m) => m.id === id);
+  const marcaDe = (id: string | null) => marcas.find((m) => m.id === id) ?? null;
+  const categoriaNombre = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "Sin categoría";
+
+  const gastoPorEntidad = useMemo(() => {
+    const acc: Record<string, number> = {};
+    cuotas.forEach((c) => {
+      if (!c.entidad_id) return;
+      acc[c.entidad_id] = (acc[c.entidad_id] ?? 0) + Number(c.monto_cuota);
+    });
+    gastosFijos.forEach((g) => {
+      if (!g.entidad_id) return;
+      acc[g.entidad_id] = (acc[g.entidad_id] ?? 0) + Number(g.monto_estimado);
+    });
+    return acc;
+  }, [cuotas, gastosFijos]);
+
+  const entidadActiva = entidades.find((e) => e.id === activaId) ?? null;
+  const marcaActiva = resolverMarca(entidadActiva, marcas);
+
+  const itemsActivos = useMemo(() => {
+    if (!activaId) return [];
+    return [
+      ...cuotas
+        .filter((c) => c.entidad_id === activaId)
+        .map((c) => ({
+          key: `c-${c.compra_id}`,
+          descripcion: c.descripcion,
+          categoria: categoriaNombre(c.categoria_id),
+          detalle: `Cuota ${c.cuota_actual} de ${c.n_cuotas}`,
+          monto: c.monto_cuota,
+          marca_id: c.marca_id,
+          icono: c.icono,
+        })),
+      ...gastosFijos
+        .filter((g) => g.entidad_id === activaId)
+        .map((g) => ({
+          key: `g-${g.id}`,
+          descripcion: g.descripcion,
+          categoria: categoriaNombre(g.categoria_id),
+          detalle: "Gasto fijo",
+          monto: g.monto_estimado,
+          marca_id: g.marca_id,
+          icono: g.icono,
+        })),
+    ].sort((a, b) => b.monto - a.monto);
+  }, [cuotas, gastosFijos, activaId, categorias]);
+
+  if (cargando) {
+    return <p className="py-10 text-center text-gray-400">Cargando…</p>;
+  }
 
   return (
     <div className="space-y-4 pb-10">
@@ -150,7 +278,7 @@ export default function TarjetasPage() {
 
       {mostrarForm && (
         <Card>
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs text-gray-500">Elegir del catálogo (opcional)</label>
               <div className="mt-1 grid grid-cols-4 gap-2">
@@ -213,57 +341,154 @@ export default function TarjetasPage() {
                 ))}
               </select>
             </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+              <p className="text-xs font-semibold text-gray-600">Diseño de la tarjeta</p>
+              <p className="mt-0.5 text-[11px] text-gray-400">
+                Sube una foto/captura del diseño real (ej. de tu banco), o elige un color — si no eliges nada, se
+                usa un color automático.
+              </p>
+
+              <div className="mt-3">
+                <TarjetaVisual
+                  entidad={{
+                    id: "preview",
+                    nombre: nombre || "Nombre de la tarjeta",
+                    tipo,
+                    marca_id: marcaId || null,
+                    color_hex: colorHex,
+                    imagen_fondo_url: previewFondo ?? imagenFondoUrl,
+                  }}
+                  marca={marcaDe(marcaId)}
+                  gastoMes={editandoId ? gastoPorEntidad[editandoId] ?? 0 : 0}
+                  className="max-w-xs"
+                />
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-xs text-gray-600">
+                  Color
+                  <input
+                    type="color"
+                    value={colorHex || colorFor(nombre || "?")}
+                    onChange={(e) => setColorHex(e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded border border-gray-200 bg-white p-0.5"
+                  />
+                </label>
+                {colorHex && (
+                  <button type="button" onClick={() => setColorHex(null)} className="text-[11px] text-brand-from">
+                    usar color automático
+                  </button>
+                )}
+
+                <label className="cursor-pointer rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-brand-from">
+                  {previewFondo || imagenFondoUrl ? "Cambiar imagen" : "+ Subir imagen"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => onElegirArchivo(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+                {(previewFondo || imagenFondoUrl) && (
+                  <button type="button" onClick={quitarImagenFondo} className="text-[11px] text-gray-400 hover:text-red-400">
+                    quitar imagen
+                  </button>
+                )}
+              </div>
+            </div>
+
             {error && <p className="text-xs text-red-500">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
               className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {guardando ? "Guardando…" : editandoId ? "Guardar cambios" : "Guardar"}
+              {guardando ? (subiendoFondo ? "Subiendo imagen…" : "Guardando…") : editandoId ? "Guardar cambios" : "Guardar"}
             </button>
           </form>
         </Card>
       )}
 
-      <div className="space-y-3">
-        {entidades.map((e) => {
-          const marca = resolverMarca(e, marcas);
-          return (
-            <Card key={e.id}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {marca?.logo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={marca.logo_url} alt={e.nombre} className="h-9 w-9 rounded-lg object-contain" />
-                  ) : (
-                    <span
-                      className="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold text-white"
-                      style={{ backgroundColor: colorFor(e.nombre) }}
-                    >
-                      {e.nombre.charAt(0)}
-                    </span>
-                  )}
-                  <div>
-                    <p className="font-semibold text-gray-800">{e.nombre}</p>
-                    <p className="text-xs text-gray-400">{TIPOS.find((t) => t.value === e.tipo)?.label ?? e.tipo}</p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <button onClick={() => iniciarEdicion(e)} className="text-xs text-brand-from">
-                    editar
-                  </button>
-                  <button onClick={() => eliminar(e.id)} className="text-xs text-gray-300 hover:text-red-400">
-                    eliminar
-                  </button>
-                </div>
+      {entidades.length === 0 ? (
+        <p className="text-center text-sm text-gray-400">Aún no tienes tarjetas o cuentas creadas.</p>
+      ) : (
+        <>
+          <TarjetasCarousel
+            entidades={entidades}
+            marcas={marcas}
+            gastoPorEntidad={gastoPorEntidad}
+            activaId={activaId}
+            onCambiarActiva={setActivaId}
+          />
+
+          {entidadActiva && (
+            <div className="flex items-center justify-between px-1">
+              <p className="text-sm font-semibold text-gray-700">
+                {entidadActiva.nombre} <span className="font-normal text-gray-400">· {TIPO_LABEL[entidadActiva.tipo]}</span>
+              </p>
+              <div className="flex shrink-0 items-center gap-3">
+                <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from">
+                  editar
+                </button>
+                <button onClick={() => eliminar(entidadActiva.id)} className="text-xs text-gray-300 hover:text-red-400">
+                  eliminar
+                </button>
               </div>
-            </Card>
-          );
-        })}
-        {entidades.length === 0 && (
-          <p className="text-center text-sm text-gray-400">Aún no tienes tarjetas o cuentas creadas.</p>
-        )}
-      </div>
+            </div>
+          )}
+
+          <Card>
+            <p className="mb-1 text-sm font-semibold text-gray-600">Gastos con esta tarjeta</p>
+            <p className="mb-3 text-xs capitalize text-gray-400">{nombreMes()}</p>
+            {itemsActivos.length === 0 ? (
+              <p className="py-2 text-sm text-gray-400">Sin gastos este mes con esta tarjeta.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {itemsActivos.map((it) => (
+                  <li key={it.key} className="flex items-center gap-3 py-2.5">
+                    <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-8 w-8" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-gray-700">{it.descripcion}</p>
+                      <p className="text-xs text-gray-400">
+                        {it.categoria} · {it.detalle}
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-sm font-semibold text-gray-800">{formatCLP(it.monto)}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+
+          {entidades.length > 1 && (
+            <div>
+              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+                Todas tus tarjetas y cuentas
+              </p>
+              <div className="space-y-2">
+                {entidades.map((e) => {
+                  const marca = resolverMarca(e, marcas);
+                  return (
+                    <Card key={e.id} className={`!p-3 ${e.id === activaId ? "ring-1 ring-brand-from" : ""}`}>
+                      <button type="button" onClick={() => setActivaId(e.id)} className="flex w-full items-center gap-3 text-left">
+                        <EntidadAvatar entidad={e} marca={marca} className="h-9 w-9" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-gray-800">{e.nombre}</p>
+                          <p className="text-xs text-gray-400">{TIPO_LABEL[e.tipo]}</p>
+                        </div>
+                        <p className="shrink-0 text-xs font-medium text-gray-500">
+                          {formatCLP(gastoPorEntidad[e.id] ?? 0)}
+                        </p>
+                      </button>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
