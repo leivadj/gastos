@@ -9,6 +9,7 @@ import { EntidadPicker } from "@/components/EntidadPicker";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { mensajeError } from "@/lib/supabaseError";
 import { IconoPicker } from "@/components/IconoPicker";
+import { ItemDesplegable } from "@/components/ItemDesplegable";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { formatCLP } from "@/lib/format";
@@ -359,42 +360,128 @@ export default function ComprasPage() {
           const activa = c.cuota_actual >= 1 && c.cuota_actual <= c.n_cuotas;
           const progreso = Math.min(100, Math.max(0, (c.cuota_actual / c.n_cuotas) * 100));
           const marcaItem = marcaDe(c.marca_id);
+          const filasReparto = participantesPorItem[c.compra_id] ?? [];
+          const barraProgreso = (
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+              <div className="h-full bg-brand-gradient" style={{ width: `${progreso}%` }} />
+            </div>
+          );
           return (
             <Card key={c.compra_id} className={!activa ? "opacity-50" : ""}>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-3">
-                  <EntidadAvatar
-                    entidad={entidadDe(c.entidad_id)}
-                    marca={marcaItem ?? marcaDeEntidad(c.entidad_id)}
-                    icono={c.icono}
-                    className="h-9 w-9"
-                  />
+              <ItemDesplegable
+                resumen={({ onClick }) => (
                   <div>
-                    <p className="font-semibold text-gray-800">{c.descripcion}</p>
-                    <p className="text-xs text-gray-400">
-                      {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)}
-                      {marcaItem ? ` (${marcaItem.nombre})` : ""} · {resumenReparto(c)}
-                    </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <button type="button" onClick={onClick} className="flex flex-1 items-start gap-3 text-left">
+                        <EntidadAvatar
+                          entidad={entidadDe(c.entidad_id)}
+                          marca={marcaItem ?? marcaDeEntidad(c.entidad_id)}
+                          icono={c.icono}
+                          className="h-9 w-9"
+                        />
+                        <div>
+                          <p className="font-semibold text-gray-800">{c.descripcion}</p>
+                          <p className="text-xs text-gray-400">
+                            {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)}
+                            {marcaItem ? ` (${marcaItem.nombre})` : ""} · {resumenReparto(c)}
+                          </p>
+                        </div>
+                      </button>
+                      <div className="flex shrink-0 items-center gap-3 pt-0.5">
+                        <button onClick={() => iniciarEdicion(c)} className="text-xs text-brand-from">
+                          editar
+                        </button>
+                        <button onClick={() => eliminar(c.compra_id)} className="text-xs text-gray-300 hover:text-red-400">
+                          eliminar
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-sm">
+                      <span className="text-gray-500">
+                        {activa ? `Cuota ${c.cuota_actual} de ${c.n_cuotas}` : "Terminada"}
+                      </span>
+                      <span className="font-semibold text-gray-800">{formatCLP(c.monto_cuota)}/mes</span>
+                    </div>
+                    {barraProgreso}
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <button onClick={() => iniciarEdicion(c)} className="text-xs text-brand-from">
-                    editar
-                  </button>
-                  <button onClick={() => eliminar(c.compra_id)} className="text-xs text-gray-300 hover:text-red-400">
-                    eliminar
-                  </button>
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-between text-sm">
-                <span className="text-gray-500">
-                  {activa ? `Cuota ${c.cuota_actual} de ${c.n_cuotas}` : "Terminada"}
-                </span>
-                <span className="font-semibold text-gray-800">{formatCLP(c.monto_cuota)}/mes</span>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-                <div className="h-full bg-brand-gradient" style={{ width: `${progreso}%` }} />
-              </div>
+                )}
+                detalle={({ onClick }) => (
+                  <div>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-3">
+                        <EntidadAvatar
+                          entidad={entidadDe(c.entidad_id)}
+                          marca={marcaItem ?? marcaDeEntidad(c.entidad_id)}
+                          icono={c.icono}
+                          className="h-9 w-9"
+                        />
+                        <p className="pt-1.5 font-semibold text-gray-800">{c.descripcion}</p>
+                      </div>
+                      <button type="button" onClick={onClick} className="shrink-0 pt-1.5 text-xs text-gray-400">
+                        cerrar ✕
+                      </button>
+                    </div>
+                    <dl className="mt-3 space-y-1.5 text-xs">
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-400">Monto total</dt>
+                        <dd className="font-medium text-gray-700">{formatCLP(c.monto_total)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-400">Cuota</dt>
+                        <dd className="font-medium text-gray-700">
+                          {activa ? `${c.cuota_actual} de ${c.n_cuotas}` : `${c.n_cuotas} (terminada)`} ·{" "}
+                          {formatCLP(c.monto_cuota)}/mes
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-400">Primera cuota</dt>
+                        <dd className="font-medium text-gray-700">{c.fecha_primera_cuota.slice(0, 10)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="text-gray-400">Tarjeta / medio de pago</dt>
+                        <dd className="font-medium text-gray-700">{nombreEntidad(c.entidad_id)}</dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="shrink-0 text-gray-400">Categoría</dt>
+                        <dd className="text-right font-medium text-gray-700">
+                          {nombreCategoria(c.categoria_id)}
+                          {marcaItem ? ` (${marcaItem.nombre})` : ""}
+                        </dd>
+                      </div>
+                      <div className="flex justify-between gap-3">
+                        <dt className="shrink-0 text-gray-400">Reparto</dt>
+                        <dd className="text-right font-medium text-gray-700">
+                          {c.grupo_id
+                            ? `Grupo: ${grupoDe(c.grupo_id)?.nombre ?? "—"}`
+                            : filasReparto.length === 0
+                              ? "Sin personas asignadas"
+                              : filasReparto
+                                  .map((f) => {
+                                    const nombre = personas.find((p) => p.id === f.persona_id)?.nombre ?? "?";
+                                    return f.porcentaje != null ? `${nombre} (${f.porcentaje}%)` : nombre;
+                                  })
+                                  .join(", ")}
+                        </dd>
+                      </div>
+                    </dl>
+                    {barraProgreso}
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        onClick={() => iniciarEdicion(c)}
+                        className="flex-1 rounded-lg bg-purple-50 py-2 text-xs font-semibold text-brand-from"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => eliminar(c.compra_id)}
+                        className="flex-1 rounded-lg bg-gray-50 py-2 text-xs font-semibold text-gray-400 hover:text-red-400"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              />
             </Card>
           );
         })}
