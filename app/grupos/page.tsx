@@ -9,6 +9,20 @@ import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { mensajeError } from "@/lib/supabaseError";
 import { Grupo, GrupoParticipante, Participante, Persona } from "@/lib/types";
 
+// "grupos_nombre_key" es una restricción vieja (de antes de separar los
+// datos por cuenta) que exige nombre único en TODAS las cuentas — ver
+// migration_17_elimina_unico_nombre_global_personas_grupos.sql.
+function traducirErrorGrupo(err: unknown): string {
+  const msg = mensajeError(err);
+  if (msg.includes("grupos_nombre_key")) {
+    return "Todavía falta correr la migración de Supabase migration_17_elimina_unico_nombre_global_personas_grupos.sql — hay una restricción vieja que exige que el nombre sea único entre TODAS las cuentas (no solo la tuya). Corre esa migración y vuelve a intentar.";
+  }
+  if (msg.includes("grupos_owner_id_nombre_key")) {
+    return "Ya tienes un grupo con ese nombre.";
+  }
+  return msg || "No se pudo guardar el grupo.";
+}
+
 export default function GruposPage() {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [participantesPorGrupo, setParticipantesPorGrupo] = useState<Record<string, GrupoParticipante[]>>({});
@@ -91,7 +105,7 @@ export default function GruposPage() {
       cancelarForm();
       cargarTodo();
     } catch (err) {
-      setError(mensajeError(err) || "No se pudo guardar el grupo.");
+      setError(traducirErrorGrupo(err));
     } finally {
       setGuardando(false);
     }

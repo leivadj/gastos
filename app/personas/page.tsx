@@ -23,6 +23,20 @@ function nombreDesdeCorreo(correo: string): string {
     .join(" ");
 }
 
+// Traduce errores conocidos a un mensaje entendible. "personas_nombre_key"
+// es una restricción vieja (de antes de separar los datos por cuenta) que
+// exige nombre único en TODAS las cuentas — ver migration_17.
+function traducirErrorPersona(err: unknown): string {
+  const msg = mensajeError(err);
+  if (msg.includes("personas_nombre_key")) {
+    return "Todavía falta correr la migración de Supabase migration_17_elimina_unico_nombre_global_personas_grupos.sql — hay una restricción vieja que exige que el nombre sea único entre TODAS las cuentas (no solo la tuya). Corre esa migración y vuelve a intentar.";
+  }
+  if (msg.includes("personas_owner_id_nombre_key")) {
+    return "Ya tienes una persona con ese nombre en tu cuenta.";
+  }
+  return msg || "No se pudo guardar.";
+}
+
 export default function PersonasPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [resumen, setResumen] = useState<ResumenPersonaMes[]>([]);
@@ -31,6 +45,7 @@ export default function PersonasPage() {
   const [guardando, setGuardando] = useState(false);
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
+  const [errorNueva, setErrorNueva] = useState("");
 
   const [editandoPerfil, setEditandoPerfil] = useState(false);
   const [nombrePerfil, setNombrePerfil] = useState("");
@@ -86,8 +101,13 @@ export default function PersonasPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setGuardando(true);
-    await supabase.from("personas").insert({ nombre, activo: true });
+    setErrorNueva("");
+    const { error } = await supabase.from("personas").insert({ nombre, activo: true });
     setGuardando(false);
+    if (error) {
+      setErrorNueva(traducirErrorPersona(error));
+      return;
+    }
     setMostrarForm(false);
     setNombre("");
     cargar();
@@ -116,7 +136,7 @@ export default function PersonasPage() {
       setEditandoPerfil(false);
       cargar();
     } catch (err) {
-      setErrorPerfil(mensajeError(err) || "No se pudo guardar el nombre.");
+      setErrorPerfil(traducirErrorPersona(err));
     } finally {
       setGuardandoPerfil(false);
     }
@@ -246,7 +266,10 @@ export default function PersonasPage() {
       <div className="flex items-center justify-between pt-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Otras personas (repartos)</p>
         <button
-          onClick={() => setMostrarForm((v) => !v)}
+          onClick={() => {
+            setMostrarForm((v) => !v);
+            setErrorNueva("");
+          }}
           className="rounded-full bg-brand-gradient px-4 py-1.5 text-xs font-semibold text-white"
         >
           {mostrarForm ? "Cancelar" : "+ Nueva"}
@@ -265,6 +288,7 @@ export default function PersonasPage() {
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
             </div>
+            {errorNueva && <p className="text-xs text-red-500">{errorNueva}</p>}
             <button
               type="submit"
               disabled={guardando}
