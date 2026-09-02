@@ -62,6 +62,9 @@ export function TarjetaVisual({
         <div className="min-w-0">
           <p className="truncate text-base font-bold leading-tight drop-shadow-sm">{entidad.nombre}</p>
           <p className="text-[11px] opacity-85">{TIPO_LABEL[entidad.tipo]}</p>
+          {entidad.saldo != null && (
+            <p className="mt-1 text-xl font-bold tracking-tight drop-shadow-sm">{formatCLP(entidad.saldo)}</p>
+          )}
         </div>
         {marca?.logo_url && (
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/90 p-1.5 shadow-sm">

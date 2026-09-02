@@ -38,6 +38,8 @@ export interface Entidad {
   // si existe, se usa como fondo en vez del degradado.
   color_hex: string | null;
   imagen_fondo_url: string | null;
+  // Saldo actual, editado a mano por el usuario (null = todavía no lo puso).
+  saldo: number | null;
 }
 
 export type TipoMarca =

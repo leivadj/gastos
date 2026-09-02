@@ -6,7 +6,7 @@ import { Card } from "@/components/Card";
 import { TarjetasCarousel } from "@/components/TarjetasCarousel";
 import { TarjetaVisual, TIPO_LABEL } from "@/components/TarjetaVisual";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
-import { Categoria, CompraVigente, Entidad, GastoFijo, Marca } from "@/lib/types";
+import { Categoria, CompraVigente, Entidad, GastoFijo, Marca, Transferencia } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { formatCLP, nombreMes } from "@/lib/format";
@@ -44,6 +44,7 @@ export default function TarjetasPage() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuotas, setCuotas] = useState<CompraVigente[]>([]);
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [cargando, setCargando] = useState(true);
 
   const [activaId, setActivaId] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export default function TarjetasPage() {
   const [tipo, setTipo] = useState<Entidad["tipo"]>("tarjeta_credito");
   const [marcaId, setMarcaId] = useState("");
   const [marcaAutodetectada, setMarcaAutodetectada] = useState(false);
+  const [saldo, setSaldo] = useState("");
   const [colorHex, setColorHex] = useState<string | null>(null);
   const [imagenFondoUrl, setImagenFondoUrl] = useState<string | null>(null);
   const [archivoFondo, setArchivoFondo] = useState<File | null>(null);
@@ -64,12 +66,13 @@ export default function TarjetasPage() {
   const [subiendoFondo, setSubiendoFondo] = useState(false);
 
   async function cargarTodo() {
-    const [{ data: e }, { data: m }, { data: cat }, { data: c }, { data: gf }] = await Promise.all([
+    const [{ data: e }, { data: m }, { data: cat }, { data: c }, { data: gf }, { data: t }] = await Promise.all([
       supabase.from("entidades").select("*").order("nombre"),
       supabase.from("marcas").select("*").order("nombre"),
       supabase.from("categorias").select("*"),
       supabase.from("vista_cuotas_mes_actual").select("*"),
       supabase.from("gastos_fijos").select("*").eq("activo", true),
+      supabase.from("transferencias").select("*"),
     ]);
     const listaEntidades = (e as Entidad[]) ?? [];
     setEntidades(listaEntidades);
@@ -77,6 +80,7 @@ export default function TarjetasPage() {
     setCategorias((cat as Categoria[]) ?? []);
     setCuotas((c as CompraVigente[]) ?? []);
     setGastosFijos((gf as GastoFijo[]) ?? []);
+    setTransferencias((t as Transferencia[]) ?? []);
     setCargando(false);
     setActivaId((actual) => {
       if (actual && listaEntidades.some((x) => x.id === actual)) return actual;
@@ -162,6 +166,7 @@ export default function TarjetasPage() {
     setTipo("tarjeta_credito");
     setMarcaId("");
     setMarcaAutodetectada(false);
+    setSaldo("");
     setColorHex(null);
     setImagenFondoUrl(null);
     onElegirArchivo(null);
@@ -174,6 +179,7 @@ export default function TarjetasPage() {
     setTipo(e.tipo);
     setMarcaId(e.marca_id ?? "");
     setMarcaAutodetectada(false);
+    setSaldo(e.saldo != null ? String(e.saldo) : "");
     setColorHex(e.color_hex ?? null);
     setImagenFondoUrl(e.imagen_fondo_url ?? null);
     onElegirArchivo(null);
@@ -208,6 +214,7 @@ export default function TarjetasPage() {
         nombre,
         tipo,
         marca_id: marcaId || null,
+        saldo: saldo.trim() === "" ? null : Number(saldo),
         color_hex: colorHex || null,
         imagen_fondo_url: fondoUrlFinal,
       };
@@ -252,6 +259,15 @@ export default function TarjetasPage() {
 
   const entidadActiva = entidades.find((e) => e.id === activaId) ?? null;
   const marcaActiva = resolverMarca(entidadActiva, marcas);
+  const nombreEntidad = (id: string | null) => entidades.find((e) => e.id === id)?.nombre ?? "otra cuenta";
+
+  // Suma solo las cuentas a las que el usuario ya les puso un saldo (es
+  // manual/opcional, no todas lo van a tener necesariamente).
+  const totalSaldo = useMemo(
+    () => entidades.reduce((acc, e) => acc + (e.saldo ?? 0), 0),
+    [entidades]
+  );
+  const hayAlgunSaldo = entidades.some((e) => e.saldo != null);
 
   const itemsActivos = useMemo(() => {
     if (!activaId) return [];
@@ -264,6 +280,7 @@ export default function TarjetasPage() {
           categoria: categoriaNombre(c.categoria_id),
           detalle: `Cuota ${c.cuota_actual} de ${c.n_cuotas}`,
           monto: c.monto_cuota,
+          signo: -1 as const,
           marca_id: c.marca_id,
           icono: c.icono,
         })),
@@ -275,11 +292,27 @@ export default function TarjetasPage() {
           categoria: categoriaNombre(g.categoria_id),
           detalle: "Gasto fijo",
           monto: g.monto_estimado,
+          signo: -1 as const,
           marca_id: g.marca_id,
           icono: g.icono,
         })),
+      ...transferencias
+        .filter((t) => t.cuenta_origen_id === activaId || t.cuenta_destino_id === activaId)
+        .map((t) => {
+          const esSalida = t.cuenta_origen_id === activaId;
+          return {
+            key: `t-${t.id}`,
+            descripcion: t.notas || (esSalida ? "Transferencia enviada" : "Transferencia recibida"),
+            categoria: "Transferencia",
+            detalle: esSalida ? `Hacia ${nombreEntidad(t.cuenta_destino_id)}` : `Desde ${nombreEntidad(t.cuenta_origen_id)}`,
+            monto: Number(t.monto),
+            signo: (esSalida ? -1 : 1) as -1 | 1,
+            marca_id: null,
+            icono: esSalida ? "↗️" : "↙️",
+          };
+        }),
     ].sort((a, b) => b.monto - a.monto);
-  }, [cuotas, gastosFijos, activaId, categorias]);
+  }, [cuotas, gastosFijos, transferencias, activaId, categorias, entidades]);
 
   if (cargando) {
     return <p className="py-10 text-center text-gray-400">Cargando…</p>;
@@ -365,6 +398,19 @@ export default function TarjetasPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="text-xs text-gray-500">Saldo actual (opcional)</label>
+              <input
+                type="number"
+                value={saldo}
+                onChange={(e) => setSaldo(e.target.value)}
+                placeholder="Ej: 250000"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Lo actualizas tú a mano cuando quieras — no se calcula solo a partir de tus gastos.
+              </p>
+            </div>
 
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
               <p className="text-xs font-semibold text-gray-600">Diseño de la tarjeta</p>
@@ -380,6 +426,7 @@ export default function TarjetasPage() {
                     nombre: nombre || "Nombre de la tarjeta",
                     tipo,
                     marca_id: marcaId || null,
+                    saldo: saldo.trim() === "" ? null : Number(saldo),
                     color_hex: colorHex,
                     imagen_fondo_url: previewFondo ?? imagenFondoUrl,
                   }}
@@ -438,6 +485,16 @@ export default function TarjetasPage() {
         <p className="text-center text-sm text-gray-400">Aún no tienes tarjetas o cuentas creadas.</p>
       ) : (
         <>
+          {hayAlgunSaldo && (
+            <Card className="!py-3">
+              <p className="text-xs text-gray-400">Total en tus cuentas</p>
+              <p className="text-2xl font-bold text-gray-800">{formatCLP(totalSaldo)}</p>
+              <p className="mt-0.5 text-[11px] text-gray-400">
+                Solo suma las cuentas a las que ya les pusiste un saldo.
+              </p>
+            </Card>
+          )}
+
           <TarjetasCarousel
             entidades={entidades}
             marcas={marcas}
@@ -463,10 +520,10 @@ export default function TarjetasPage() {
           )}
 
           <Card>
-            <p className="mb-1 text-sm font-semibold text-gray-600">Gastos con esta tarjeta</p>
+            <p className="mb-1 text-sm font-semibold text-gray-600">Movimientos</p>
             <p className="mb-3 text-xs capitalize text-gray-400">{nombreMes()}</p>
             {itemsActivos.length === 0 ? (
-              <p className="py-2 text-sm text-gray-400">Sin gastos este mes con esta tarjeta.</p>
+              <p className="py-2 text-sm text-gray-400">Sin movimientos este mes con esta cuenta.</p>
             ) : (
               <ul className="divide-y divide-gray-100">
                 {itemsActivos.map((it) => (
@@ -478,7 +535,10 @@ export default function TarjetasPage() {
                         {it.categoria} · {it.detalle}
                       </p>
                     </div>
-                    <p className="shrink-0 text-sm font-semibold text-gray-800">{formatCLP(it.monto)}</p>
+                    <p className={`shrink-0 text-sm font-semibold ${it.signo === 1 ? "text-emerald-600" : "text-rose-500"}`}>
+                      {it.signo === 1 ? "+" : "-"}
+                      {formatCLP(it.monto)}
+                    </p>
                   </li>
                 ))}
               </ul>
@@ -501,9 +561,12 @@ export default function TarjetasPage() {
                           <p className="truncate text-sm font-semibold text-gray-800">{e.nombre}</p>
                           <p className="text-xs text-gray-400">{TIPO_LABEL[e.tipo]}</p>
                         </div>
-                        <p className="shrink-0 text-xs font-medium text-gray-500">
-                          {formatCLP(gastoPorEntidad[e.id] ?? 0)}
-                        </p>
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-medium text-gray-700">
+                            {formatCLP(e.saldo ?? gastoPorEntidad[e.id] ?? 0)}
+                          </p>
+                          <p className="text-[10px] text-gray-400">{e.saldo != null ? "saldo" : "gastado este mes"}</p>
+                        </div>
                       </button>
                     </Card>
                   );

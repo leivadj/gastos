@@ -93,6 +93,10 @@ create table entidades (
   -- que reemplaza al degradado cuando existe.
   color_hex text,
   imagen_fondo_url text,
+  -- Saldo actual de la cuenta/tarjeta, editado a mano por el usuario (no se
+  -- calcula solo a partir de los movimientos — ver migration_18). null =
+  -- todavía no le puso un saldo.
+  saldo numeric(12, 2),
   created_at timestamptz not null default now(),
   -- nombre + tipo (no solo nombre): permite tener "Banco Estado" como
   -- tarjeta de débito Y como tarjeta de crédito a la vez, por ejemplo.
