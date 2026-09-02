@@ -114,3 +114,40 @@ body {
     transition: none;
   }
 }
+
+/* Efecto "panel-reveal" (transitions.dev) para el bottom-sheet de detalle
+   por persona (ver PersonaBreakdown.tsx): el panel entra deslizándose desde
+   abajo (100px) con un leve cross-blur, en vez de aparecer de golpe encima
+   del dashboard. Duración distinta para abrir (400ms) y cerrar (350ms,
+   duración por defecto de la transición), misma curva de desaceleración
+   que el resto de las animaciones de la app. El fondo oscuro se maneja
+   aparte con .panel-reveal-backdrop, con las mismas duraciones. */
+.panel-reveal {
+  transition:
+    transform 350ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 350ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  transform: translateY(100px);
+  opacity: 0;
+  filter: blur(2px);
+}
+.panel-reveal[data-open="true"] {
+  transition-duration: 400ms;
+  transform: translateY(0);
+  opacity: 1;
+  filter: blur(0);
+}
+.panel-reveal-backdrop {
+  transition: opacity 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  opacity: 0;
+}
+.panel-reveal-backdrop[data-open="true"] {
+  transition-duration: 400ms;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .panel-reveal,
+  .panel-reveal-backdrop {
+    transition: none;
+  }
+}

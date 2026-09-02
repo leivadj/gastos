@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Categoria, Entidad, Marca, RepartoCuota, RepartoGastoFijo } from "@/lib/types";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { formatCLP } from "@/lib/format";
@@ -27,6 +28,26 @@ export function PersonaBreakdown({
   marcas: Marca[];
   onClose: () => void;
 }) {
+  // Efecto "panel-reveal" (transitions.dev): el panel entra deslizándose
+  // desde abajo con un leve cross-blur en vez de aparecer de golpe, y sale
+  // con su propia duración (ver .panel-reveal / .panel-reveal-backdrop en
+  // globals.css) — por eso el cierre real (onClose, que desmonta el sheet)
+  // se retrasa lo que dura la animación, salvo que el usuario prefiera
+  // menos movimiento.
+  const [abierto, setAbierto] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setAbierto(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  function cerrar() {
+    setAbierto(false);
+    const prefiereMenosMovimiento =
+      typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    setTimeout(onClose, prefiereMenosMovimiento ? 0 : 350);
+  }
+
   const nombreCategoria = (id: string | null) => categorias.find((c) => c.id === id)?.nombre ?? "Sin categoría";
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
   const marcaDeEntidad = (id: string | null) => resolverMarca(entidadDe(id), marcas);
@@ -71,11 +92,13 @@ export function PersonaBreakdown({
 
   return (
     <div
-      className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 px-0 sm:items-center sm:px-4"
-      onClick={onClose}
+      data-open={abierto}
+      className="panel-reveal-backdrop fixed inset-0 z-30 flex items-end justify-center bg-black/40 px-0 sm:items-center sm:px-4"
+      onClick={cerrar}
     >
       <div
-        className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-2xl"
+        data-open={abierto}
+        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-lg sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2">
@@ -83,7 +106,7 @@ export function PersonaBreakdown({
             <p className="text-lg font-bold text-gray-800">{personaNombre}</p>
             <p className="text-xs capitalize text-gray-400">{mesLabel}</p>
           </div>
-          <button onClick={onClose} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
+          <button onClick={cerrar} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
             ✕
           </button>
         </div>
