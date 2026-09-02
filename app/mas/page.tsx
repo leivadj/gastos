@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { adminNavItem, esAdmin as checkEsAdmin, navItems } from "@/components/navItems";
+import { PerfilPropioCard } from "@/components/PerfilPropioCard";
 
 // Los destinos que antes estaban sueltos en la barra inferior y ahora se
 // agrupan acá, para no amontonar la barra (ver BottomNav — Fijos quedó
 // como destino principal ahí, en el lugar de Ingresos). "Personas" ya
 // tiene su propia sección de "Sesión iniciada como / Cerrar sesión", así
-// que no se repite acá.
+// que no se repite acá; su tarjeta "Tu perfil" sí se repite arriba de la
+// lista, para verla apenas se aprieta "Más" sin tener que entrar a
+// Personas.
 const HREFS_AGRUPADOS = ["/ingresos", "/grupos", "/personas"];
 
 export default function MasPage() {
@@ -32,6 +35,8 @@ export default function MasPage() {
         <h1 className="text-2xl font-bold text-gray-800">Más</h1>
         <p className="mt-1 text-sm text-gray-400">Ingresos, grupos, personas{esAdminUsuario ? " y ajustes" : ""}.</p>
       </div>
+
+      <PerfilPropioCard />
 
       <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white">
         {items.map((item, i) => (

@@ -16,6 +16,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { PersonaBreakdown } from "@/components/PersonaBreakdown";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
+import { AvatarGroupHover } from "@/components/AvatarGroupHover";
+import { ContadorOdometro } from "@/components/ContadorOdometro";
 import { diaDelMes, formatCLP, mesActualISO, nombreMes } from "@/lib/format";
 import {
   Categoria,
@@ -287,7 +289,7 @@ export default function DashboardPage() {
             <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-medium capitalize">
               {nombreMes()} ▾
             </span>
-            <div className="flex -space-x-2">
+            <AvatarGroupHover className="flex -space-x-2">
               {personas.slice(0, 4).map((p, i) => (
                 <span
                   key={p.id}
@@ -298,26 +300,34 @@ export default function DashboardPage() {
                   {p.nombre.charAt(0).toUpperCase()}
                 </span>
               ))}
-            </div>
+            </AvatarGroupHover>
           </div>
 
           <p className="mt-5 flex items-center gap-1.5 text-sm opacity-85">
             💰 Disponible este mes
           </p>
-          <p className="text-4xl font-bold tracking-tight">{formatCLP(disponible)}</p>
+          <p className="text-4xl font-bold tracking-tight">
+            <ContadorOdometro texto={formatCLP(disponible)} />
+          </p>
 
           <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div className="rounded-xl bg-white/15 p-3">
               <p className="flex items-center gap-1 text-[11px] opacity-85">↑ Ingresos</p>
-              <p className="text-sm font-semibold">{formatCLP(ingresosMes)}</p>
+              <p className="text-sm font-semibold">
+                <ContadorOdometro texto={formatCLP(ingresosMes)} />
+              </p>
             </div>
             <div className="rounded-xl bg-white/15 p-3">
               <p className="flex items-center gap-1 text-[11px] opacity-85">↓ Gastos</p>
-              <p className="text-sm font-semibold">{formatCLP(gastosYaPagados)}</p>
+              <p className="text-sm font-semibold">
+                <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
+              </p>
             </div>
             <div className="rounded-xl bg-white/15 p-3">
               <p className="flex items-center gap-1 text-[11px] opacity-85">⏳ Comprometido</p>
-              <p className="text-sm font-semibold">{formatCLP(comprometido)}</p>
+              <p className="text-sm font-semibold">
+                <ContadorOdometro texto={formatCLP(comprometido)} />
+              </p>
             </div>
           </div>
         </div>
@@ -335,7 +345,7 @@ export default function DashboardPage() {
           <h1 className="text-xl font-bold text-gray-800">Resumen del mes</h1>
           <p className="text-sm capitalize text-gray-400">{nombreMes()}</p>
         </div>
-        <div className="flex -space-x-2">
+        <AvatarGroupHover className="flex -space-x-2">
           {personas.slice(0, 6).map((p, i) => (
             <span
               key={p.id}
@@ -346,26 +356,34 @@ export default function DashboardPage() {
               {p.nombre.charAt(0).toUpperCase()}
             </span>
           ))}
-        </div>
+        </AvatarGroupHover>
       </div>
 
       <div className="grid grid-cols-4 gap-4">
         <Card>
           <p className="text-xs font-medium text-gray-400">Ingresos</p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(ingresosMes)}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-800">
+            <ContadorOdometro texto={formatCLP(ingresosMes)} />
+          </p>
         </Card>
         <Card>
           <p className="text-xs font-medium text-gray-400">↓ Gastos</p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(gastosYaPagados)}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-800">
+            <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
+          </p>
         </Card>
         <Card>
           <p className="text-xs font-medium text-gray-400">⏳ Comprometido</p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(comprometido)}</p>
+          <p className="mt-1 text-2xl font-bold text-gray-800">
+            <ContadorOdometro texto={formatCLP(comprometido)} />
+          </p>
           <p className="text-[11px] text-gray-400">vence más adelante este mes</p>
         </Card>
         <Card>
           <p className="text-xs font-medium text-gray-400">💰 Disponible</p>
-          <p className="mt-1 text-2xl font-bold text-brand-from">{formatCLP(disponible)}</p>
+          <p className="mt-1 text-2xl font-bold text-brand-from">
+            <ContadorOdometro texto={formatCLP(disponible)} />
+          </p>
         </Card>
       </div>
 
