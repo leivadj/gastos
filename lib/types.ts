@@ -166,6 +166,18 @@ export interface Ingreso {
   descripcion: string | null;
 }
 
+// Mover plata entre tus propias cuentas (ej. BancoEstado -> Mercado Pago).
+// No es gasto ni ingreso, así que no afecta "Disponible este mes" — por
+// ahora es solo un registro/historial.
+export interface Transferencia {
+  id: string;
+  monto: number;
+  cuenta_origen_id: string | null;
+  cuenta_destino_id: string | null;
+  fecha: string;
+  notas: string | null;
+}
+
 export interface ResumenPersonaMes {
   persona_id: string;
   persona_nombre: string;

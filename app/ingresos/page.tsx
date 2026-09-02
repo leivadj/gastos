@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
 import { Ingreso, Persona } from "@/lib/types";
 
@@ -28,6 +29,8 @@ export default function IngresosPage() {
 
   useEffect(() => {
     cargarTodo();
+    window.addEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargarTodo);
+    return () => window.removeEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargarTodo);
   }, []);
 
   async function handleSubmit(e: FormEvent) {

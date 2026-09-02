@@ -199,6 +199,23 @@ create table ingresos (
 );
 
 -- ---------------------------------------------------------------------------
+-- TRANSFERENCIAS — mover plata entre tus propias cuentas (ej. BancoEstado ->
+-- Mercado Pago). NO es un gasto ni un ingreso (sigue siendo tu misma plata),
+-- así que no afecta "Disponible este mes". Por ahora es solo un registro/
+-- historial para que quede la traza del movimiento.
+-- ---------------------------------------------------------------------------
+create table transferencias (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  monto numeric(12, 2) not null check (monto > 0),
+  cuenta_origen_id uuid references entidades(id),
+  cuenta_destino_id uuid references entidades(id),
+  fecha date not null default current_date,
+  notas text,
+  created_at timestamptz not null default now()
+);
+
+-- ---------------------------------------------------------------------------
 -- PAGOS — marca si el cargo del mes (cuota o gasto fijo) ya se pagó, y
 -- permite ajustar el monto real si difiere del estimado (ej. interés).
 -- Opcional: la app funciona igual sin esto, es solo para llevar el check.
@@ -382,6 +399,7 @@ alter table compras enable row level security;
 alter table gastos_fijos enable row level security;
 alter table item_participantes enable row level security;
 alter table ingresos enable row level security;
+alter table transferencias enable row level security;
 alter table pagos enable row level security;
 
 create policy "solo_dueno" on personas for all
@@ -415,6 +433,8 @@ create policy "solo_dueno" on gastos_fijos for all
 create policy "solo_dueno" on item_participantes for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on ingresos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on transferencias for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on pagos for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { EntidadPicker } from "@/components/EntidadPicker";
+import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { IconoPicker } from "@/components/IconoPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
@@ -64,6 +65,8 @@ export default function ComprasPage() {
 
   useEffect(() => {
     cargarTodo();
+    window.addEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargarTodo);
+    return () => window.removeEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargarTodo);
   }, []);
 
   function cancelarForm() {

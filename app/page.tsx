@@ -15,7 +15,8 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { PersonaBreakdown } from "@/components/PersonaBreakdown";
-import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
+import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
+import { diaDelMes, formatCLP, mesActualISO, nombreMes } from "@/lib/format";
 import {
   Categoria,
   CompraVigente,
@@ -91,6 +92,10 @@ export default function DashboardPage() {
       setCargando(false);
     }
     cargar();
+    // Cuando se guarda un "+ Movimiento" rápido (gasto/ingreso/transferencia)
+    // desde cualquier pantalla, refresca estos números sin recargar la página.
+    window.addEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargar);
+    return () => window.removeEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargar);
   }, []);
 
   const categoriaNombre = (id: string | null) =>
@@ -101,6 +106,24 @@ export default function DashboardPage() {
   const totalFijosMonto = gastosFijos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
   const totalGastos = totalCuotas + totalFijosMonto;
   const disponible = ingresosMes - totalGastos;
+
+  // "Gastos" = ya venció su día de pago este mes (ya salió/sale de la
+  // cuenta). "Comprometido" = ya sabes que viene, pero su día de pago este
+  // mes todavía no llega — sigue restando del disponible, pero por
+  // separado, para no confundir "ya gastado" con "ya sé que se va a ir".
+  const hoyDia = new Date().getDate();
+  let gastosYaPagados = 0;
+  let comprometido = 0;
+  cuotas.forEach((c) => {
+    const monto = Number(c.monto_cuota);
+    if (diaDelMes(c.fecha_primera_cuota) <= hoyDia) gastosYaPagados += monto;
+    else comprometido += monto;
+  });
+  gastosFijos.forEach((g) => {
+    const monto = Number(g.monto_estimado);
+    if (g.dia_mes_pago == null || g.dia_mes_pago <= hoyDia) gastosYaPagados += monto;
+    else comprometido += monto;
+  });
 
   const porCategoria: Record<string, number> = {};
   let totalTipoFijo = 0;
@@ -278,17 +301,23 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <p className="mt-5 text-sm opacity-85">Disponible este mes</p>
+          <p className="mt-5 flex items-center gap-1.5 text-sm opacity-85">
+            💰 Disponible este mes
+          </p>
           <p className="text-4xl font-bold tracking-tight">{formatCLP(disponible)}</p>
 
-          <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
             <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 opacity-85">↑ Ingresos</p>
-              <p className="text-lg font-semibold">{formatCLP(ingresosMes)}</p>
+              <p className="flex items-center gap-1 text-[11px] opacity-85">↑ Ingresos</p>
+              <p className="text-sm font-semibold">{formatCLP(ingresosMes)}</p>
             </div>
             <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 opacity-85">↓ Gastos</p>
-              <p className="text-lg font-semibold">{formatCLP(totalGastos)}</p>
+              <p className="flex items-center gap-1 text-[11px] opacity-85">↓ Gastos</p>
+              <p className="text-sm font-semibold">{formatCLP(gastosYaPagados)}</p>
+            </div>
+            <div className="rounded-xl bg-white/15 p-3">
+              <p className="flex items-center gap-1 text-[11px] opacity-85">⏳ Comprometido</p>
+              <p className="text-sm font-semibold">{formatCLP(comprometido)}</p>
             </div>
           </div>
         </div>
@@ -326,19 +355,17 @@ export default function DashboardPage() {
           <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(ingresosMes)}</p>
         </Card>
         <Card>
-          <p className="text-xs font-medium text-gray-400">Gastos</p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(totalGastos)}</p>
+          <p className="text-xs font-medium text-gray-400">↓ Gastos</p>
+          <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(gastosYaPagados)}</p>
         </Card>
         <Card>
-          <p className="text-xs font-medium text-gray-400">Disponible</p>
+          <p className="text-xs font-medium text-gray-400">⏳ Comprometido</p>
+          <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(comprometido)}</p>
+          <p className="text-[11px] text-gray-400">vence más adelante este mes</p>
+        </Card>
+        <Card>
+          <p className="text-xs font-medium text-gray-400">💰 Disponible</p>
           <p className="mt-1 text-2xl font-bold text-brand-from">{formatCLP(disponible)}</p>
-        </Card>
-        <Card>
-          <p className="text-xs font-medium text-gray-400">Cuotas este mes</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-500">{formatCLP(totalCuotas)}</p>
-          <p className="text-[11px] text-gray-400">
-            {cuotas.length} {cuotas.length === 1 ? "cuota activa" : "cuotas activas"}
-          </p>
         </Card>
       </div>
 
