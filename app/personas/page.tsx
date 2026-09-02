@@ -1,10 +1,27 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { PersonaAvatar } from "@/components/PersonaAvatar";
+import { subirImagenPropia } from "@/lib/subirImagen";
+import { mensajeError } from "@/lib/supabaseError";
 import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
 import { Ingreso, Persona, ResumenPersonaMes } from "@/lib/types";
+
+// Adivina un nombre a partir del correo (ej. "leiva.dj@gmail.com" -> "Leiva
+// Dj") para no dejar el perfil sin nombre al crearlo solo — se puede
+// cambiar al toque desde "editar".
+function nombreDesdeCorreo(correo: string): string {
+  const usuario = correo.split("@")[0] || "Yo";
+  return usuario
+    .replace(/[._-]+/g, " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((palabra) => palabra.charAt(0).toUpperCase() + palabra.slice(1))
+    .join(" ");
+}
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
@@ -15,6 +32,15 @@ export default function PersonasPage() {
   const [nombre, setNombre] = useState("");
   const [correo, setCorreo] = useState("");
 
+  const [editandoPerfil, setEditandoPerfil] = useState(false);
+  const [nombrePerfil, setNombrePerfil] = useState("");
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false);
+  const [subiendoFoto, setSubiendoFoto] = useState(false);
+  const [errorPerfil, setErrorPerfil] = useState("");
+  const intentoCrearPerfil = useRef(false);
+
+  const [cargado, setCargado] = useState(false);
+
   async function cargar() {
     const [{ data: p }, { data: r }, { data: i }] = await Promise.all([
       supabase.from("personas").select("*").order("nombre"),
@@ -24,12 +50,34 @@ export default function PersonasPage() {
     setPersonas((p as Persona[]) ?? []);
     setResumen((r as ResumenPersonaMes[]) ?? []);
     setIngresos((i as Ingreso[]) ?? []);
+    setCargado(true);
   }
 
   useEffect(() => {
     cargar();
     supabase.auth.getSession().then(({ data }) => setCorreo(data.session?.user?.email ?? ""));
   }, []);
+
+  // Si todavía no existe tu persona "propia" (es_self), se crea sola la
+  // primera vez que abres esta página — con un nombre adivinado desde tu
+  // correo, editable al toque. El índice único en la base evita duplicados
+  // aunque este efecto se dispare dos veces (ej. en desarrollo).
+  useEffect(() => {
+    if (intentoCrearPerfil.current) return;
+    if (!cargado || !correo) return; // todavía cargando la primera vez
+    const yaExiste = personas.some((p) => p.es_self);
+    if (yaExiste) return;
+    intentoCrearPerfil.current = true;
+    supabase
+      .from("personas")
+      .insert({ nombre: nombreDesdeCorreo(correo), es_self: true, activo: true })
+      .then(({ error }) => {
+        if (!error) cargar();
+      });
+  }, [cargado, personas, correo]);
+
+  const perfilPropio = personas.find((p) => p.es_self) ?? null;
+  const otrasPersonas = personas.filter((p) => p.activo && !p.es_self);
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -50,6 +98,46 @@ export default function PersonasPage() {
     cargar();
   }
 
+  function iniciarEdicionPerfil() {
+    if (!perfilPropio) return;
+    setNombrePerfil(perfilPropio.nombre);
+    setErrorPerfil("");
+    setEditandoPerfil(true);
+  }
+
+  async function guardarNombrePerfil(e: FormEvent) {
+    e.preventDefault();
+    if (!perfilPropio) return;
+    setGuardandoPerfil(true);
+    setErrorPerfil("");
+    try {
+      const { error } = await supabase.from("personas").update({ nombre: nombrePerfil }).eq("id", perfilPropio.id);
+      if (error) throw error;
+      setEditandoPerfil(false);
+      cargar();
+    } catch (err) {
+      setErrorPerfil(mensajeError(err) || "No se pudo guardar el nombre.");
+    } finally {
+      setGuardandoPerfil(false);
+    }
+  }
+
+  async function cambiarFoto(archivo: File | null) {
+    if (!archivo || !perfilPropio) return;
+    setSubiendoFoto(true);
+    setErrorPerfil("");
+    try {
+      const url = await subirImagenPropia("personas-fotos", archivo);
+      const { error } = await supabase.from("personas").update({ foto_url: url }).eq("id", perfilPropio.id);
+      if (error) throw error;
+      cargar();
+    } catch (err) {
+      setErrorPerfil(mensajeError(err) || "No se pudo subir la foto.");
+    } finally {
+      setSubiendoFoto(false);
+    }
+  }
+
   const mesActualPrefix = mesActualISO().slice(0, 7); // "AAAA-MM"
   function debeEstaPersona(personaId: string) {
     return resumen.find((r) => r.persona_id === personaId)?.total ?? 0;
@@ -62,16 +150,104 @@ export default function PersonasPage() {
 
   return (
     <div className="space-y-4 pb-10">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-gray-800">Personas</h1>
-          <p className="text-xs capitalize text-gray-400">
-            Lo que debe e ingresó cada una en {nombreMes()}. El reparto se define en cada gasto/compra o en Grupos.
-          </p>
-        </div>
+      <div>
+        <h1 className="text-lg font-bold text-gray-800">Personas</h1>
+        <p className="text-xs capitalize text-gray-400">
+          Tu perfil, y lo que debe e ingresó cada persona en {nombreMes()}. El reparto se define en cada
+          gasto/compra o en Grupos.
+        </p>
+      </div>
+
+      {perfilPropio && (
+        <Card>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Tu perfil</p>
+          <div className="flex items-center gap-3">
+            <label className="group relative cursor-pointer">
+              <PersonaAvatar fotoUrl={perfilPropio.foto_url} nombre={perfilPropio.nombre} className="h-16 w-16" />
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/0 text-[10px] font-medium text-transparent group-hover:bg-black/40 group-hover:text-white">
+                {subiendoFoto ? "…" : "Cambiar"}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={subiendoFoto}
+                onChange={(e) => cambiarFoto(e.target.files?.[0] ?? null)}
+              />
+            </label>
+
+            <div className="min-w-0 flex-1">
+              {editandoPerfil ? (
+                <form onSubmit={guardarNombrePerfil} className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    required
+                    value={nombrePerfil}
+                    onChange={(e) => setNombrePerfil(e.target.value)}
+                    className="w-full min-w-0 rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={guardandoPerfil}
+                    className="shrink-0 text-xs font-semibold text-brand-from disabled:opacity-60"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditandoPerfil(false)}
+                    className="shrink-0 text-xs text-gray-400"
+                  >
+                    cancelar
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <p className="truncate font-semibold text-gray-800">{perfilPropio.nombre}</p>
+                  <button onClick={iniciarEdicionPerfil} className="shrink-0 text-xs text-brand-from">
+                    editar
+                  </button>
+                </div>
+              )}
+              <p className="truncate text-xs text-gray-400">{correo}</p>
+            </div>
+          </div>
+
+          {errorPerfil && <p className="mt-2 text-xs text-red-500">{errorPerfil}</p>}
+
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <div>
+              <p className="text-[11px] text-gray-400">Debe este mes</p>
+              <p className="font-semibold text-gray-800">{formatCLP(debeEstaPersona(perfilPropio.id))}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-[11px] text-gray-400">Ingresó este mes</p>
+              <p className="font-semibold text-gray-800">{formatCLP(ingresoEstaPersona(perfilPropio.id))}</p>
+            </div>
+          </div>
+
+          <div className="mt-3 flex gap-2">
+            <Link
+              href="/tarjetas?nueva=1"
+              className="flex-1 rounded-lg bg-brand-gradient py-2 text-center text-xs font-semibold text-white"
+            >
+              + Agregar tarjeta
+            </Link>
+            <Link
+              href="/tarjetas"
+              className="flex-1 rounded-lg border border-gray-200 py-2 text-center text-xs font-semibold text-gray-500"
+            >
+              Ver mis tarjetas
+            </Link>
+          </div>
+        </Card>
+      )}
+
+      <div className="flex items-center justify-between pt-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Otras personas (repartos)</p>
         <button
           onClick={() => setMostrarForm((v) => !v)}
-          className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
+          className="rounded-full bg-brand-gradient px-4 py-1.5 text-xs font-semibold text-white"
         >
           {mostrarForm ? "Cancelar" : "+ Nueva"}
         </button>
@@ -101,28 +277,34 @@ export default function PersonasPage() {
       )}
 
       <div className="space-y-3">
-        {personas
-          .filter((p) => p.activo)
-          .map((p) => (
-            <Card key={p.id}>
-              <div className="flex items-center justify-between gap-3">
+        {otrasPersonas.map((p) => (
+          <Card key={p.id}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <PersonaAvatar fotoUrl={p.foto_url} nombre={p.nombre} className="h-8 w-8" />
                 <p className="font-semibold text-gray-800">{p.nombre}</p>
-                <button onClick={() => desactivar(p.id)} className="text-xs text-gray-300 hover:text-red-400">
-                  quitar
-                </button>
               </div>
-              <div className="mt-2 flex items-center justify-between text-sm">
-                <div>
-                  <p className="text-[11px] text-gray-400">Debe este mes</p>
-                  <p className="font-semibold text-gray-800">{formatCLP(debeEstaPersona(p.id))}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[11px] text-gray-400">Ingresó este mes</p>
-                  <p className="font-semibold text-gray-800">{formatCLP(ingresoEstaPersona(p.id))}</p>
-                </div>
+              <button onClick={() => desactivar(p.id)} className="text-xs text-gray-300 hover:text-red-400">
+                quitar
+              </button>
+            </div>
+            <div className="mt-2 flex items-center justify-between text-sm">
+              <div>
+                <p className="text-[11px] text-gray-400">Debe este mes</p>
+                <p className="font-semibold text-gray-800">{formatCLP(debeEstaPersona(p.id))}</p>
               </div>
-            </Card>
-          ))}
+              <div className="text-right">
+                <p className="text-[11px] text-gray-400">Ingresó este mes</p>
+                <p className="font-semibold text-gray-800">{formatCLP(ingresoEstaPersona(p.id))}</p>
+              </div>
+            </div>
+          </Card>
+        ))}
+        {otrasPersonas.length === 0 && (
+          <p className="text-center text-sm text-gray-400">
+            Aún no agregaste otras personas para repartir gastos (ej. Marian).
+          </p>
+        )}
       </div>
 
       <Card>

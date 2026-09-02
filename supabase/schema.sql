@@ -23,9 +23,18 @@ create table personas (
   nombre text not null,
   porcentaje_reparto numeric(5,2), -- ya no se usa para calcular repartos (ver GRUPOS/ITEM_PARTICIPANTES), se deja solo por compatibilidad histórica
   activo boolean not null default true,
+  -- Foto de perfil (opcional).
+  foto_url text,
+  -- Marca la persona "propia" de la cuenta: se crea sola al iniciar sesión
+  -- por primera vez (representa a quien tiene la cuenta), a diferencia de
+  -- las demás personas que se agregan a mano solo para repartos. El índice
+  -- de abajo garantiza que exista como máximo una por cuenta.
+  es_self boolean not null default false,
   created_at timestamptz not null default now(),
   unique (owner_id, nombre)
 );
+
+create unique index personas_owner_self_idx on personas (owner_id) where es_self;
 
 -- ---------------------------------------------------------------------------
 -- CATEGORIAS (luz, agua, gas, supermercado, casa comercial, etc.)
@@ -477,3 +486,21 @@ create policy "tarjetas_fondos_dueno_update" on storage.objects for update
   using (bucket_id = 'tarjetas-fondos' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy "tarjetas_fondos_dueno_delete" on storage.objects for delete
   using (bucket_id = 'tarjetas-fondos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============================================================================
+-- ALMACENAMIENTO — fotos de perfil de personas (/personas), personales.
+-- Mismo patrón que "tarjetas-fondos": cada usuario sube y administra solo
+-- sus propias fotos, bajo una carpeta con su propio user id.
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('personas-fotos', 'personas-fotos', true)
+on conflict (id) do nothing;
+
+create policy "personas_fotos_lectura_publica" on storage.objects for select
+  using (bucket_id = 'personas-fotos');
+create policy "personas_fotos_dueno_insert" on storage.objects for insert
+  with check (bucket_id = 'personas-fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "personas_fotos_dueno_update" on storage.objects for update
+  using (bucket_id = 'personas-fotos' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "personas_fotos_dueno_delete" on storage.objects for delete
+  using (bucket_id = 'personas-fotos' and (storage.foldername(name))[1] = auth.uid()::text);

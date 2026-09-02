@@ -83,6 +83,12 @@ export default function TarjetasPage() {
 
   useEffect(() => {
     cargarTodo();
+    // Acceso directo desde "Tu perfil" (/personas): abre el formulario de
+    // nueva tarjeta directamente, sin pasos extra. Se lee así (en vez de
+    // useSearchParams) para no forzar un límite de Suspense en la página.
+    if (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("nueva") === "1") {
+      setMostrarForm(true);
+    }
   }, []);
 
   // Revoca el object URL de la previsualización local cuando cambia o se

@@ -3,6 +3,10 @@ export interface Persona {
   nombre: string;
   porcentaje_reparto: number | null; // ya no se usa para calcular repartos (queda por compatibilidad histórica)
   activo: boolean;
+  foto_url: string | null;
+  // true = la persona que se crea sola al iniciar sesión y representa al
+  // dueño de la cuenta; false = agregada a mano solo para repartos.
+  es_self: boolean;
 }
 
 export interface Categoria {
