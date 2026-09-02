@@ -207,3 +207,37 @@ export interface ResumenPersonaMes {
   persona_nombre: string;
   total: number;
 }
+
+// Meta de ahorro (ej. "Viaje a Cancún", "Fondo de emergencia") — distinta de
+// la categoría "Ahorro" (para gastos recurrentes): es un objetivo puntual
+// con progreso propio, no un gasto del mes.
+export interface MetaAhorro {
+  id: string;
+  nombre: string;
+  monto_objetivo: number;
+  fecha_objetivo: string | null;
+  icono: string | null;
+  activa: boolean;
+}
+
+// Aporte suelto contra una meta. monto sin restricción de signo a
+// propósito: positivo = aporte, negativo = retiro.
+export interface MetaAhorroAporte {
+  id: string;
+  meta_id: string;
+  monto: number;
+  fecha: string;
+  notas: string | null;
+}
+
+// Viene de vista_metas_ahorro_progreso: monto_actual es la suma de los
+// aportes de la meta, calculada siempre en la base (nunca se guarda suelta).
+export interface MetaAhorroProgreso {
+  meta_id: string;
+  nombre: string;
+  monto_objetivo: number;
+  fecha_objetivo: string | null;
+  icono: string | null;
+  activa: boolean;
+  monto_actual: number;
+}

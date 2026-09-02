@@ -8,7 +8,17 @@ import { MovimientoFab } from "@/components/MovimientoRapido";
 // Rutas que "pertenecen" a la pestaña Más, para que se marque activa aunque
 // el usuario esté en /compras, /calendario-pagos, /grupos, /admin, etc. (no
 // solo en /mas mismo).
-const RUTAS_MAS = ["/mas", "/compras", "/calendario-pagos", "/reportes", "/ingresos", "/grupos", "/personas", "/admin"];
+const RUTAS_MAS = [
+  "/mas",
+  "/compras",
+  "/calendario-pagos",
+  "/reportes",
+  "/metas-ahorro",
+  "/ingresos",
+  "/grupos",
+  "/personas",
+  "/admin",
+];
 
 // Barra inferior rediseñada (rediseño "cuotas"): 4 destinos + el botón
 // central "+" — Inicio, Cuentas, Presupuesto y Más (que agrupa

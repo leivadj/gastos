@@ -251,6 +251,38 @@ create table pagos (
   unique (origen, origen_id, mes)
 );
 
+-- ---------------------------------------------------------------------------
+-- METAS DE AHORRO — objetivos puntuales (ej. "Viaje a Cancún", "Fondo de
+-- emergencia") con un monto objetivo y aportes sueltos hasta completarlos.
+-- Distinto de la categoría "Ahorro" (para gastos recurrentes tipo "ahorro
+-- programado mensual"): una meta no es un gasto del mes, así que —igual que
+-- transferencias— sus aportes no afectan "Disponible este mes" en el
+-- dashboard. monto_actual no se guarda acá: se calcula sumando los aportes
+-- (ver vista_metas_ahorro_progreso más abajo), para que nunca se desincronice.
+-- ---------------------------------------------------------------------------
+create table metas_ahorro (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  nombre text not null,
+  monto_objetivo numeric(12, 2) not null check (monto_objetivo > 0),
+  fecha_objetivo date,
+  icono text,
+  activa boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+-- monto sin restricción de signo a propósito: positivo = aporte, negativo =
+-- retiro (ej. tuviste que usar parte del fondo de emergencia).
+create table metas_ahorro_aportes (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  meta_id uuid not null references metas_ahorro(id) on delete cascade,
+  monto numeric(12, 2) not null,
+  fecha date not null default current_date,
+  notas text,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- VISTAS — aquí vive la automatización de las cuotas y del reparto
 -- ============================================================================
@@ -400,6 +432,22 @@ from (
 ) t
 group by persona_id, persona_nombre;
 
+-- Progreso de cada meta de ahorro: monto_actual se calcula sumando sus
+-- aportes (nunca se guarda, para que no se pueda desincronizar).
+create or replace view vista_metas_ahorro_progreso
+with (security_invoker = true) as
+select
+  m.id as meta_id,
+  m.nombre,
+  m.monto_objetivo,
+  m.fecha_objetivo,
+  m.icono,
+  m.activa,
+  coalesce(sum(a.monto), 0) as monto_actual
+from metas_ahorro m
+left join metas_ahorro_aportes a on a.meta_id = m.id
+group by m.id, m.nombre, m.monto_objetivo, m.fecha_objetivo, m.icono, m.activa;
+
 -- ============================================================================
 -- SEGURIDAD (RLS) — cada usuario autenticado tiene su propio espacio,
 -- totalmente separado del de cualquier otro usuario (Felipe, Marian, etc.
@@ -419,6 +467,8 @@ alter table item_participantes enable row level security;
 alter table ingresos enable row level security;
 alter table transferencias enable row level security;
 alter table pagos enable row level security;
+alter table metas_ahorro enable row level security;
+alter table metas_ahorro_aportes enable row level security;
 
 create policy "solo_dueno" on personas for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
@@ -455,6 +505,10 @@ create policy "solo_dueno" on ingresos for all
 create policy "solo_dueno" on transferencias for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on pagos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on metas_ahorro for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on metas_ahorro_aportes for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ============================================================================

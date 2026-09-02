@@ -76,6 +76,16 @@ export const navItems = [
     ),
   },
   {
+    href: "/metas-ahorro",
+    label: "Metas",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    ),
+  },
+  {
     href: "/grupos",
     label: "Grupos",
     icon: (active: boolean) => (
