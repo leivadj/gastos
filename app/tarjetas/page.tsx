@@ -17,6 +17,9 @@ function traducirError(err: unknown): string {
   if (msg.includes("entidades_owner_id_nombre_tipo_key") || msg.includes("entidades_owner_id_nombre_key")) {
     return "Ya tienes una tarjeta o cuenta con ese nombre y ese mismo tipo. Si es distinta (ej. débito vs. crédito), cambia el Tipo; si son la misma, edítala en vez de crear otra.";
   }
+  if (msg.includes("entidades_nombre_key")) {
+    return "Todavía falta correr la migración de Supabase migration_16_elimina_unico_nombre_global.sql — hay una restricción vieja que exige que el nombre sea único entre TODAS las cuentas (no solo la tuya), y por eso bloquea nombres que ya usa otra cuenta. Corre esa migración y vuelve a intentar.";
+  }
   if (msg.includes("Bucket not found")) {
     return "Todavía falta correr la migración de Supabase que crea el almacenamiento de imágenes de tarjetas (migration_12_tarjetas_visuales.sql). Corre esa migración y vuelve a intentar subir la imagen.";
   }
