@@ -8,6 +8,7 @@ import { Categoria, Marca, TipoMarca } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { IconoPicker } from "@/components/IconoPicker";
+import { mensajeError } from "@/lib/supabaseError";
 
 const TIPOS: { value: TipoMarca; label: string }[] = [
   { value: "banco", label: "Banco" },
@@ -134,7 +135,7 @@ export default function AdminPage() {
       setArchivo(null);
       cargarMarcas();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar la marca.");
+      setError(mensajeError(err) || "No se pudo guardar la marca.");
     } finally {
       setGuardando(false);
     }
@@ -164,7 +165,7 @@ export default function AdminPage() {
       }
       cargarMarcas();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo subir el logo.");
+      setError(mensajeError(err) || "No se pudo subir el logo.");
     } finally {
       setSubiendoId(null);
     }

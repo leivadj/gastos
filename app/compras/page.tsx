@@ -7,6 +7,7 @@ import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
+import { mensajeError } from "@/lib/supabaseError";
 import { IconoPicker } from "@/components/IconoPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
@@ -150,7 +151,7 @@ export default function ComprasPage() {
       cancelarForm();
       cargarTodo();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+      setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
     } finally {
       setGuardando(false);
     }

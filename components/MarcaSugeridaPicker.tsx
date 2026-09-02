@@ -5,6 +5,7 @@ import { Marca, TipoMarca } from "@/lib/types";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { IconoPicker } from "@/components/IconoPicker";
 import { supabase } from "@/lib/supabaseClient";
+import { mensajeError } from "@/lib/supabaseError";
 
 const TIPOS_MARCA: { value: TipoMarca; label: string }[] = [
   { value: "servicio_basico", label: "Servicio básico (luz, agua, gas...)" },
@@ -73,7 +74,7 @@ export function MarcaSugeridaPicker({
       cerrarBusqueda();
       if (onCatalogoActualizado) await onCatalogoActualizado();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo agregar. ¿Tu cuenta tiene permiso de administrador?");
+      setError(mensajeError(err) || "No se pudo agregar. ¿Tu cuenta tiene permiso de administrador?");
     } finally {
       setGuardando(false);
     }

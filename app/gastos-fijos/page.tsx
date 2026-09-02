@@ -10,6 +10,7 @@ import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { formatCLP } from "@/lib/format";
 import { resolverMarca } from "@/lib/resolverMarca";
+import { mensajeError } from "@/lib/supabaseError";
 import { Categoria, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
 
 export default function GastosFijosPage() {
@@ -143,7 +144,7 @@ export default function GastosFijosPage() {
       cancelarForm();
       cargarTodo();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+      setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
     } finally {
       setGuardando(false);
     }

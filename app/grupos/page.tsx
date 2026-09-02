@@ -6,6 +6,7 @@ import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { IconoPicker } from "@/components/IconoPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
+import { mensajeError } from "@/lib/supabaseError";
 import { Grupo, GrupoParticipante, Participante, Persona } from "@/lib/types";
 
 export default function GruposPage() {
@@ -90,7 +91,7 @@ export default function GruposPage() {
       cancelarForm();
       cargarTodo();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar el grupo.");
+      setError(mensajeError(err) || "No se pudo guardar el grupo.");
     } finally {
       setGuardando(false);
     }

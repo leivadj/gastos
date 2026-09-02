@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { useDeviceType } from "@/lib/useDeviceType";
+import { mensajeError } from "@/lib/supabaseError";
 import { Categoria, Entidad, Marca } from "@/lib/types";
 
 // Avisa a cualquier pantalla que esté escuchando (dashboard, /compras,
@@ -200,7 +201,7 @@ function FormGasto({
       avisarGuardado("gasto");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+      setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
     } finally {
       setGuardando(false);
     }
@@ -321,7 +322,7 @@ function FormIngreso({ onClose }: { onClose: () => void }) {
       avisarGuardado("ingreso");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+      setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
     } finally {
       setGuardando(false);
     }
@@ -405,7 +406,7 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
       avisarGuardado("transferencia");
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar. Intenta de nuevo.");
+      setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
     } finally {
       setGuardando(false);
     }

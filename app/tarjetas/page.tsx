@@ -10,14 +10,18 @@ import { Categoria, CompraVigente, Entidad, GastoFijo, Marca } from "@/lib/types
 import { colorFor } from "@/lib/avatarColor";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { formatCLP, nombreMes } from "@/lib/format";
+import { mensajeError } from "@/lib/supabaseError";
 
 function traducirError(err: unknown): string {
-  const msg = err instanceof Error ? err.message : "";
+  const msg = mensajeError(err);
   if (msg.includes("entidades_owner_id_nombre_tipo_key") || msg.includes("entidades_owner_id_nombre_key")) {
     return "Ya tienes una tarjeta o cuenta con ese nombre y ese mismo tipo. Si es distinta (ej. débito vs. crédito), cambia el Tipo; si son la misma, edítala en vez de crear otra.";
   }
   if (msg.includes("Bucket not found")) {
     return "Todavía falta correr la migración de Supabase que crea el almacenamiento de imágenes de tarjetas (migration_12_tarjetas_visuales.sql). Corre esa migración y vuelve a intentar subir la imagen.";
+  }
+  if (msg.includes("Could not find") && msg.includes("column")) {
+    return `Todavía falta correr una migración de Supabase (revisa que hayas corrido migration_12 y migration_13, en orden) — falta una columna en la base de datos. Detalle: ${msg}`;
   }
   return msg || "No se pudo guardar. Intenta de nuevo.";
 }
