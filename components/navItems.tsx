@@ -65,6 +65,17 @@ export const navItems = [
     ),
   },
   {
+    href: "/reportes",
+    label: "Reportes",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <rect x="4" y="12" width="4.5" height="8" rx="1.2" />
+        <rect x="10.2" y="7" width="4.5" height="13" rx="1.2" />
+        <rect x="16.4" y="3.5" width="4.5" height="16.5" rx="1.2" />
+      </svg>
+    ),
+  },
+  {
     href: "/grupos",
     label: "Grupos",
     icon: (active: boolean) => (

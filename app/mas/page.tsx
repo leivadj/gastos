@@ -13,7 +13,7 @@ import { PerfilPropioCard } from "@/components/PerfilPropioCard";
 // Cerrar sesión", así que no se repite acá; su tarjeta "Tu perfil" sí se
 // repite arriba de la lista, para verla apenas se aprieta "Más" sin tener
 // que entrar a Personas.
-const HREFS_AGRUPADOS = ["/compras", "/calendario-pagos", "/ingresos", "/grupos", "/personas"];
+const HREFS_AGRUPADOS = ["/compras", "/calendario-pagos", "/reportes", "/ingresos", "/grupos", "/personas"];
 
 export default function MasPage() {
   const [esAdminUsuario, setEsAdminUsuario] = useState(false);
@@ -34,7 +34,7 @@ export default function MasPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Más</h1>
         <p className="mt-1 text-sm text-gray-400">
-          Cuotas, calendario de pagos, ingresos, grupos, personas{esAdminUsuario ? " y ajustes" : ""}.
+          Cuotas, calendario de pagos, reportes, ingresos, grupos, personas{esAdminUsuario ? " y ajustes" : ""}.
         </p>
       </div>
 
