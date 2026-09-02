@@ -10,6 +10,19 @@ import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { IconoPicker } from "@/components/IconoPicker";
 import { mensajeError } from "@/lib/supabaseError";
 
+// A diferencia de personas/grupos/entidades (que son POR CUENTA), el
+// catálogo de marcas es compartido entre todas las cuentas a propósito —
+// por eso "nombre" es único en TODA la tabla, sin owner_id. Si ya existe
+// (ej. "Spotify"), no hay que crearla de nuevo: está más arriba, en su
+// grupo por tipo, y se puede editar el logo/ícono ahí mismo.
+function traducirErrorMarca(err: unknown, nombreIntentado: string): string {
+  const msg = mensajeError(err);
+  if (msg.includes("marcas_nombre_key")) {
+    return `Ya existe "${nombreIntentado}" en el catálogo (es compartido entre todas las cuentas, no puede haber dos con el mismo nombre) — buscala más arriba en su grupo y usa "cambiar logo" o "cambiar ícono" ahí mismo en vez de crearla de nuevo.`;
+  }
+  return msg || "No se pudo guardar la marca.";
+}
+
 const TIPOS: { value: TipoMarca; label: string }[] = [
   { value: "banco", label: "Banco" },
   { value: "casa_comercial", label: "Casa comercial" },
@@ -135,7 +148,7 @@ export default function AdminPage() {
       setArchivo(null);
       cargarMarcas();
     } catch (err) {
-      setError(mensajeError(err) || "No se pudo guardar la marca.");
+      setError(traducirErrorMarca(err, nombre));
     } finally {
       setGuardando(false);
     }
