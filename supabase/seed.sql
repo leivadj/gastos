@@ -28,16 +28,23 @@ insert into personas (nombre, porcentaje_reparto, activo) values
 -- ---------------------------------------------------------------------------
 -- CATEGORIAS
 -- ---------------------------------------------------------------------------
+-- Los mismos 12 grupos que el catálogo de marcas en /admin, en el mismo
+-- orden — cada categoría enlaza a su tipo de marca, así el formulario
+-- ofrece directamente las marcas de ese grupo (ej. "Supermercado" -> Jumbo,
+-- Líder...).
 insert into categorias (nombre, tipo, tipo_marca_sugerido) values
+  ('Banco', 'variable', 'banco'),
+  ('Casa comercial', 'variable', 'casa_comercial'),
+  ('Caja de compensación', 'variable', 'caja_compensacion'),
+  ('Autopista / TAG', 'variable', 'autopista'),
+  ('Internet / Móvil', 'fijo', 'telecom'),
   ('Servicio básico (luz, agua, gas...)', 'fijo', 'servicio_basico'),
   ('Supermercado', 'variable', 'supermercado'),
-  ('Casa comercial', 'variable', 'casa_comercial'),
-  ('Transporte', 'variable', 'transporte'),
-  ('Suscripciones', 'fijo', 'suscripcion'),
-  ('Educación', 'variable', null),
-  ('Ahorro', 'variable', null),
-  ('Salud', 'variable', null),
-  ('Otro', 'variable', null);
+  ('Pasajes (bus, avión)', 'variable', 'transporte'),
+  ('Compras online', 'variable', 'compras_online'),
+  ('Delivery (comida, encargos)', 'variable', 'delivery'),
+  ('Suscripción (streaming, apps...)', 'fijo', 'suscripcion'),
+  ('Otro', 'variable', 'otro');
 
 -- ---------------------------------------------------------------------------
 -- ENTIDADES (medios de pago / tarjetas / créditos)
@@ -80,7 +87,7 @@ select 'Reestructuración deuda Falabella', 4839109, 24, '2026-03-01'::date,
 union all
 select 'Pago auto Papá', 2700000, 48, '2026-07-01'::date,
   (select id from entidades where nombre = 'Banco Estado'),
-  (select id from categorias where nombre = 'Transporte'),
+  (select id from categorias where nombre = 'Otro'),
   'manual', (select id from personas where nombre = 'Papá'),
   'Iba en cuota 2 de 48 en agosto 2026'
 union all
@@ -101,19 +108,19 @@ select 'Zapatillas Madi', 144990, 3, '2026-08-01'::date,
 union all
 select 'Lentes', 89990, 3, '2026-08-01'::date,
   (select id from entidades where nombre = 'Banco Estado'),
-  (select id from categorias where nombre = 'Salud'),
+  (select id from categorias where nombre = 'Otro'),
   'manual', (select id from personas where nombre = 'Papá'),
   'Asignación de persona aproximada, revisar'
 union all
 select 'Cuota gira de estudio', 50000, 15, '2025-11-01'::date,
   (select id from entidades where nombre = 'Efectivo'),
-  (select id from categorias where nombre = 'Educación'),
+  (select id from categorias where nombre = 'Otro'),
   'manual', (select id from personas where nombre = 'Nicolás'),
   'Iba en cuota 10 de 15 en agosto 2026'
 union all
 select 'Ahorro Madi', 30000, 10, '2026-02-01'::date,
   (select id from entidades where nombre = 'Efectivo'),
-  (select id from categorias where nombre = 'Ahorro'),
+  (select id from categorias where nombre = 'Otro'),
   'manual', (select id from personas where nombre = 'Madi'),
   'Iba en cuota 7 de 10 en agosto 2026';
 
