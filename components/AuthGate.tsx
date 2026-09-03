@@ -14,9 +14,15 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const deviceType = useDeviceType();
   const esMobile = deviceType === "mobile";
   const pathname = usePathname();
-  // El dashboard ("/") usa un layout ancho tipo panel en escritorio; el resto
-  // de las páginas (formularios, listas) se ven mejor en un ancho moderado.
-  const anchoDesktop = pathname === "/" ? "max-w-6xl" : "max-w-2xl";
+  // El dashboard ("/") usa un layout ancho tipo panel en escritorio, con
+  // grillas de 2-4 columnas que aprovechan el ancho. El resto de las
+  // páginas (formularios, listas de una columna) usan un ancho más
+  // moderado para que las líneas de texto no queden gigantes — pero
+  // "moderado" en escritorio sigue siendo bastante más ancho que el
+  // contenedor mobile (max-w-3xl del layout esMobile de más arriba),
+  // para que no se vean como una versión angosta de celular estirada
+  // en medio de una pantalla grande.
+  const anchoDesktop = pathname === "/" ? "max-w-6xl" : "max-w-4xl";
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");

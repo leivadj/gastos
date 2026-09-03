@@ -26,13 +26,18 @@ export function DesktopNav() {
 
   return (
     <header className="sticky top-0 z-20 border-b border-gray-100 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-6 py-3">
         {/* "Cuadro perfil" del escritorio: en el celular esto vive en /mas
             (PerfilPropioCard), pero ese destino es solo el menú "Más" de la
             barra inferior — en escritorio no hay "Más" (todo se muestra
             suelto, ver navItems.tsx), así que el mini-perfil vive acá,
             en el header, y "Cerrar sesión" va DENTRO de este mismo cuadro
-            en vez de suelto aparte. */}
+            en vez de suelto aparte.
+            El header entero usa flex-wrap: con 11-12 destinos sueltos (más
+            el cuadro de perfil) no siempre entra todo en una sola línea —
+            antes eso empujaba la navegación fuera del viewport (invisible
+            e inalcanzable) en vez de acomodarse. Con wrap, si no entra,
+            la navegación baja a una segunda línea en vez de recortarse. */}
         <div className="flex shrink-0 items-center gap-3 rounded-2xl border border-gray-100 py-1.5 pl-1.5 pr-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-gradient text-white">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
@@ -54,7 +59,7 @@ export function DesktopNav() {
           </button>
         </div>
 
-        <nav className="flex items-center gap-1">
+        <nav className="flex flex-wrap items-center gap-1">
           {visibles.map((item) => {
             const active = pathname === item.href;
             return (
