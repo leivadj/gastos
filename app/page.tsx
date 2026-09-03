@@ -18,11 +18,13 @@ import { PersonaBreakdown } from "@/components/PersonaBreakdown";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { AvatarGroupHover } from "@/components/AvatarGroupHover";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
-import { diaDelMes, formatCLP, mesActualISO, nombreMes } from "@/lib/format";
+import { diaDelMes, formatCLP, mesActualISO, nombreMes, primerDiaMesSiguiente } from "@/lib/format";
+import { resumenGastosMes } from "@/lib/resumenGastos";
 import {
   Categoria,
   CompraVigente,
   Entidad,
+  GastoDiario,
   GastoFijo,
   Marca,
   Persona,
@@ -82,6 +84,7 @@ export default function DashboardPage() {
 
   const [cuotas, setCuotas] = useState<CompraVigente[]>([]);
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
+  const [gastosDiarios, setGastosDiarios] = useState<GastoDiario[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
@@ -98,6 +101,7 @@ export default function DashboardPage() {
       const [
         { data: c },
         { data: gf },
+        { data: gd },
         { data: cat },
         { data: per },
         { data: ent },
@@ -109,6 +113,7 @@ export default function DashboardPage() {
       ] = await Promise.all([
         supabase.from("vista_cuotas_mes_actual").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
+        supabase.from("gastos_diarios").select("*").gte("fecha", mesActualISO()).lt("fecha", primerDiaMesSiguiente()),
         supabase.from("categorias").select("*"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("entidades").select("*"),
@@ -120,6 +125,7 @@ export default function DashboardPage() {
       ]);
       setCuotas((c as CompraVigente[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
+      setGastosDiarios((gd as GastoDiario[]) ?? []);
       setCategorias((cat as Categoria[]) ?? []);
       setPersonas((per as Persona[]) ?? []);
       setEntidades((ent as Entidad[]) ?? []);
@@ -139,19 +145,21 @@ export default function DashboardPage() {
 
   const categoriaNombre = (id: string | null) =>
     categorias.find((c) => c.id === id)?.nombre ?? "Sin categoría";
-  const categoriaTipo = (id: string | null) => categorias.find((c) => c.id === id)?.tipo ?? "variable";
 
   const totalCuotas = cuotas.reduce((acc, c) => acc + Number(c.monto_cuota), 0);
   const totalFijosMonto = gastosFijos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
-  const totalGastos = totalCuotas + totalFijosMonto;
+  const totalDiarios = gastosDiarios.reduce((acc, d) => acc + Number(d.monto), 0);
+  const totalGastos = totalCuotas + totalFijosMonto + totalDiarios;
   const disponible = ingresosMes - totalGastos;
 
   // "Gastos" = ya venció su día de pago este mes (ya salió/sale de la
   // cuenta). "Comprometido" = ya sabes que viene, pero su día de pago este
   // mes todavía no llega — sigue restando del disponible, pero por
-  // separado, para no confundir "ya gastado" con "ya sé que se va a ir".
+  // separado, para no confundir "ya gastado" con "ya sé que se va a ir". Los
+  // gastos diarios no tienen "vencimiento" — ya se hicieron, así que siempre
+  // suman a "ya pagados", nunca a "comprometido".
   const hoyDia = new Date().getDate();
-  let gastosYaPagados = 0;
+  let gastosYaPagados = totalDiarios;
   let comprometido = 0;
   cuotas.forEach((c) => {
     const monto = Number(c.monto_cuota);
@@ -164,24 +172,12 @@ export default function DashboardPage() {
     else comprometido += monto;
   });
 
-  const porCategoria: Record<string, number> = {};
-  let totalTipoFijo = 0;
-  let totalTipoVariable = 0;
-  cuotas.forEach((c) => {
-    const nombre = categoriaNombre(c.categoria_id);
-    porCategoria[nombre] = (porCategoria[nombre] ?? 0) + Number(c.monto_cuota);
-    if (categoriaTipo(c.categoria_id) === "fijo") totalTipoFijo += Number(c.monto_cuota);
-    else totalTipoVariable += Number(c.monto_cuota);
-  });
-  gastosFijos.forEach((g) => {
-    const nombre = categoriaNombre(g.categoria_id);
-    porCategoria[nombre] = (porCategoria[nombre] ?? 0) + Number(g.monto_estimado);
-    if (categoriaTipo(g.categoria_id) === "fijo") totalTipoFijo += Number(g.monto_estimado);
-    else totalTipoVariable += Number(g.monto_estimado);
-  });
-  const dataCategoria = Object.entries(porCategoria)
-    .map(([name, value]) => ({ name, value }))
-    .sort((a, b) => b.value - a.value);
+  const { dataCategoria, totalTipoFijo, totalTipoVariable, pctFijo } = resumenGastosMes(
+    cuotas,
+    gastosFijos,
+    categorias,
+    gastosDiarios
+  );
   const legendPrincipal = dataCategoria.slice(0, 3);
   const restoCategorias = dataCategoria.slice(3);
   const restoTotal = restoCategorias.reduce((acc, d) => acc + d.value, 0);
@@ -189,8 +185,6 @@ export default function DashboardPage() {
   const dataPersonas = resumenPersonas
     .map((p) => ({ name: p.persona_nombre, total: Number(p.total), persona_id: p.persona_id }))
     .sort((a, b) => b.total - a.total);
-
-  const pctFijo = totalGastos > 0 ? (totalTipoFijo / totalGastos) * 100 : 0;
 
   if (cargando) {
     return <p className="py-10 text-center text-gray-400">Cargando…</p>;

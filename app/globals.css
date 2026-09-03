@@ -83,9 +83,10 @@ body {
 
 /* Efecto "page-side-by-side" (transitions.dev) para desplegar el detalle de
    cada ítem de una lista (gastos fijos, cuotas…): resumen y detalle se
-   apilan en la misma caja vía CSS grid (ver ItemDesplegable.tsx) y se
    cruzan con un leve desplazamiento (8px) + blur, en vez de un acordeón
-   que empuja de golpe el resto de la lista hacia abajo. */
+   que empuja de golpe el resto de la lista hacia abajo. Solo la página
+   activa queda en el flujo normal, así el alto de la caja es el de lo que
+   se ve (ver ItemDesplegable.tsx). */
 .pagina-desliza {
   transition:
     opacity 250ms cubic-bezier(0.22, 1, 0.36, 1),

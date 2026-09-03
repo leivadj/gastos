@@ -8,7 +8,7 @@ import { TIPO_CORTO } from "@/components/TarjetaVisual";
 import { mensajeError } from "@/lib/supabaseError";
 import { Categoria, Entidad, Marca } from "@/lib/types";
 
-// Avisa a cualquier pantalla que esté escuchando (dashboard, /compras,
+// Avisa a cualquier pantalla que esté escuchando (dashboard, /gastos,
 // /ingresos...) que se guardó un movimiento rápido, para que refresque sus
 // datos sin que el usuario tenga que recargar la página a mano.
 export const EVENTO_MOVIMIENTO_GUARDADO = "movimiento:guardado";

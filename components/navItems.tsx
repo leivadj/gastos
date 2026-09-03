@@ -4,13 +4,16 @@ export function esAdmin(email?: string | null): boolean {
   return !!email && ADMIN_EMAILS.includes(email);
 }
 
-// "Presupuesto" apunta por ahora a /gastos-fijos como mapeo interino: la
-// pantalla real de Presupuesto del rediseño (barras de gasto vs. presupuesto
-// por categoría) todavía no existe, así que esta pestaña sigue mostrando la
-// vista de gastos fijos actual hasta que se construya esa fase. El
-// Calendario de pagos (con el promedio móvil de luz/agua/gas) ya existe
-// como pantalla propia, agrupada en "Más" — igual que en el mockup, que la
-// deja fuera de la barra inferior.
+// "Presupuesto" es la pantalla real del rediseño (/presupuesto): gastos
+// por categoría, fijo vs. variable, los fijos obligatorios de monto
+// variable (que llevan al detalle "Hogar > Servicios básicos", una
+// sub-página sin ítem propio de navegación) y un resumen de metas de
+// ahorro. La gestión (alta/edición/baja) de todos los gastos vive en
+// /gastos — una sola pantalla con pestañas (Fijos, Variables, Cuotas,
+// Diarios) que reemplazó a las antiguas /gastos-fijos y /compras (ambas
+// rutas quedaron como redirect por si había accesos directos guardados) —
+// agrupada en "Más", y también accesible con "Gestionar gastos" al fondo
+// de Presupuesto.
 export const navItems = [
   {
     href: "/",
@@ -34,8 +37,8 @@ export const navItems = [
     ),
   },
   {
-    href: "/compras",
-    label: "Cuotas",
+    href: "/gastos",
+    label: "Gastos",
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
         <rect x="4" y="3.5" width="16" height="17" rx="2" />
@@ -44,7 +47,7 @@ export const navItems = [
     ),
   },
   {
-    href: "/gastos-fijos",
+    href: "/presupuesto",
     label: "Presupuesto",
     icon: (active: boolean) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>

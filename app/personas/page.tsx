@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { PersonaAvatar } from "@/components/PersonaAvatar";
-import { PerfilPropioCard, traducirErrorPersona } from "@/components/PerfilPropioCard";
+import { traducirErrorPersona } from "@/components/PerfilPropioCard";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
 import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
 import { Ingreso, Persona, ResumenPersonaMes } from "@/lib/types";
@@ -16,7 +16,6 @@ export default function PersonasPage() {
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [nombre, setNombre] = useState("");
-  const [correo, setCorreo] = useState("");
   const [errorNueva, setErrorNueva] = useState("");
 
   async function cargar() {
@@ -32,14 +31,9 @@ export default function PersonasPage() {
 
   useEffect(() => {
     cargar();
-    supabase.auth.getSession().then(({ data }) => setCorreo(data.session?.user?.email ?? ""));
   }, []);
 
   const otrasPersonas = personas.filter((p) => p.activo && !p.es_self);
-
-  async function cerrarSesion() {
-    await supabase.auth.signOut();
-  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -76,12 +70,10 @@ export default function PersonasPage() {
       <div>
         <h1 className="text-lg font-bold text-gray-800">Personas</h1>
         <p className="text-xs capitalize text-gray-400">
-          Tu perfil, y lo que debe e ingresó cada persona en {nombreMes()}. El reparto se define en cada
-          gasto/compra o en Grupos.
+          Quiénes participan en los repartos, y lo que debe e ingresó cada una en {nombreMes()}. El reparto se
+          define en cada gasto/compra o en Grupos.
         </p>
       </div>
-
-      <PerfilPropioCard />
 
       <div className="flex items-center justify-between pt-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Otras personas (repartos)</p>
@@ -154,17 +146,6 @@ export default function PersonasPage() {
           </p>
         )}
       </div>
-
-      <Card>
-        <p className="text-xs text-gray-400">Sesión iniciada como</p>
-        <p className="mb-3 truncate text-sm font-semibold text-gray-800">{correo}</p>
-        <button
-          onClick={cerrarSesion}
-          className="w-full rounded-lg border border-gray-200 py-2.5 text-sm font-semibold text-gray-500 hover:border-red-200 hover:text-red-500"
-        >
-          Cerrar sesión
-        </button>
-      </Card>
     </div>
   );
 }

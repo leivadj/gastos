@@ -6,11 +6,12 @@ import { navItems, masNavItem } from "@/components/navItems";
 import { MovimientoFab } from "@/components/MovimientoRapido";
 
 // Rutas que "pertenecen" a la pestaña Más, para que se marque activa aunque
-// el usuario esté en /compras, /calendario-pagos, /grupos, /admin, etc. (no
-// solo en /mas mismo).
+// el usuario esté en /gastos, /calendario-pagos, /grupos, /admin, etc. (no
+// solo en /mas mismo). /compras y /gastos-fijos quedaron como redirect a
+// /gastos, así que ya no hace falta listarlas acá aparte.
 const RUTAS_MAS = [
   "/mas",
-  "/compras",
+  "/gastos",
   "/calendario-pagos",
   "/reportes",
   "/metas-ahorro",
@@ -19,6 +20,11 @@ const RUTAS_MAS = [
   "/personas",
   "/admin",
 ];
+
+// /servicios-basicos es el detalle "Hogar" al que se llega desde
+// Presupuesto (ver navItems.tsx) — no tiene ítem propio en la barra, pero
+// la pestaña "Presupuesto" se mantiene activa mientras el usuario esté ahí.
+const RUTAS_PRESUPUESTO = ["/presupuesto", "/servicios-basicos"];
 
 // Barra inferior rediseñada (rediseño "cuotas"): 4 destinos + el botón
 // central "+" — Inicio, Cuentas, Presupuesto y Más (que agrupa
@@ -32,7 +38,7 @@ export function BottomNav() {
 
   const inicio = navItems.find((item) => item.href === "/")!;
   const cuentas = navItems.find((item) => item.href === "/tarjetas")!;
-  const presupuesto = navItems.find((item) => item.href === "/gastos-fijos")!;
+  const presupuesto = navItems.find((item) => item.href === "/presupuesto")!;
 
   function renderItem(item: (typeof navItems)[number], active: boolean) {
     return (
@@ -64,7 +70,7 @@ export function BottomNav() {
         {renderItem(inicio, pathname === inicio.href)}
         {renderItem(cuentas, pathname === cuentas.href)}
         <MovimientoFab variante="en-nav" />
-        {renderItem(presupuesto, pathname === presupuesto.href)}
+        {renderItem(presupuesto, RUTAS_PRESUPUESTO.includes(pathname))}
         {renderItem(masNavItem, RUTAS_MAS.includes(pathname))}
       </div>
       <div className="h-[max(env(safe-area-inset-bottom),12px)] bg-white/90" />

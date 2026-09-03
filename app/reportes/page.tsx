@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { formatCLP, mesActualISO } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
-import { Compra, GastoFijo, Ingreso, Pago } from "@/lib/types";
+import { Compra, GastoDiario, GastoFijo, Ingreso, Pago } from "@/lib/types";
 
 const N_MESES = 6;
 const COLOR_GASTO = "#DDD6FE"; // violet-200, mismo tono que el mockup
@@ -48,20 +48,23 @@ function cuotaActualEn(fechaPrimeraCuota: string, ref: MesRef): number {
 export default function ReportesPage() {
   const [compras, setCompras] = useState<Compra[]>([]);
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
+  const [gastosDiarios, setGastosDiarios] = useState<GastoDiario[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [cargando, setCargando] = useState(true);
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: c }, { data: gf }, { data: pg }, { data: ing }] = await Promise.all([
+      const [{ data: c }, { data: gf }, { data: gd }, { data: pg }, { data: ing }] = await Promise.all([
         supabase.from("compras").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
+        supabase.from("gastos_diarios").select("*"),
         supabase.from("pagos").select("*"),
         supabase.from("ingresos").select("*"),
       ]);
       setCompras((c as Compra[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
+      setGastosDiarios((gd as GastoDiario[]) ?? []);
       setPagos((pg as Pago[]) ?? []);
       setIngresos((ing as Ingreso[]) ?? []);
       setCargando(false);
@@ -85,10 +88,11 @@ export default function ReportesPage() {
   // matemática de fecha, exacta para cualquier mes pasado o futuro) + los
   // gastos fijos que están activos HOY (la base no guarda de cuándo a
   // cuándo estuvo activo cada uno, así que se toma la lista actual como
-  // aproximación para meses pasados). Donde exista un pago real registrado
-  // para ese mes (ver Calendario de pagos), se usa ese monto en vez de la
-  // estimación — así los reportes se vuelven exactos a medida que se van
-  // registrando pagos.
+  // aproximación para meses pasados) + gastos diarios de ESE mes (exactos
+  // siempre — cada uno ya tiene su fecha real, sin necesidad de estimar).
+  // Donde exista un pago real registrado para ese mes (ver Calendario de
+  // pagos), se usa ese monto en vez de la estimación — así los reportes se
+  // vuelven exactos a medida que se van registrando pagos.
   function gastosDelMes(ref: MesRef): number {
     let total = 0;
     compras.forEach((c) => {
@@ -108,6 +112,9 @@ export default function ReportesPage() {
       } else {
         total += Number(g.monto_estimado);
       }
+    });
+    gastosDiarios.forEach((d) => {
+      if (d.fecha.slice(0, 7) === ref.iso.slice(0, 7)) total += Number(d.monto);
     });
     return total;
   }

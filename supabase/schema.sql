@@ -283,6 +283,23 @@ create table metas_ahorro_aportes (
   created_at timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- GASTOS DIARIOS — compras chicas/improvisadas del día a día (pan, queso,
+-- algo que faltaba...), sin medio de pago ni reparto entre personas: carga
+-- rápida de monto, descripción y fecha. Pestaña "Diarios" de /gastos. Todas
+-- caen bajo la categoría "Hogar" del catálogo compartido (ver seed.sql) —
+-- el usuario no la elige a mano, el formulario la busca por nombre.
+-- ---------------------------------------------------------------------------
+create table gastos_diarios (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  descripcion text not null,
+  monto numeric(12, 2) not null check (monto > 0),
+  categoria_id uuid references categorias(id),
+  fecha date not null default current_date,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- VISTAS — aquí vive la automatización de las cuotas y del reparto
 -- ============================================================================
@@ -469,6 +486,7 @@ alter table transferencias enable row level security;
 alter table pagos enable row level security;
 alter table metas_ahorro enable row level security;
 alter table metas_ahorro_aportes enable row level security;
+alter table gastos_diarios enable row level security;
 
 create policy "solo_dueno" on personas for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
@@ -509,6 +527,8 @@ create policy "solo_dueno" on pagos for all
 create policy "solo_dueno" on metas_ahorro for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on metas_ahorro_aportes for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on gastos_diarios for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ============================================================================

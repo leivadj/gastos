@@ -41,10 +41,12 @@ export function traducirErrorPersona(err: unknown): string {
 }
 
 // Tarjeta "Tu perfil": foto, nombre editable, cuánto debes/ingresaste este
-// mes y atajos a tarjetas. Crea sola tu persona "propia" (es_self) la
-// primera vez que se monta, con un nombre adivinado desde tu correo. Se usa
-// tanto en /personas como en /mas (al apretar "Más" ahora se ve tu perfil
-// ahí mismo, no solo la lista de accesos).
+// mes, atajos a tarjetas y "Cerrar sesión". Crea sola tu persona "propia"
+// (es_self) la primera vez que se monta, con un nombre adivinado desde tu
+// correo. Vive solo en /mas (arriba de la lista de accesos) — /personas ya
+// no la repite, para no mostrar dos veces el perfil y dos botones de
+// cerrar sesión distintos; ahí solo queda la gestión de "otras personas"
+// para repartos.
 export function PerfilPropioCard() {
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [resumen, setResumen] = useState<ResumenPersonaMes[]>([]);
@@ -231,6 +233,13 @@ export function PerfilPropioCard() {
           Ver mis tarjetas
         </Link>
       </div>
+
+      <button
+        onClick={() => supabase.auth.signOut()}
+        className="mt-2 w-full rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-500 hover:border-red-200 hover:text-red-500"
+      >
+        Cerrar sesión
+      </button>
     </Card>
   );
 }

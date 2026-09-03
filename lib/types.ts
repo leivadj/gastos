@@ -241,3 +241,16 @@ export interface MetaAhorroProgreso {
   activa: boolean;
   monto_actual: number;
 }
+
+// Compra chica/improvisada del día a día (pan, queso, algo que faltaba...),
+// sin medio de pago ni reparto entre personas — carga rápida: solo monto,
+// descripción y fecha. Siempre caen bajo la categoría "Hogar" (categoria_id
+// se completa solo al guardar, no lo elige el usuario). Pestaña "Diarios"
+// de /gastos.
+export interface GastoDiario {
+  id: string;
+  descripcion: string;
+  monto: number;
+  categoria_id: string | null;
+  fecha: string;
+}
