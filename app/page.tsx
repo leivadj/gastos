@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   PieChart,
   Pie,
@@ -14,11 +15,14 @@ import {
 } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { PersonaBreakdown } from "@/components/PersonaBreakdown";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { AvatarGroupHover } from "@/components/AvatarGroupHover";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
 import { diaDelMes, formatCLP, mesActualISO, nombreMes, primerDiaMesSiguiente } from "@/lib/format";
+import { promedioMovil } from "@/lib/promedioMovil";
+import { resolverMarca } from "@/lib/resolverMarca";
 import { resumenGastosMes } from "@/lib/resumenGastos";
 import {
   Categoria,
@@ -27,6 +31,8 @@ import {
   GastoDiario,
   GastoFijo,
   Marca,
+  MetaAhorroProgreso,
+  Pago,
   Persona,
   RepartoCuota,
   RepartoGastoFijo,
@@ -78,6 +84,45 @@ function IconoComprometido({ className = "" }: { className?: string }) {
   );
 }
 
+function IconoCuentas({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3 8.5 12 3l9 5.5" />
+      <path d="M4.5 8v10.5a1 1 0 0 0 1 1H18a1 1 0 0 0 1-1V8" />
+      <path d="M9.5 19.5v-6h5v6" />
+    </svg>
+  );
+}
+
+function IconoPromedio({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M3.5 17.5 9 11l4 4 7.5-8.5" />
+      <path d="M3.5 20.5h17" />
+    </svg>
+  );
+}
+
+function IconoProximosPagos({ className = "" }: { className?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3.5" y="4.5" width="17" height="16" rx="2" />
+      <path d="M3.5 9.5h17" />
+      <path d="M8 3v3M16 3v3" />
+    </svg>
+  );
+}
+
+function IconoMetas({ className = "" }: { className?: string }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="0.6" fill="currentColor" />
+    </svg>
+  );
+}
+
 export default function DashboardPage() {
   const deviceType = useDeviceType();
   const esMobile = deviceType === "mobile";
@@ -92,6 +137,8 @@ export default function DashboardPage() {
   const [resumenPersonas, setResumenPersonas] = useState<ResumenPersonaMes[]>([]);
   const [repartoCuotas, setRepartoCuotas] = useState<RepartoCuota[]>([]);
   const [repartoGastos, setRepartoGastos] = useState<RepartoGastoFijo[]>([]);
+  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [metas, setMetas] = useState<MetaAhorroProgreso[]>([]);
   const [ingresosMes, setIngresosMes] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
@@ -110,6 +157,8 @@ export default function DashboardPage() {
         { data: rc },
         { data: rg },
         { data: ing },
+        { data: pg },
+        { data: mt },
       ] = await Promise.all([
         supabase.from("vista_cuotas_mes_actual").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -122,6 +171,8 @@ export default function DashboardPage() {
         supabase.from("vista_reparto_cuotas_mes").select("*"),
         supabase.from("vista_reparto_gastos_fijos").select("*"),
         supabase.from("ingresos").select("monto").eq("mes", mesActualISO()),
+        supabase.from("pagos").select("*"),
+        supabase.from("vista_metas_ahorro_progreso").select("*").eq("activa", true).order("nombre"),
       ]);
       setCuotas((c as CompraVigente[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -134,6 +185,8 @@ export default function DashboardPage() {
       setRepartoCuotas((rc as RepartoCuota[]) ?? []);
       setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
       setIngresosMes((ing ?? []).reduce((acc, r: any) => acc + Number(r.monto), 0));
+      setPagos((pg as Pago[]) ?? []);
+      setMetas((mt as MetaAhorroProgreso[]) ?? []);
       setCargando(false);
     }
     cargar();
@@ -185,6 +238,63 @@ export default function DashboardPage() {
   const dataPersonas = resumenPersonas
     .map((p) => ({ name: p.persona_nombre, total: Number(p.total), persona_id: p.persona_id }))
     .sort((a, b) => b.total - a.total);
+
+  // Saldo manual de las cuentas (ver Entidad.saldo) — se excluyen las
+  // tarjetas de crédito porque su "saldo" es deuda, no un activo.
+  const totalEnCuentas = entidades
+    .filter((e) => e.tipo !== "tarjeta_credito" && e.saldo != null)
+    .reduce((acc, e) => acc + Number(e.saldo), 0);
+
+  const gastoPromedioDiario = totalGastos / Math.max(1, hoyDia);
+
+  // Mismo cálculo de "eventos" de vencimiento que /calendario-pagos (gasto
+  // fijo con su día de pago + promedio móvil si es de monto variable, cuota
+  // vigente con el día de su primera cuota), filtrado a los que todavía no
+  // se marcaron como pagados este mes, para una vista rápida en el dashboard.
+  const mesActualStr = mesActualISO();
+  const eventosPagos = [
+    ...gastosFijos.map((g) => {
+      const esVariable = g.tipo_monto === "variable";
+      const { promedio } = esVariable
+        ? promedioMovil(pagos, g.id, mesActualStr, Number(g.monto_estimado))
+        : { promedio: Number(g.monto_estimado) };
+      return {
+        origen: "gasto_fijo" as const,
+        origenId: g.id,
+        descripcion: g.descripcion,
+        detalle: undefined as string | undefined,
+        dia: g.dia_mes_pago,
+        monto: promedio,
+        entidadId: g.entidad_id,
+        marcaId: g.marca_id,
+        icono: g.icono,
+      };
+    }),
+    ...cuotas.map((c) => ({
+      origen: "compra" as const,
+      origenId: c.compra_id,
+      descripcion: c.descripcion,
+      detalle: `Cuota ${c.cuota_actual}/${c.n_cuotas}` as string | undefined,
+      dia: diaDelMes(c.fecha_primera_cuota),
+      monto: Number(c.monto_cuota),
+      entidadId: c.entidad_id,
+      marcaId: c.marca_id,
+      icono: c.icono,
+    })),
+  ];
+
+  const proximosPagos = eventosPagos
+    .filter((ev) => {
+      const pago = pagos.find((p) => p.origen === ev.origen && p.origen_id === ev.origenId && p.mes === mesActualStr);
+      return !(pago?.pagado ?? false);
+    })
+    .sort((a, b) => {
+      if (a.dia == null && b.dia == null) return 0;
+      if (a.dia == null) return 1;
+      if (b.dia == null) return -1;
+      return a.dia - b.dia;
+    })
+    .slice(0, 5);
 
   if (cargando) {
     return <p className="py-10 text-center text-gray-400">Cargando…</p>;
@@ -310,6 +420,91 @@ export default function DashboardPage() {
     </Card>
   );
 
+  const tarjetaPromedioDiario = (
+    <Card>
+      <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
+        <IconoPromedio className="text-gray-400" />
+        Gasto promedio diario
+      </p>
+      <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(gastoPromedioDiario)}</p>
+      <p className="text-[11px] capitalize text-gray-400">en lo que va de {nombreMes()}</p>
+    </Card>
+  );
+
+  const tarjetaProximosPagos = (
+    <Card>
+      <div className="mb-1 flex items-center justify-between">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
+          <IconoProximosPagos className="text-gray-400" />
+          Próximos pagos
+        </p>
+        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from">
+          Ver todos
+        </Link>
+      </div>
+      {proximosPagos.length === 0 ? (
+        <p className="text-sm text-gray-400">No hay pagos pendientes este mes.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100">
+          {proximosPagos.map((ev) => {
+            const entidad = entidades.find((e) => e.id === ev.entidadId) ?? null;
+            const marca = marcas.find((m) => m.id === ev.marcaId) ?? resolverMarca(entidad, marcas);
+            return (
+              <li key={`${ev.origen}:${ev.origenId}`} className="flex items-center gap-3 py-2.5 text-sm">
+                <EntidadAvatar entidad={entidad} marca={marca} icono={ev.icono} className="h-8 w-8 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-gray-700">{ev.descripcion}</p>
+                  <p className="text-xs text-gray-400">
+                    {ev.dia != null ? `Vence el ${ev.dia}` : "Sin día definido"}
+                    {ev.detalle ? ` · ${ev.detalle}` : ""}
+                  </p>
+                </div>
+                <p className="shrink-0 font-semibold text-gray-800">{formatCLP(ev.monto)}</p>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+
+  const tarjetaMetas = (
+    <Card>
+      <div className="mb-2 flex items-center justify-between">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
+          <IconoMetas className="text-gray-400" />
+          Metas de ahorro
+        </p>
+        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from">
+          Ver todas
+        </Link>
+      </div>
+      {metas.length === 0 ? (
+        <p className="text-sm text-gray-400">Todavía no tienes metas de ahorro activas.</p>
+      ) : (
+        <ul className="space-y-3">
+          {metas.slice(0, 3).map((m) => {
+            const pct = m.monto_objetivo > 0 ? Math.min(100, Math.round((m.monto_actual / m.monto_objetivo) * 100)) : 0;
+            return (
+              <li key={m.meta_id}>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-gray-700">
+                    {m.icono ? `${m.icono} ` : ""}
+                    {m.nombre}
+                  </span>
+                  <span className="text-gray-400">{pct}%</span>
+                </div>
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                  <div className="h-full bg-brand-gradient" style={{ width: `${pct}%` }} />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Card>
+  );
+
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
   const contenido = esMobile ? (
@@ -383,8 +578,10 @@ export default function DashboardPage() {
     <div className="space-y-6 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Resumen del mes</h1>
-          <p className="text-sm capitalize text-gray-400">{nombreMes()}</p>
+          <h1 className="text-xl font-bold text-gray-800">Resumen general</h1>
+          <p className="text-sm text-gray-400">
+            Así van tus finanzas en <span className="capitalize">{nombreMes()}</span> 👋
+          </p>
         </div>
         <AvatarGroupHover className="flex -space-x-2">
           {personas.slice(0, 6).map((p, i) => (
@@ -400,22 +597,71 @@ export default function DashboardPage() {
         </AvatarGroupHover>
       </div>
 
-      <div className="grid grid-cols-4 gap-4">
-        <Card>
-          <p className="text-xs font-medium text-gray-400">Ingresos</p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">
-            <ContadorOdometro texto={formatCLP(ingresosMes)} />
+      {/* Fila de KPIs: "Disponible" queda como tarjeta grande (mismo
+          contenido que el hero mobile: ingresos/gastos/comprometido
+          adentro) para que siga siendo el número principal, y las otras 3
+          quedan como tarjetas simples de un dato cada una. */}
+      <div className="grid grid-cols-5 gap-4">
+        <div className="col-span-2 rounded-2xl bg-brand-gradient p-5 text-white">
+          <p className="flex items-center gap-1.5 text-sm opacity-85">
+            <IconoDisponible className="text-white" />
+            Disponible este mes
           </p>
+          <p className="mt-1 text-3xl font-bold tracking-tight">
+            <ContadorOdometro texto={formatCLP(disponible)} />
+          </p>
+          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
+            <div className="rounded-xl bg-white/15 p-2.5">
+              <p className="flex items-center gap-1 text-[11px] opacity-85">
+                <IconoIngresos className="text-white" />
+                Ingresos
+              </p>
+              <p className="text-sm font-semibold">
+                <ContadorOdometro texto={formatCLP(ingresosMes)} />
+              </p>
+            </div>
+            <div className="rounded-xl bg-white/15 p-2.5">
+              <p className="flex items-center gap-1 text-[11px] opacity-85">
+                <IconoGastos className="text-white" />
+                Gastos
+              </p>
+              <p className="text-sm font-semibold">
+                <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
+              </p>
+            </div>
+            <div className="rounded-xl bg-white/15 p-2.5">
+              <p className="flex items-center gap-1 text-[11px] opacity-85">
+                <IconoComprometido className="text-white" />
+                Comprometido
+              </p>
+              <p className="text-sm font-semibold">
+                <ContadorOdometro texto={formatCLP(comprometido)} />
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Card>
+          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
+            <IconoCuentas className="text-gray-400" />
+            Total en cuentas
+          </p>
+          <p className="mt-1 text-2xl font-bold text-gray-800">
+            <ContadorOdometro texto={formatCLP(totalEnCuentas)} />
+          </p>
+          <p className="text-[11px] text-gray-400">saldo de tus cuentas</p>
         </Card>
+
         <Card>
           <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
             <IconoGastos className="text-gray-400" />
-            Gastos
+            Gastos este mes
           </p>
           <p className="mt-1 text-2xl font-bold text-gray-800">
             <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
           </p>
         </Card>
+
         <Card>
           <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
             <IconoComprometido className="text-gray-400" />
@@ -426,24 +672,21 @@ export default function DashboardPage() {
           </p>
           <p className="text-[11px] text-gray-400">vence más adelante este mes</p>
         </Card>
-        <Card>
-          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
-            <IconoDisponible className="text-gray-400" />
-            Disponible
-          </p>
-          <p className="mt-1 text-2xl font-bold text-brand-from">
-            <ContadorOdometro texto={formatCLP(disponible)} />
-          </p>
-        </Card>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {tarjetaCategoria}
-        {tarjetaPersonas}
+        {tarjetaFijoVariable}
+        {tarjetaPromedioDiario}
       </div>
 
-      {tarjetaFijoVariable}
-      {tarjetaCuotas}
+      <div className="grid grid-cols-3 gap-4">
+        {tarjetaProximosPagos}
+        {tarjetaCuotas}
+        {tarjetaMetas}
+      </div>
+
+      {tarjetaPersonas}
     </div>
   );
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
@@ -42,6 +43,24 @@ function IconoTransferencia() {
     </svg>
   );
 }
+function IconoCuotas() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <path d="M3.5 9.5h17" strokeLinecap="round" />
+      <path d="M7 14h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconoPagoFijo() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+      <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+      <path d="M3.5 9.5h17" strokeLinecap="round" />
+      <path d="M8 3v3M16 3v3" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 type ModalActivo = "gasto" | "ingreso" | "transferencia" | null;
 
@@ -65,7 +84,20 @@ function HojaInferior({ titulo, onClose, children }: { titulo: string; onClose: 
   );
 }
 
-export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante" | "en-nav" }) {
+export function MovimientoFab({
+  variante = "flotante",
+}: {
+  // "en-nav": el botón vive dentro de la barra inferior del celular.
+  // "flotante": botón circular fijo abajo a la derecha (sin usar por ahora,
+  // en escritorio el punto de entrada es "boton-lateral" en el Sidebar).
+  // "boton-lateral": botón con etiqueta "+ Nuevo movimiento" dentro del
+  // Sidebar de escritorio (ver DesktopSidebar.tsx) — mismo menú y mismos 3
+  // formularios (Gasto/Ingreso/Transferencia) que las otras variantes, más
+  // 2 atajos de navegación a "Compra en cuotas" y "Pago fijo" (esos dos
+  // tienen formularios más largos que ya viven en /gastos, así que acá solo
+  // se navega ahí en vez de duplicar esa lógica en un modal).
+  variante?: "flotante" | "en-nav" | "boton-lateral";
+}) {
   const [abierto, setAbierto] = useState(false);
   const [modal, setModal] = useState<ModalActivo>(null);
 
@@ -95,65 +127,102 @@ export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante"
 
   // "en-nav": el botón vive DENTRO de la barra inferior (como en el mockup),
   // en vez de flotar encima del contenido y taparlo. "flotante": el botón
-  // clásico fijo abajo a la derecha — se usa solo en escritorio, donde no
-  // hay barra inferior debajo de la que taparse.
+  // clásico fijo abajo a la derecha. "boton-lateral": el menú se abre hacia
+  // abajo, alineado a la izquierda del botón (vive dentro del Sidebar, no
+  // tiene sentido centrarlo ni pegarlo al piso de la pantalla).
   const menuAbierto = abierto && (
     <div
       className={
         variante === "en-nav"
           ? "absolute bottom-full left-1/2 z-30 mb-3 flex -translate-x-1/2 flex-col items-center gap-2"
-          : "mb-3 flex flex-col items-end gap-2"
+          : variante === "boton-lateral"
+            ? "absolute left-0 top-full z-30 mt-2 flex w-full flex-col gap-1.5"
+            : "mb-3 flex flex-col items-end gap-2"
       }
     >
+      {variante === "boton-lateral" && (
+        <>
+          <Link
+            href="/gastos?tab=cuotas"
+            onClick={() => setAbierto(false)}
+            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-100 text-brand-from">
+              <IconoCuotas />
+            </span>
+            Compra en cuotas
+          </Link>
+          <Link
+            href="/gastos?tab=fijos"
+            onClick={() => setAbierto(false)}
+            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+              <IconoPagoFijo />
+            </span>
+            Pago fijo
+          </Link>
+        </>
+      )}
       <button
         onClick={() => abrir("transferencia")}
-        className="animate-pop-resorte flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
         style={{ animationDelay: "120ms" }}
       >
-        Transferencia
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
           <IconoTransferencia />
         </span>
+        Transferencia
       </button>
       <button
         onClick={() => abrir("ingreso")}
-        className="animate-pop-resorte flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
         style={{ animationDelay: "60ms" }}
       >
-        Ingreso
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
           <IconoIngreso />
         </span>
+        Ingreso
       </button>
       <button
         onClick={() => abrir("gasto")}
-        className="animate-pop-resorte flex items-center gap-2 whitespace-nowrap rounded-full bg-white py-2 pl-4 pr-2 text-sm font-medium text-gray-700 shadow-lg"
+        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
       >
-        Gasto
-        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pink-100 text-pink-600">
           <IconoGasto />
         </span>
+        Gasto
       </button>
     </div>
   );
 
-  const boton = (
-    <button
-      onClick={() => setAbierto((v) => !v)}
-      aria-label="Agregar movimiento"
-      className={
-        variante === "en-nav"
-          ? `-mt-7 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl ring-4 ring-white transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-              abierto ? "rotate-45" : ""
-            }`
-          : `flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-              abierto ? "rotate-45" : ""
-            }`
-      }
-    >
-      +
-    </button>
-  );
+  const boton =
+    variante === "boton-lateral" ? (
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        aria-label="Nuevo movimiento"
+        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gradient py-2.5 text-sm font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
+      >
+        <span className={`text-lg leading-none transition-transform duration-200 ${abierto ? "rotate-45" : ""}`}>+</span>
+        Nuevo movimiento
+      </button>
+    ) : (
+      <button
+        onClick={() => setAbierto((v) => !v)}
+        aria-label="Agregar movimiento"
+        className={
+          variante === "en-nav"
+            ? `-mt-7 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl ring-4 ring-white transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                abierto ? "rotate-45" : ""
+              }`
+            : `flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
+                abierto ? "rotate-45" : ""
+              }`
+        }
+      >
+        +
+      </button>
+    );
 
   return (
     <>
@@ -161,6 +230,11 @@ export function MovimientoFab({ variante = "flotante" }: { variante?: "flotante"
         <div className="relative flex flex-1 flex-col items-center justify-end pb-2.5">
           {menuAbierto}
           {boton}
+        </div>
+      ) : variante === "boton-lateral" ? (
+        <div className="relative">
+          {boton}
+          {menuAbierto}
         </div>
       ) : (
         <div className="fixed bottom-6 right-4 z-30">

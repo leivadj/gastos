@@ -5,8 +5,7 @@ import { usePathname } from "next/navigation";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { BottomNav } from "@/components/BottomNav";
-import { DesktopNav } from "@/components/DesktopNav";
-import { MovimientoFab } from "@/components/MovimientoRapido";
+import { DesktopSidebar } from "@/components/DesktopSidebar";
 import { TransicionPagina } from "@/components/TransicionPagina";
 import { useDeviceType } from "@/lib/useDeviceType";
 
@@ -110,12 +109,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#F5F3FB]">
-      <DesktopNav />
-      <main className={`mx-auto ${anchoDesktop} px-6 py-8`}>
-        <TransicionPagina>{children}</TransicionPagina>
-      </main>
-      <MovimientoFab />
+    <div className="flex min-h-screen bg-[#F5F3FB]">
+      <DesktopSidebar />
+      <div className="min-w-0 flex-1 overflow-y-auto">
+        <main className={`mx-auto ${anchoDesktop} px-8 py-8`}>
+          <TransicionPagina>{children}</TransicionPagina>
+        </main>
+      </div>
     </div>
   );
 }
