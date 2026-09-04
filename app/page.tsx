@@ -325,22 +325,23 @@ export default function DashboardPage() {
               <span className="text-[10px] text-gray-400">este mes</span>
             </div>
           </div>
-          <div className="flex-1 space-y-2 text-sm">
+          <div className="min-w-0 flex-1 space-y-2 text-sm">
             {legendPrincipal.map((d, i) => (
               <div key={d.name} className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-gray-600">
+                <span className="flex min-w-0 items-center gap-1.5 text-gray-600">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COLORES[i % COLORES.length] }} />
-                  {d.name}
+                  <span className="truncate">{d.name}</span>
                 </span>
-                <span className="font-medium text-gray-800">${formatCompacto(d.value)}</span>
+                <span className="shrink-0 whitespace-nowrap font-medium text-gray-800">${formatCompacto(d.value)}</span>
               </div>
             ))}
             {restoCategorias.length > 0 && (
               <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-gray-400">
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-gray-300" />+{restoCategorias.length} más
+                <span className="flex min-w-0 items-center gap-1.5 text-gray-400">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-gray-300" />
+                  <span className="truncate">+{restoCategorias.length} más</span>
                 </span>
-                <span className="font-medium text-gray-400">${formatCompacto(restoTotal)}</span>
+                <span className="shrink-0 whitespace-nowrap font-medium text-gray-400">${formatCompacto(restoTotal)}</span>
               </div>
             )}
           </div>

@@ -222,7 +222,7 @@ export default function CalendarioPagosPage() {
 
       <div>
         <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-gray-400">Vencimientos de este mes</p>
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {eventos.map((ev) => {
             const key = `${ev.origen}:${ev.origenId}`;
             const pago = pagoDe(ev);

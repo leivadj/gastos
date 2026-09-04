@@ -168,7 +168,7 @@ export function DiariosLista({
         </Card>
       )}
 
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {gastos.map((g) => (
           <Card key={g.id} className="!p-3.5">
             <div className="flex items-center justify-between gap-3">

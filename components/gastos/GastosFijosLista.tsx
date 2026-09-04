@@ -408,7 +408,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
         </Card>
       )}
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {lista.map((g) => {
           const marcaItem = marcaDe(g.marca_id);
           const filasReparto = participantesPorItem[g.id] ?? [];

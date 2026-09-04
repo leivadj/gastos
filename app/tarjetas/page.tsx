@@ -338,7 +338,7 @@ export default function TarjetasPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-xs text-gray-500">Elegir del catálogo (opcional)</label>
-              <div className="mt-1 grid grid-cols-4 gap-2">
+              <div className="mt-1 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
                 {marcas.map((m) => (
                   <button
                     type="button"
@@ -550,7 +550,7 @@ export default function TarjetasPage() {
               <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
                 Todas tus tarjetas y cuentas
               </p>
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                 {entidades.map((e) => {
                   const marca = resolverMarca(e, marcas);
                   return (

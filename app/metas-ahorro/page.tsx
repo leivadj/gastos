@@ -379,14 +379,14 @@ export default function MetasAhorroPage() {
       {enProgreso.length > 0 && (
         <div className="space-y-3">
           <p className="px-1 text-xs font-bold uppercase tracking-wide text-gray-400">En progreso</p>
-          {enProgreso.map(renderMeta)}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{enProgreso.map(renderMeta)}</div>
         </div>
       )}
 
       {cumplidas.length > 0 && (
         <div className="space-y-3">
           <p className="px-1 text-xs font-bold uppercase tracking-wide text-gray-400">Cumplidas</p>
-          {cumplidas.map(renderMeta)}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">{cumplidas.map(renderMeta)}</div>
         </div>
       )}
 

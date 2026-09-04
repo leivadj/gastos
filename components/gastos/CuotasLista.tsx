@@ -355,7 +355,7 @@ export function CuotasLista() {
         </Card>
       )}
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {compras.map((c) => {
           const activa = c.cuota_actual >= 1 && c.cuota_actual <= c.n_cuotas;
           const progreso = Math.min(100, Math.max(0, (c.cuota_actual / c.n_cuotas) * 100));

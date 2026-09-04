@@ -189,15 +189,15 @@ export default function GruposPage() {
         </Card>
       )}
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {grupos.map((g) => (
           <Card key={g.id}>
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <EntidadAvatar icono={g.icono} nombreFallback={g.nombre} className="h-9 w-9" />
-                <div>
-                  <p className="font-semibold text-gray-800">{g.nombre}</p>
-                  <p className="text-xs text-gray-400">{resumenReparto(g)}</p>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-gray-800">{g.nombre}</p>
+                  <p className="truncate text-xs text-gray-400">{resumenReparto(g)}</p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
