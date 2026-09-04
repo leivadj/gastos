@@ -254,3 +254,16 @@ export interface GastoDiario {
   categoria_id: string | null;
   fecha: string;
 }
+
+export type TipoDocumentoAuto = "permiso_circulacion" | "revision_tecnica" | "seguro" | "otro";
+
+// Documento del auto con vencimiento anual (permiso de circulación, revisión
+// técnica, seguro, u "otro" libre). Al renovar se edita fecha_vencimiento
+// del mismo registro en vez de crear uno nuevo. Pantalla /auto.
+export interface DocumentoAuto {
+  id: string;
+  tipo: TipoDocumentoAuto;
+  nombre: string;
+  fecha_vencimiento: string;
+  notas: string | null;
+}

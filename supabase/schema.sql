@@ -304,6 +304,23 @@ create table gastos_diarios (
   created_at timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- DOCUMENTOS AUTO — permiso de circulación, revisión técnica, seguro (o un
+-- tipo libre "otro"), cada uno con su fecha de vencimiento anual, para
+-- avisar en /auto cuando se acercan o ya vencieron. Se permite más de un
+-- registro del mismo tipo (ej. más de un vehículo). Al renovar se EDITA la
+-- fecha_vencimiento del mismo registro en vez de crear uno nuevo.
+-- ---------------------------------------------------------------------------
+create table documentos_auto (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  tipo text not null check (tipo in ('permiso_circulacion', 'revision_tecnica', 'seguro', 'otro')),
+  nombre text not null,
+  fecha_vencimiento date not null,
+  notas text,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- VISTAS — aquí vive la automatización de las cuotas y del reparto
 -- ============================================================================
@@ -491,6 +508,7 @@ alter table pagos enable row level security;
 alter table metas_ahorro enable row level security;
 alter table metas_ahorro_aportes enable row level security;
 alter table gastos_diarios enable row level security;
+alter table documentos_auto enable row level security;
 
 create policy "solo_dueno" on personas for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
@@ -533,6 +551,8 @@ create policy "solo_dueno" on metas_ahorro for all
 create policy "solo_dueno" on metas_ahorro_aportes for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on gastos_diarios for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on documentos_auto for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ============================================================================
