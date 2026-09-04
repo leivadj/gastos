@@ -45,7 +45,9 @@ insert into categorias (nombre, tipo, tipo_marca_sugerido) values
   ('Delivery (comida, encargos)', 'variable', 'delivery'),
   ('Suscripción (streaming, apps...)', 'fijo', 'suscripcion'),
   ('Otro', 'variable', 'otro'),
-  ('Hogar', 'variable', null);
+  ('Hogar', 'variable', null),
+  ('Auto', 'variable', null),
+  ('Salud', 'variable', null);
 
 -- ---------------------------------------------------------------------------
 -- ENTIDADES (medios de pago / tarjetas / créditos)

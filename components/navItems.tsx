@@ -13,7 +13,9 @@ export function esAdmin(email?: string | null): boolean {
 // Diarios) que reemplazó a las antiguas /gastos-fijos y /compras (ambas
 // rutas quedaron como redirect por si había accesos directos guardados) —
 // agrupada en "Más", y también accesible con "Gestionar gastos" al fondo
-// de Presupuesto.
+// de Presupuesto. "Auto" y "Salud" son gastos sueltos de carga rápida
+// (mismo patrón que "Diarios" de /gastos, ver DiariosLista.tsx) atados a
+// su propia categoría del catálogo compartido (migration_22).
 export const navItems = [
   {
     href: "/",
@@ -85,6 +87,35 @@ export const navItems = [
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
         <circle cx="12" cy="12" r="8.5" />
         <circle cx="12" cy="12" r="4" />
+      </svg>
+    ),
+  },
+  {
+    href: "/auto",
+    label: "Auto",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <path
+          d="M4 16v-3.5a2 2 0 0 1 1.2-1.8l1.3-3.4A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.3l1.3 3.4a2 2 0 0 1 1.2 1.8V16"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M4 16h16" strokeLinecap="round" />
+        <circle cx="7.5" cy="16.5" r="1.5" />
+        <circle cx="16.5" cy="16.5" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    href: "/salud",
+    label: "Salud",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <path
+          d="M12 20s-7-4.35-9.5-8.5C.8 8.2 2.4 5 5.6 5c1.8 0 3.1 1 4.4 2.6C11.3 6 12.6 5 14.4 5c3.2 0 4.8 3.2 3.1 6.5C15 15.65 12 20 12 20Z"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </svg>
     ),
   },

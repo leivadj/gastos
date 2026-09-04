@@ -15,6 +15,8 @@ const RUTAS_MAS = [
   "/calendario-pagos",
   "/reportes",
   "/metas-ahorro",
+  "/auto",
+  "/salud",
   "/ingresos",
   "/grupos",
   "/personas",

@@ -284,11 +284,15 @@ create table metas_ahorro_aportes (
 );
 
 -- ---------------------------------------------------------------------------
--- GASTOS DIARIOS — compras chicas/improvisadas del día a día (pan, queso,
--- algo que faltaba...), sin medio de pago ni reparto entre personas: carga
--- rápida de monto, descripción y fecha. Pestaña "Diarios" de /gastos. Todas
--- caen bajo la categoría "Hogar" del catálogo compartido (ver seed.sql) —
--- el usuario no la elige a mano, el formulario la busca por nombre.
+-- GASTOS DIARIOS — gastos sueltos de carga rápida: solo monto, descripción
+-- y fecha, sin medio de pago ni reparto entre personas. Se usa en 3
+-- pantallas, cada una atada a una categoría distinta del catálogo
+-- compartido (ver seed.sql) que el usuario no elige a mano — el formulario
+-- la busca por nombre:
+--   - Pestaña "Diarios" de /gastos -> categoría "Hogar": compras chicas o
+--     improvisadas del día a día (pan, queso, algo que faltaba...).
+--   - /auto -> categoría "Auto": bencina, mecánico, mantención.
+--   - /salud -> categoría "Salud": remedios, visita al doctor.
 -- ---------------------------------------------------------------------------
 create table gastos_diarios (
   id uuid primary key default gen_random_uuid(),

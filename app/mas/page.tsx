@@ -10,8 +10,19 @@ import { PerfilPropioCard } from "@/components/PerfilPropioCard";
 // agrupan acá, para no amontonar la barra (ver BottomNav — Inicio, Cuentas
 // y Presupuesto quedaron como destinos principales ahí, junto con el botón
 // "+"). "Gastos" reemplaza a las antiguas /compras y /gastos-fijos, ahora
-// fusionadas en una sola pantalla con pestañas.
-const HREFS_AGRUPADOS = ["/gastos", "/calendario-pagos", "/reportes", "/metas-ahorro", "/ingresos", "/grupos", "/personas"];
+// fusionadas en una sola pantalla con pestañas. "Auto" y "Salud" son
+// pantallas nuevas de gastos sueltos (ver navItems.tsx).
+const HREFS_AGRUPADOS = [
+  "/gastos",
+  "/calendario-pagos",
+  "/reportes",
+  "/metas-ahorro",
+  "/auto",
+  "/salud",
+  "/ingresos",
+  "/grupos",
+  "/personas",
+];
 
 export default function MasPage() {
   const [esAdminUsuario, setEsAdminUsuario] = useState(false);
@@ -32,7 +43,7 @@ export default function MasPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Más</h1>
         <p className="mt-1 text-sm text-gray-400">
-          Gastos, calendario de pagos, reportes, metas de ahorro, ingresos, grupos, personas
+          Gastos, calendario de pagos, reportes, metas de ahorro, auto, salud, ingresos, grupos, personas
           {esAdminUsuario ? " y ajustes" : ""}.
         </p>
       </div>

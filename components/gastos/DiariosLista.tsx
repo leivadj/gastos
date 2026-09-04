@@ -14,15 +14,35 @@ function fechaCorta(fechaISO: string): string {
   return new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "short" }).format(fecha).replace(".", "");
 }
 
-// Pestaña "Diarios" de /gastos — compras chicas/improvisadas del día a día
-// (pan, queso, algo que faltaba...). Carga rápida a propósito: solo monto y
-// descripción, sin medio de pago ni reparto entre personas. Todas caen bajo
-// la categoría compartida "Hogar" (ver migration_21), elegida sola acá, sin
-// que el usuario tenga que elegirla. Solo muestra el mes actual — no es un
-// historial largo, es un anotador rápido de gastos sueltos.
-export function DiariosLista() {
+// Gasto suelto de carga rápida: solo monto + descripción, sin medio de pago
+// ni reparto entre personas. Se usa en 3 lugares con la misma lógica, cada
+// uno atado a una categoría compartida distinta del catálogo (ver
+// migration_21 para "Hogar" y migration_22 para "Auto"/"Salud"):
+//   - Pestaña "Diarios" de /gastos (categoriaNombre="Hogar", el original):
+//     compras chicas/improvisadas del día a día (pan, queso...).
+//   - /auto (categoriaNombre="Auto"): bencina, mecánico, mantención.
+//   - /salud (categoriaNombre="Salud"): remedios, visita al doctor.
+// Al ser todas gastos_diarios con categoria_id, ya participan solas en el
+// resumen por categoría de Inicio/Presupuesto y en el historial de Reportes
+// (ver lib/resumenGastos.ts) — no hace falta tocar esos archivos al agregar
+// una categoría nueva acá, solo instanciar este componente con el nombre
+// correspondiente. Solo muestra el mes actual — no es un historial largo,
+// es un anotador rápido.
+export function DiariosLista({
+  categoriaNombre = "Hogar",
+  placeholderDescripcion = "Ej: Pan y queso",
+  textoAyuda = 'Compras chicas o improvisadas (pan, queso, algo que faltaba…). Caen bajo la categoría "Hogar".',
+  tituloTotal = "Total diarios este mes",
+  textoVacio = "Aún no cargaste gastos diarios este mes.",
+}: {
+  categoriaNombre?: string;
+  placeholderDescripcion?: string;
+  textoAyuda?: string;
+  tituloTotal?: string;
+  textoVacio?: string;
+}) {
   const [gastos, setGastos] = useState<GastoDiario[]>([]);
-  const [categoriaHogarId, setCategoriaHogarId] = useState<string | null>(null);
+  const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
@@ -32,24 +52,30 @@ export function DiariosLista() {
   const [guardando, setGuardando] = useState(false);
 
   async function cargarTodo() {
-    const [{ data: g }, { data: cat }] = await Promise.all([
-      supabase
+    setCargando(true);
+    const { data: cat } = await supabase.from("categorias").select("*").eq("nombre", categoriaNombre);
+    const catId = ((cat as Categoria[]) ?? [])[0]?.id ?? null;
+    setCategoriaId(catId);
+    if (catId) {
+      const { data: gastosCat } = await supabase
         .from("gastos_diarios")
         .select("*")
+        .eq("categoria_id", catId)
         .gte("fecha", mesActualISO())
         .lt("fecha", primerDiaMesSiguiente())
         .order("fecha", { ascending: false })
-        .order("created_at", { ascending: false }),
-      supabase.from("categorias").select("*").eq("nombre", "Hogar"),
-    ]);
-    setGastos((g as GastoDiario[]) ?? []);
-    setCategoriaHogarId(((cat as Categoria[]) ?? [])[0]?.id ?? null);
+        .order("created_at", { ascending: false });
+      setGastos((gastosCat as GastoDiario[]) ?? []);
+    } else {
+      setGastos([]);
+    }
     setCargando(false);
   }
 
   useEffect(() => {
     cargarTodo();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoriaNombre]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -61,7 +87,7 @@ export function DiariosLista() {
         descripcion,
         monto: Number(monto),
         fecha,
-        categoria_id: categoriaHogarId,
+        categoria_id: categoriaId,
       });
       if (insError) throw insError;
       setDescripcion("");
@@ -92,9 +118,7 @@ export function DiariosLista() {
 
   return (
     <div className="space-y-4">
-      <p className="text-xs text-gray-400">
-        Compras chicas o improvisadas (pan, queso, algo que faltaba…). Caen bajo la categoría &quot;Hogar&quot;.
-      </p>
+      <p className="text-xs text-gray-400">{textoAyuda}</p>
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-2">
@@ -103,7 +127,7 @@ export function DiariosLista() {
               required
               value={descripcion}
               onChange={(e) => setDescripcion(e.target.value)}
-              placeholder="Ej: Pan y queso"
+              placeholder={placeholderDescripcion}
               className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
             />
             <input
@@ -138,7 +162,7 @@ export function DiariosLista() {
       {gastos.length > 0 && (
         <Card>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">Total diarios este mes</span>
+            <span className="text-gray-500">{tituloTotal}</span>
             <span className="font-semibold text-gray-800">{formatCLP(total)}</span>
           </div>
         </Card>
@@ -161,9 +185,7 @@ export function DiariosLista() {
             </div>
           </Card>
         ))}
-        {gastos.length === 0 && (
-          <p className="text-center text-sm text-gray-400">Aún no cargaste gastos diarios este mes.</p>
-        )}
+        {gastos.length === 0 && <p className="text-center text-sm text-gray-400">{textoVacio}</p>}
       </div>
     </div>
   );
