@@ -70,6 +70,16 @@ export const navItems = [
     ),
   },
   {
+    href: "/movimientos",
+    label: "Movimientos",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <path d="M4 8h13.5M14 4.5 17.5 8 14 11.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M20 16H6.5M10 12.5 6.5 16 10 19.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/reportes",
     label: "Reportes",
     icon: (active: boolean) => (

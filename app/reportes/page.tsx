@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { cuotaActualEn } from "@/lib/cuotasHistoricas";
 import { formatCLP, mesActualISO } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { Compra, GastoDiario, GastoFijo, Ingreso, Pago } from "@/lib/types";
@@ -32,17 +33,6 @@ function ultimosMeses(n: number): MesRef[] {
     });
   }
   return meses;
-}
-
-// Misma matemática que la vista SQL vista_cuotas_vigentes, pero evaluada en
-// un mes de referencia arbitrario (no necesariamente el actual) — así se
-// puede reconstruir qué cuota estaba vigente en cualquier mes pasado sin
-// necesitar una vista nueva: la fecha de inicio y el N° de cuotas ya son
-// suficientes para saberlo con certeza matemática.
-function cuotaActualEn(fechaPrimeraCuota: string, ref: MesRef): number {
-  const [y, m] = fechaPrimeraCuota.slice(0, 7).split("-").map(Number); // m: 1-12
-  const diffMeses = (ref.year - y) * 12 + (ref.month - (m - 1));
-  return diffMeses + 1;
 }
 
 export default function ReportesPage() {
