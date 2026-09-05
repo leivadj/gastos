@@ -69,12 +69,12 @@ function HojaInferior({ titulo, onClose, children }: { titulo: string; onClose: 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 px-0 sm:items-center sm:px-4" onClick={onClose}>
       <div
-        className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl sm:max-w-md sm:rounded-2xl"
+        className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-gray-900 dark:shadow-none sm:max-w-md sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-800">{titulo}</h2>
-          <button onClick={onClose} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
+          <h2 className="text-base font-bold text-gray-800 dark:text-white">{titulo}</h2>
+          <button onClick={onClose} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-white/10">
             ✕
           </button>
         </div>
@@ -314,7 +314,7 @@ function FormGasto({
     <HojaInferior titulo="+ Gasto" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-xs text-gray-500">Monto</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
           <input
             required
             autoFocus
@@ -323,11 +323,11 @@ function FormGasto({
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
             placeholder="0"
-            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800"
+            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Categoría</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
           <select
             value={categoriaId}
             onChange={(e) => {
@@ -335,7 +335,7 @@ function FormGasto({
               if (nueva?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
               setCategoriaId(e.target.value);
             }}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           >
             <option value="">—</option>
             {categorias.map((c) => (
@@ -348,7 +348,7 @@ function FormGasto({
         </div>
         {categoriaSeleccionada?.tipo_marca_sugerido && (
           <div>
-            <label className="text-xs text-gray-500">¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)</label>
+            <label className="text-xs text-gray-500 dark:text-gray-400">¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)</label>
             <div className="mt-1">
               <MarcaSugeridaPicker
                 marcas={marcas}
@@ -361,31 +361,31 @@ function FormGasto({
           </div>
         )}
         <div>
-          <label className="text-xs text-gray-500">Descripción (opcional)</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Descripción (opcional)</label>
           <input
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             placeholder={marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Ej: Supermercado"}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Cuenta</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Cuenta</label>
           <div className="mt-1">
             <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} onCatalogoActualizado={onCatalogoActualizado} />
           </div>
         </div>
         <div>
-          <label className="text-xs text-gray-500">Fecha</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
           <input
             required
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
         <button
           type="submit"
           disabled={guardando}
@@ -393,7 +393,7 @@ function FormGasto({
         >
           {guardando ? "Guardando…" : "Guardar gasto"}
         </button>
-        <p className="text-center text-[11px] text-gray-400">
+        <p className="text-center text-[11px] text-gray-400 dark:text-gray-500">
           No se reparte entre personas automáticamente — si quieres dividirlo, créalo desde Cuotas.
         </p>
       </form>
@@ -435,7 +435,7 @@ function FormIngreso({ onClose }: { onClose: () => void }) {
     <HojaInferior titulo="+ Ingreso" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-xs text-gray-500">Monto</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
           <input
             required
             autoFocus
@@ -444,29 +444,29 @@ function FormIngreso({ onClose }: { onClose: () => void }) {
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
             placeholder="0"
-            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800"
+            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Descripción (opcional)</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Descripción (opcional)</label>
           <input
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             placeholder="Ej: Sueldo, bono, venta…"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Fecha</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
           <input
             required
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
         <button
           type="submit"
           disabled={guardando}
@@ -519,7 +519,7 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
     <HojaInferior titulo="↔ Transferencia" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="text-xs text-gray-500">Monto</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
           <input
             required
             autoFocus
@@ -528,12 +528,12 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
             placeholder="0"
-            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800"
+            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Desde</label>
-          <select value={origenId} onChange={(e) => setOrigenId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+          <label className="text-xs text-gray-500 dark:text-gray-400">Desde</label>
+          <select value={origenId} onChange={(e) => setOrigenId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
             <option value="">—</option>
             {entidades.map((e) => (
               <option key={e.id} value={e.id}>
@@ -543,8 +543,8 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500">Hacia</label>
-          <select value={destinoId} onChange={(e) => setDestinoId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+          <label className="text-xs text-gray-500 dark:text-gray-400">Hacia</label>
+          <select value={destinoId} onChange={(e) => setDestinoId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
             <option value="">—</option>
             {entidades.map((e) => (
               <option key={e.id} value={e.id}>
@@ -554,24 +554,24 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500">Fecha</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
           <input
             required
             type="date"
             value={fecha}
             onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500">Nota (opcional)</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Nota (opcional)</label>
           <input
             value={notas}
             onChange={(e) => setNotas(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
         <button
           type="submit"
           disabled={guardando}
@@ -579,7 +579,7 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
         >
           {guardando ? "Guardando…" : "Guardar transferencia"}
         </button>
-        <p className="text-center text-[11px] text-gray-400">
+        <p className="text-center text-[11px] text-gray-400 dark:text-gray-500">
           No mueve el saldo de las cuentas automáticamente todavía — queda como registro.
         </p>
       </form>

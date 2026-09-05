@@ -73,7 +73,7 @@ export default function ReportesPage() {
   }, []);
 
   if (cargando) {
-    return <p className="py-10 text-center text-gray-400">Cargando…</p>;
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
   const hoyISO = mesActualISO();
@@ -135,8 +135,8 @@ export default function ReportesPage() {
   return (
     <div className="space-y-4 pb-10">
       <div>
-        <h1 className="text-lg font-bold text-gray-800">Reportes</h1>
-        <p className="text-xs text-gray-400">Ingresos vs. gastos, últimos {N_MESES} meses.</p>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Reportes</h1>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Ingresos vs. gastos, últimos {N_MESES} meses.</p>
       </div>
 
       <Card>
@@ -170,7 +170,7 @@ export default function ReportesPage() {
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <div className="mt-1 flex gap-4 text-[11.5px] font-semibold text-gray-500">
+        <div className="mt-1 flex gap-4 text-[11.5px] font-semibold text-gray-500 dark:text-gray-300">
           <span className="flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: COLOR_GASTO }} />
             Gastos
@@ -184,22 +184,22 @@ export default function ReportesPage() {
 
       <div className="grid grid-cols-2 gap-3">
         <Card>
-          <p className="text-[11px] font-semibold text-gray-400">Ahorro promedio</p>
-          <p className={`mt-1.5 text-lg font-extrabold ${ahorroPromedio < 0 ? "text-red-500" : "text-gray-800"}`}>
+          <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">Ahorro promedio</p>
+          <p className={`mt-1.5 text-lg font-extrabold ${ahorroPromedio < 0 ? "text-red-500 dark:text-red-400" : "text-gray-800 dark:text-white"}`}>
             {formatCLP(ahorroPromedio)}
           </p>
-          <p className="mt-0.5 text-[10.5px] text-gray-400">por mes, {N_MESES} meses</p>
+          <p className="mt-0.5 text-[10.5px] text-gray-400 dark:text-gray-500">por mes, {N_MESES} meses</p>
         </Card>
         <Card>
-          <p className="text-[11px] font-semibold text-gray-400">Mes con más gasto</p>
-          <p className="mt-1.5 text-lg font-extrabold text-gray-800">{mesMasGasto.labelLargo}</p>
-          <p className="mt-0.5 text-[10.5px] text-gray-400">{formatCLP(mesMasGasto.gastos)}</p>
+          <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">Mes con más gasto</p>
+          <p className="mt-1.5 text-lg font-extrabold text-gray-800 dark:text-white">{mesMasGasto.labelLargo}</p>
+          <p className="mt-0.5 text-[10.5px] text-gray-400 dark:text-gray-500">{formatCLP(mesMasGasto.gastos)}</p>
         </Card>
       </div>
 
       <Card>
-        <p className="mb-2 text-sm font-semibold text-gray-600">Detalle por mes</p>
-        <div className="flex items-center justify-between gap-2 border-b border-gray-50 pb-2 text-[10.5px] font-semibold uppercase tracking-wide text-gray-300">
+        <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle por mes</p>
+        <div className="flex items-center justify-between gap-2 border-b border-gray-50 dark:border-white/10 pb-2 text-[10.5px] font-semibold uppercase tracking-wide text-gray-300 dark:text-gray-600">
           <span className="w-9 shrink-0">Mes</span>
           <span className="flex-1 text-right">Gastos</span>
           <span className="flex-1 text-right">Ingresos</span>
@@ -208,12 +208,12 @@ export default function ReportesPage() {
         <div className="mt-2 space-y-2 text-sm">
           {datos.map((d) => (
             <div key={d.iso} className="flex items-center justify-between gap-2">
-              <span className={`w-9 shrink-0 font-medium ${d.esActual ? "text-brand-from" : "text-gray-500"}`}>
+              <span className={`w-9 shrink-0 font-medium ${d.esActual ? "text-brand-from dark:text-pink-400" : "text-gray-500 dark:text-gray-300"}`}>
                 {d.label}
               </span>
-              <span className="flex-1 text-right text-gray-400">{formatCLP(d.gastos)}</span>
+              <span className="flex-1 text-right text-gray-400 dark:text-gray-500">{formatCLP(d.gastos)}</span>
               <span className="flex-1 text-right text-emerald-600">{formatCLP(d.ingresos)}</span>
-              <span className={`w-24 shrink-0 text-right font-semibold ${d.ahorro < 0 ? "text-red-500" : "text-gray-800"}`}>
+              <span className={`w-24 shrink-0 text-right font-semibold ${d.ahorro < 0 ? "text-red-500 dark:text-red-400" : "text-gray-800 dark:text-white"}`}>
                 {formatCLP(d.ahorro)}
               </span>
             </div>
@@ -221,7 +221,7 @@ export default function ReportesPage() {
         </div>
       </Card>
 
-      <p className="px-1 text-[11px] text-gray-400">
+      <p className="px-1 text-[11px] text-gray-400 dark:text-gray-500">
         Los meses sin pagos reales registrados usan una estimación (gastos fijos activos hoy + cuotas vigentes ese mes).
         A medida que registres pagos en el Calendario de pagos, esos meses se vuelven exactos.
       </p>

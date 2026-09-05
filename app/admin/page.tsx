@@ -194,14 +194,14 @@ export default function AdminPage() {
   }
 
   if (session === undefined) {
-    return <p className="pt-10 text-center text-sm text-gray-400">Cargando…</p>;
+    return <p className="pt-10 text-center text-sm text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
   if (!esAdmin) {
     return (
       <div className="pt-10">
         <Card>
-          <p className="text-center text-sm text-gray-500">
+          <p className="text-center text-sm text-gray-500 dark:text-gray-400">
             No autorizado. Esta sección es solo para la cuenta administradora.
           </p>
         </Card>
@@ -213,8 +213,8 @@ export default function AdminPage() {
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-gray-800">Catálogo de marcas</h1>
-          <p className="text-xs text-gray-400">
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">Catálogo de marcas</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Bancos, tiendas, servicios, suscripciones y más — con su logo, para elegir al pagar o al crear un item.
           </p>
         </div>
@@ -230,21 +230,21 @@ export default function AdminPage() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500">Nombre</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
               <input
                 required
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
                 placeholder="Ej: Banco Estado"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">Tipo</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Tipo</label>
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value as TipoMarca)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
               >
                 {TIPOS.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -254,21 +254,21 @@ export default function AdminPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Logo (imagen)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Logo (imagen)</label>
               <input
                 type="file"
                 accept="image/*"
                 onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">
+              <label className="text-xs text-gray-500 dark:text-gray-400">
                 O ícono (si no tienes un logo a mano)
               </label>
               <IconoPicker value={icono} onChange={setIcono} />
             </div>
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -281,7 +281,7 @@ export default function AdminPage() {
       )}
 
       {marcas.length === 0 && (
-        <p className="text-center text-sm text-gray-400">Todavía no hay marcas cargadas.</p>
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay marcas cargadas.</p>
       )}
 
       {TIPOS.map((t) => {
@@ -289,7 +289,7 @@ export default function AdminPage() {
         if (delGrupo.length === 0) return null;
         return (
           <div key={t.value} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{t.label}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t.label}</p>
             <div className="grid grid-cols-2 gap-3">
               {delGrupo.map((m) => (
                 <Card key={m.id}>
@@ -313,11 +313,11 @@ export default function AdminPage() {
                       </span>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-gray-800">{m.nombre}</p>
+                      <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{m.nombre}</p>
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <label className="cursor-pointer text-[11px] text-brand-from">
+                    <label className="cursor-pointer text-[11px] text-brand-from dark:text-pink-400">
                       {subiendoId === m.id ? "subiendo…" : m.logo_url ? "cambiar logo" : "+ subir logo"}
                       <input
                         type="file"
@@ -333,13 +333,13 @@ export default function AdminPage() {
                     </label>
                     <button
                       onClick={() => setEditandoIconoMarca(editandoIconoMarca === m.id ? null : m.id)}
-                      className="text-[11px] text-brand-from"
+                      className="text-[11px] text-brand-from dark:text-pink-400"
                     >
                       cambiar ícono
                     </button>
                     <button
                       onClick={() => eliminar(m)}
-                      className="text-[11px] text-gray-300 hover:text-red-400"
+                      className="text-[11px] text-gray-300 hover:text-red-400 dark:text-gray-600"
                     >
                       eliminar
                     </button>
@@ -352,7 +352,7 @@ export default function AdminPage() {
                       />
                       <button
                         onClick={() => setEditandoIconoMarca(null)}
-                        className="mt-1 text-[11px] text-gray-400"
+                        className="mt-1 text-[11px] text-gray-400 dark:text-gray-500"
                       >
                         listo
                       </button>
@@ -367,8 +367,8 @@ export default function AdminPage() {
 
       <div className="space-y-2 pt-4">
         <div>
-          <h2 className="text-sm font-bold text-gray-800">Categorías</h2>
-          <p className="text-xs text-gray-400">
+          <h2 className="text-sm font-bold text-gray-800 dark:text-white">Categorías</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Ícono, y qué marcas de arriba se ofrecen para elegir al usar esta categoría en un gasto/compra
             (ej: &quot;Supermercado&quot; → Jumbo, Líder...).
           </p>
@@ -383,7 +383,7 @@ export default function AdminPage() {
                 >
                   {c.icono || c.nombre.charAt(0)}
                 </span>
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800">{c.nombre}</p>
+                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800 dark:text-white">{c.nombre}</p>
               </div>
               {editandoIconoCat === c.id ? (
                 <div className="mt-2">
@@ -393,7 +393,7 @@ export default function AdminPage() {
                   />
                   <button
                     onClick={() => setEditandoIconoCat(null)}
-                    className="mt-1 text-[11px] text-gray-400"
+                    className="mt-1 text-[11px] text-gray-400 dark:text-gray-500"
                   >
                     listo
                   </button>
@@ -401,17 +401,17 @@ export default function AdminPage() {
               ) : (
                 <button
                   onClick={() => setEditandoIconoCat(c.id)}
-                  className="mt-2 text-[11px] text-brand-from"
+                  className="mt-2 text-[11px] text-brand-from dark:text-pink-400"
                 >
                   cambiar ícono
                 </button>
               )}
               <div className="mt-2">
-                <label className="text-[11px] text-gray-400">Marcas sugeridas</label>
+                <label className="text-[11px] text-gray-400 dark:text-gray-500">Marcas sugeridas</label>
                 <select
                   value={c.tipo_marca_sugerido ?? ""}
                   onChange={(e) => guardarTipoSugerido(c.id, e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs"
+                  className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
                 >
                   <option value="">— Ninguna —</option>
                   {TIPOS.map((t) => (

@@ -58,7 +58,7 @@ export default function CalendarioPagosPage() {
   }, []);
 
   if (cargando) {
-    return <p className="py-10 text-center text-gray-400">Cargando…</p>;
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
@@ -174,13 +174,13 @@ export default function CalendarioPagosPage() {
   return (
     <div className="space-y-4 pb-10">
       <div>
-        <h1 className="text-lg font-bold text-gray-800">Calendario de pagos</h1>
-        <p className="text-xs text-gray-400">Servicios básicos, gastos fijos y cuotas de tarjeta, por fecha de vencimiento.</p>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Calendario de pagos</h1>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Servicios básicos, gastos fijos y cuotas de tarjeta, por fecha de vencimiento.</p>
       </div>
 
       <Card>
-        <p className="mb-3 text-sm font-bold capitalize text-gray-800">{nombreMes()}</p>
-        <div className="grid grid-cols-7 text-center text-[11px] font-bold text-gray-400">
+        <p className="mb-3 text-sm font-bold capitalize text-gray-800 dark:text-white">{nombreMes()}</p>
+        <div className="grid grid-cols-7 text-center text-[11px] font-bold text-gray-400 dark:text-gray-500">
           {["L", "M", "M", "J", "V", "S", "D"].map((d, i) => (
             <span key={i}>{d}</span>
           ))}
@@ -194,8 +194,8 @@ export default function CalendarioPagosPage() {
               <div
                 key={i}
                 className={`flex h-11 w-11 flex-col items-center justify-center rounded-xl text-[13px] font-semibold ${
-                  celda.delMes ? "text-gray-700" : "text-gray-300"
-                } ${esHoy ? "border-[1.5px] border-brand-from text-brand-from" : ""}`}
+                  celda.delMes ? "text-gray-700 dark:text-gray-200" : "text-gray-300 dark:text-gray-600"
+                } ${esHoy ? "border-[1.5px] border-brand-from text-brand-from dark:text-pink-400" : ""}`}
               >
                 {celda.numero}
                 {(tieneFijo || tieneCuota) && (
@@ -208,7 +208,7 @@ export default function CalendarioPagosPage() {
             );
           })}
         </div>
-        <div className="mt-3 flex gap-4 px-1 text-[11.5px] font-semibold text-gray-500">
+        <div className="mt-3 flex gap-4 px-1 text-[11.5px] font-semibold text-gray-500 dark:text-gray-400">
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-amber-500" />
             Gastos fijos
@@ -221,7 +221,7 @@ export default function CalendarioPagosPage() {
       </Card>
 
       <div>
-        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-gray-400">Vencimientos de este mes</p>
+        <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Vencimientos de este mes</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {eventos.map((ev) => {
             const key = `${ev.origen}:${ev.origenId}`;
@@ -234,18 +234,18 @@ export default function CalendarioPagosPage() {
                 <div className="flex items-start gap-3">
                   <EntidadAvatar entidad={entidadDe(ev.entidadId)} marca={marca} icono={ev.icono} className="h-9 w-9" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-800">
+                    <p className="font-semibold text-gray-800 dark:text-white">
                       {ev.descripcion}
                       {ev.detalle ? ` · ${ev.detalle}` : ""}
                     </p>
-                    <p className={`text-xs ${vencido ? "font-semibold text-red-400" : "text-gray-400"}`}>
+                    <p className={`text-xs ${vencido ? "font-semibold text-red-400" : "text-gray-400 dark:text-gray-500"}`}>
                       {ev.dia != null ? `Vence el ${ev.dia}` : "Sin día definido"}
                       {vencido ? " · vencido" : ""}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-gray-800">
-                      {ev.esPromedio && <span className="mr-0.5 font-normal text-gray-400">~</span>}
+                    <p className="font-semibold text-gray-800 dark:text-white">
+                      {ev.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
                       {formatCLP(ev.monto)}
                     </p>
                     {pagado ? (
@@ -253,20 +253,20 @@ export default function CalendarioPagosPage() {
                         Pagado{pago?.monto_real != null ? ` · ${formatCLP(pago.monto_real)}` : ""}
                       </p>
                     ) : (
-                      <p className="text-[11px] text-gray-300">Pendiente</p>
+                      <p className="text-[11px] text-gray-300 dark:text-gray-600">Pendiente</p>
                     )}
                   </div>
                 </div>
 
                 {marcandoKey === key ? (
-                  <div className="mt-3 flex items-center gap-2 border-t border-gray-50 pt-3">
+                  <div className="mt-3 flex items-center gap-2 border-t border-gray-50 dark:border-white/10 pt-3">
                     <input
                       type="number"
                       min={0}
                       autoFocus
                       value={montoIngresado}
                       onChange={(e) => setMontoIngresado(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 px-3 py-1.5 text-sm"
+                      className="w-full rounded-lg border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white px-3 py-1.5 text-sm"
                     />
                     <button
                       onClick={() => confirmarPago(ev)}
@@ -277,23 +277,23 @@ export default function CalendarioPagosPage() {
                     </button>
                     <button
                       onClick={() => setMarcandoKey(null)}
-                      className="shrink-0 rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-400"
+                      className="shrink-0 rounded-lg bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500"
                     >
                       Cancelar
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-3 flex justify-end border-t border-gray-50 pt-3">
+                  <div className="mt-3 flex justify-end border-t border-gray-50 dark:border-white/10 pt-3">
                     {pagado ? (
                       <button
                         onClick={() => pago && deshacerPago(pago)}
                         disabled={guardando}
-                        className="text-xs text-gray-300 hover:text-red-400"
+                        className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400"
                       >
                         deshacer
                       </button>
                     ) : (
-                      <button onClick={() => abrirMarcarPagado(ev)} className="text-xs font-semibold text-brand-from">
+                      <button onClick={() => abrirMarcarPagado(ev)} className="text-xs font-semibold text-brand-from dark:text-pink-400">
                         Marcar como pagado
                       </button>
                     )}
@@ -303,12 +303,12 @@ export default function CalendarioPagosPage() {
             );
           })}
           {eventos.length === 0 && (
-            <p className="text-center text-sm text-gray-400">Todavía no hay gastos fijos ni cuotas vigentes.</p>
+            <p className="text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay gastos fijos ni cuotas vigentes.</p>
           )}
         </div>
       </div>
 
-      {error && <p className="text-center text-xs text-red-500">{error}</p>}
+      {error && <p className="text-center text-xs text-red-500 dark:text-red-400">{error}</p>}
     </div>
   );
 }

@@ -138,8 +138,8 @@ export default function GruposPage() {
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-gray-800">Grupos</h1>
-          <p className="text-xs text-gray-400">
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">Grupos</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
             Agrupa gastos (ej: &quot;Casa&quot;) y define el reparto una sola vez para todos.
           </p>
         </div>
@@ -155,29 +155,29 @@ export default function GruposPage() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500">Nombre</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
               <input
                 required
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
                 placeholder="Ej: Casa"
               />
             </div>
             <div>
-              <label className="text-xs text-gray-500">Ícono (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Ícono (opcional)</label>
               <div className="mt-1">
                 <IconoPicker value={icono} onChange={setIcono} />
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Personas que se hacen cargo</label>
-              <p className="mb-1 text-[11px] text-gray-400">
+              <label className="text-xs text-gray-500 dark:text-gray-400">Personas que se hacen cargo</label>
+              <p className="mb-1 text-[11px] text-gray-400 dark:text-gray-500">
                 Deja el % en blanco para repartir en partes iguales el resto.
               </p>
               <ParticipantesPicker personas={personas} value={participantes} onChange={setParticipantes} />
             </div>
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -196,15 +196,15 @@ export default function GruposPage() {
               <div className="flex min-w-0 items-start gap-3">
                 <EntidadAvatar icono={g.icono} nombreFallback={g.nombre} className="h-9 w-9" />
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-gray-800">{g.nombre}</p>
-                  <p className="truncate text-xs text-gray-400">{resumenReparto(g)}</p>
+                  <p className="truncate font-semibold text-gray-800 dark:text-white">{g.nombre}</p>
+                  <p className="truncate text-xs text-gray-400 dark:text-gray-500">{resumenReparto(g)}</p>
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from">
+                <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from dark:text-pink-400">
                   editar
                 </button>
-                <button onClick={() => eliminar(g.id)} className="text-xs text-gray-300 hover:text-red-400">
+                <button onClick={() => eliminar(g.id)} className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400">
                   eliminar
                 </button>
               </div>
@@ -212,7 +212,7 @@ export default function GruposPage() {
           </Card>
         ))}
         {grupos.length === 0 && (
-          <p className="text-center text-sm text-gray-400">
+          <p className="text-center text-sm text-gray-400 dark:text-gray-500">
             Aún no tienes grupos. Crea uno para agrupar gastos como luz, agua y gas bajo un mismo reparto.
           </p>
         )}

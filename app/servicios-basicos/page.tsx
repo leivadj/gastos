@@ -45,7 +45,7 @@ export default function ServiciosBasicosPage() {
   }, []);
 
   if (cargando) {
-    return <p className="py-10 text-center text-gray-400">Cargando…</p>;
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
@@ -56,28 +56,28 @@ export default function ServiciosBasicosPage() {
       <div className="flex items-center gap-3">
         <Link
           href="/presupuesto"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-50"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
             <path d="m15 6-6 6 6 6" />
           </svg>
         </Link>
         <div>
-          <h1 className="text-lg font-bold text-gray-800">Hogar</h1>
-          <p className="text-xs text-gray-400">Servicios básicos</p>
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">Hogar</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Servicios básicos</p>
         </div>
       </div>
 
-      <p className="px-1 text-xs leading-relaxed text-gray-400">
+      <p className="px-1 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
         Fecha de vencimiento fija, monto que cambia cada mes. El presupuesto usa el promedio móvil de los últimos 3
         meses.
       </p>
 
       {gastos.length === 0 ? (
         <Card>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-gray-400 dark:text-gray-500">
             Todavía no tienes gastos fijos marcados como &quot;monto variable&quot;. Puedes hacerlo en la pestaña{" "}
-            <Link href="/gastos?tab=variables" className="font-semibold text-brand-from">
+            <Link href="/gastos?tab=variables" className="font-semibold text-brand-from dark:text-pink-400">
               Variables
             </Link>{" "}
             de Gastos.
@@ -100,8 +100,8 @@ export default function ServiciosBasicosPage() {
                   className="h-9 w-9"
                 />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-gray-800">{g.descripcion}</p>
-                  <span className="mt-0.5 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                  <p className="font-semibold text-gray-800 dark:text-white">{g.descripcion}</p>
+                  <span className="mt-0.5 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                     Fijo obligatorio · monto variable
                   </span>
                 </div>
@@ -109,14 +109,14 @@ export default function ServiciosBasicosPage() {
 
               <div className="mt-3.5 flex items-end justify-between gap-3">
                 <div>
-                  <p className="text-[10.5px] font-semibold text-gray-400">
+                  <p className="text-[10.5px] font-semibold text-gray-400 dark:text-gray-500">
                     {meses > 0 ? "Promedio móvil" : "Monto estimado"}
                   </p>
-                  <p className="mt-0.5 text-[19px] font-extrabold text-gray-800">
-                    {meses > 0 && <span className="mr-0.5 font-normal text-gray-400">~</span>}
+                  <p className="mt-0.5 text-[19px] font-extrabold text-gray-800 dark:text-white">
+                    {meses > 0 && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
                     {formatCLP(promedio)}
                   </p>
-                  <p className="mt-0.5 text-[11px] text-gray-400">Vence el {g.dia_mes_pago ?? "—"}</p>
+                  <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">Vence el {g.dia_mes_pago ?? "—"}</p>
                 </div>
 
                 {historial.length > 0 ? (
@@ -127,14 +127,14 @@ export default function ServiciosBasicosPage() {
                           className={`w-4 rounded ${i === historial.length - 1 ? "bg-amber-500" : "bg-amber-200"}`}
                           style={{ height: `${Math.max(6, (h.monto / maxMonto) * 40)}px` }}
                         />
-                        <span className="mt-1 text-[9px] font-semibold capitalize text-gray-400">
+                        <span className="mt-1 text-[9px] font-semibold capitalize text-gray-400 dark:text-gray-500">
                           {nombreMesCorto(h.mes)}
                         </span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <Link href="/calendario-pagos" className="text-[11px] font-semibold text-brand-from">
+                  <Link href="/calendario-pagos" className="text-[11px] font-semibold text-brand-from dark:text-pink-400">
                     Registrar pago →
                   </Link>
                 )}

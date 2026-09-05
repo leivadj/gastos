@@ -122,14 +122,14 @@ export function EntidadPicker({
           type="button"
           onClick={() => onChange("")}
           className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-            value === "" ? "border-brand-from bg-purple-50" : "border-gray-200"
+            value === "" ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
           }`}
           style={{ width: 64 }}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-xs text-gray-400">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-white/10 text-xs text-gray-400 dark:text-gray-500">
             —
           </span>
-          <span className="text-center text-[10px] text-gray-500">Sin dato</span>
+          <span className="text-center text-[10px] text-gray-500 dark:text-gray-400">Sin dato</span>
         </button>
         {entidades.map((e) => (
           <button
@@ -137,17 +137,17 @@ export function EntidadPicker({
             key={e.id}
             onClick={() => onChange(e.id === value ? "" : e.id)}
             className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-              value === e.id ? "border-brand-from bg-purple-50" : "border-gray-200"
+              value === e.id ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
             }`}
             style={{ width: 64 }}
           >
             <EntidadAvatar entidad={e} marca={resolverMarca(e, marcas)} className="h-9 w-9" />
-            <span className="truncate text-center text-[10px] leading-tight text-gray-600" style={{ maxWidth: 60 }}>
+            <span className="truncate text-center text-[10px] leading-tight text-gray-600 dark:text-gray-300" style={{ maxWidth: 60 }}>
               {e.nombre}
             </span>
             {/* Para diferenciar, ej., "Banco Estado" débito de "Banco Estado"
                 crédito cuando comparten el mismo nombre y logo. */}
-            <span className="truncate text-center text-[9px] leading-tight text-gray-400" style={{ maxWidth: 60 }}>
+            <span className="truncate text-center text-[9px] leading-tight text-gray-400 dark:text-gray-500" style={{ maxWidth: 60 }}>
               {TIPO_CORTO[e.tipo]}
             </span>
           </button>
@@ -156,25 +156,25 @@ export function EntidadPicker({
           type="button"
           onClick={() => setBuscando((v) => !v)}
           className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-            buscando ? "border-brand-from bg-purple-50" : "border-gray-200 border-dashed"
+            buscando ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 border-dashed dark:border-white/10"
           }`}
           style={{ width: 64 }}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 text-lg text-gray-400">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 dark:bg-white/10 text-lg text-gray-400 dark:text-gray-500">
             +
           </span>
-          <span className="text-center text-[10px] text-gray-500">Buscar</span>
+          <span className="text-center text-[10px] text-gray-500 dark:text-gray-400">Buscar</span>
         </button>
       </div>
 
       {buscando && (
-        <div className="mt-2 space-y-2 rounded-lg border border-gray-200 p-3">
+        <div className="mt-2 space-y-2 rounded-lg border border-gray-200 dark:border-white/10 p-3">
           <input
             autoFocus
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder="Ej: Aguas Andinas"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
 
           {coincidencias.length > 0 && (
@@ -185,24 +185,24 @@ export function EntidadPicker({
                   key={m.id}
                   onClick={() => crearEntidadDesdeMarca(m)}
                   disabled={guardando}
-                  className="flex w-full items-center gap-2 rounded-lg border border-gray-200 px-2 py-1.5 text-left hover:border-brand-from disabled:opacity-60"
+                  className="flex w-full items-center gap-2 rounded-lg border border-gray-200 dark:border-white/10 px-2 py-1.5 text-left hover:border-brand-from disabled:opacity-60"
                 >
                   <EntidadAvatar marca={m} nombreFallback={m.nombre} className="h-7 w-7" />
-                  <span className="text-sm text-gray-700">{m.nombre}</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-200">{m.nombre}</span>
                 </button>
               ))}
             </div>
           )}
 
           {textoNorm && !marcaExacta && !nombresYaAgregados.has(textoNorm) && (
-            <div className="space-y-2 rounded-lg bg-purple-50 p-2">
-              <p className="text-xs text-brand-from">
+            <div className="space-y-2 rounded-lg bg-purple-50 dark:bg-white/10 p-2">
+              <p className="text-xs text-brand-from dark:text-white">
                 &quot;{texto.trim()}&quot; no está en el catálogo — agrégalo:
               </p>
               <select
                 value={tipoNuevaMarca}
                 onChange={(e) => setTipoNuevaMarca(e.target.value as TipoMarca)}
-                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs"
+                className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
               >
                 {TIPOS_MARCA.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -222,16 +222,16 @@ export function EntidadPicker({
             </div>
           )}
 
-          {error && <p className="text-xs text-red-500">{error}</p>}
+          {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
 
-          <button type="button" onClick={cerrarBusqueda} className="text-[11px] text-gray-400">
+          <button type="button" onClick={cerrarBusqueda} className="text-[11px] text-gray-400 dark:text-gray-500">
             cerrar
           </button>
         </div>
       )}
 
       {entidades.length === 0 && !buscando && (
-        <p className="mt-1 py-1 text-xs text-gray-400">
+        <p className="mt-1 py-1 text-xs text-gray-400 dark:text-gray-500">
           Aún no tienes tarjetas o cuentas — créalas aquí o en &quot;Gestionar tus tarjetas y cuentas&quot;.
         </p>
       )}

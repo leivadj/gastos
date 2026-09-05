@@ -12,13 +12,13 @@ export default function AutoPage() {
   return (
     <div className="space-y-6 pb-10">
       <div>
-        <h1 className="text-lg font-bold text-gray-800">Auto</h1>
-        <p className="text-xs text-gray-400">Documentos, bencina, mecánico, mantención y otros gastos del auto.</p>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Auto</h1>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Documentos, bencina, mecánico, mantención y otros gastos del auto.</p>
       </div>
 
       <DocumentosVencimiento />
 
-      <div className="border-t border-gray-100 pt-5">
+      <div className="border-t border-gray-100 dark:border-white/10 pt-5">
         <DiariosLista
           categoriaNombre="Auto"
           placeholderDescripcion="Ej: Bencina"

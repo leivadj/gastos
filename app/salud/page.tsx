@@ -9,8 +9,8 @@ export default function SaludPage() {
   return (
     <div className="space-y-4 pb-10">
       <div>
-        <h1 className="text-lg font-bold text-gray-800">Salud</h1>
-        <p className="text-xs text-gray-400">Remedios, visitas al doctor y otros gastos de salud.</p>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Salud</h1>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Remedios, visitas al doctor y otros gastos de salud.</p>
       </div>
 
       <DiariosLista

@@ -38,17 +38,19 @@ export default function GastosPage() {
   return (
     <div className="space-y-4 pb-10">
       <div>
-        <h1 className="text-lg font-bold text-gray-800">Gastos</h1>
-        <p className="text-xs text-gray-400">Fijos, variables, cuotas y gastos diarios del hogar.</p>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Gastos</h1>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Fijos, variables, cuotas y gastos diarios del hogar.</p>
       </div>
 
-      <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-sm">
+      <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-sm dark:bg-white/5">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
-              tab === t.id ? "bg-white text-brand-from shadow-sm" : "text-gray-500"
+              tab === t.id
+                ? "bg-white text-brand-from shadow-sm dark:bg-gray-800 dark:text-white dark:shadow-none"
+                : "text-gray-500 dark:text-gray-500"
             }`}
           >
             {t.label}
@@ -59,7 +61,7 @@ export default function GastosPage() {
       {tab !== "diarios" && (
         <Link
           href="/calendario-pagos"
-          className="flex items-center justify-between rounded-2xl bg-purple-50 px-4 py-3 text-sm font-semibold text-brand-from"
+          className="flex items-center justify-between rounded-2xl bg-purple-50 px-4 py-3 text-sm font-semibold text-brand-from dark:bg-white/10 dark:text-white"
         >
           Ver calendario de pagos
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

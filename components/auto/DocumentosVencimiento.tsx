@@ -39,9 +39,9 @@ function estadoDe(dias: number): Estado {
 }
 
 const ESTADO_ESTILO: Record<Estado, string> = {
-  vencido: "bg-red-50 text-red-500",
-  pronto: "bg-amber-50 text-amber-600",
-  vigente: "bg-emerald-50 text-emerald-600",
+  vencido: "bg-red-50 text-red-500 dark:bg-red-950/40 dark:text-red-400",
+  pronto: "bg-amber-50 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300",
+  vigente: "bg-emerald-50 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-300",
 };
 
 function estadoTexto(dias: number, estado: Estado): string {
@@ -160,7 +160,7 @@ export function DocumentosVencimiento() {
   }
 
   if (cargando) {
-    return <p className="py-6 text-center text-sm text-gray-400">Cargando…</p>;
+    return <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
   const urgentes = documentos.filter((d) => estadoDe(diasHasta(d.fecha_vencimiento)) !== "vigente");
@@ -169,8 +169,8 @@ export function DocumentosVencimiento() {
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-gray-700">Documentos con vencimiento</p>
-          <p className="text-xs text-gray-400">Permiso de circulación, revisión técnica, seguro…</p>
+          <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">Documentos con vencimiento</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Permiso de circulación, revisión técnica, seguro…</p>
         </div>
         <button
           onClick={() => (mostrarForm ? cancelarForm() : abrirNuevo())}
@@ -181,9 +181,9 @@ export function DocumentosVencimiento() {
       </div>
 
       {!mostrarForm && urgentes.length > 0 && (
-        <Card className="border border-amber-200 bg-amber-50 !py-3">
-          <p className="text-xs font-semibold text-amber-700">⚠️ Por vencer o vencidos</p>
-          <ul className="mt-1 space-y-0.5 text-xs text-amber-700">
+        <Card className="border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/40 !py-3">
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">⚠️ Por vencer o vencidos</p>
+          <ul className="mt-1 space-y-0.5 text-xs text-amber-700 dark:text-amber-300">
             {urgentes.map((d) => (
               <li key={d.id}>
                 {TIPO_INFO[d.tipo].icono} {d.nombre} — {estadoTexto(diasHasta(d.fecha_vencimiento), estadoDe(diasHasta(d.fecha_vencimiento)))}
@@ -197,7 +197,7 @@ export function DocumentosVencimiento() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500">Tipo de documento</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Tipo de documento</label>
               <div className="mt-1 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {TIPOS_ORDEN.map((t) => (
                   <button
@@ -205,50 +205,50 @@ export function DocumentosVencimiento() {
                     key={t}
                     onClick={() => elegirTipo(t)}
                     className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-center ${
-                      tipo === t ? "border-brand-from bg-purple-50" : "border-gray-200"
+                      tipo === t ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
                     }`}
                   >
                     <span className="text-lg leading-none">{TIPO_INFO[t].icono}</span>
-                    <span className="text-[10px] text-gray-600">{TIPO_INFO[t].label}</span>
+                    <span className="text-[10px] text-gray-600 dark:text-gray-300">{TIPO_INFO[t].label}</span>
                   </button>
                 ))}
               </div>
             </div>
             {tipo === "otro" && (
               <div>
-                <label className="text-xs text-gray-500">Nombre</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
                 <input
                   required
                   value={nombre}
                   onChange={(e) => onNombreChange(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white px-3 py-2 text-sm"
                   placeholder="Ej: Permiso municipal"
                 />
               </div>
             )}
             <div>
-              <label className="text-xs text-gray-500">Fecha de vencimiento</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Fecha de vencimiento</label>
               <input
                 required
                 type="date"
                 value={fechaVencimiento}
                 onChange={(e) => setFechaVencimiento(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white px-3 py-2 text-sm"
               />
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                 Cuando lo renueves, edita este mismo documento con la nueva fecha.
               </p>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Notas (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Notas (opcional)</label>
               <input
                 value={notas}
                 onChange={(e) => setNotas(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white px-3 py-2 text-sm"
                 placeholder="Ej: N° de póliza"
               />
             </div>
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -261,7 +261,7 @@ export function DocumentosVencimiento() {
       )}
 
       {documentos.length === 0 && !mostrarForm ? (
-        <p className="text-center text-sm text-gray-400">Todavía no registraste documentos del auto.</p>
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500">Todavía no registraste documentos del auto.</p>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {documentos.map((d) => {
@@ -272,24 +272,24 @@ export function DocumentosVencimiento() {
                 <div className="flex items-start gap-3">
                   <EntidadAvatar icono={TIPO_INFO[d.tipo].icono} nombreFallback={d.nombre} className="h-9 w-9" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-gray-800">{d.nombre}</p>
-                    <p className="text-xs text-gray-400">Vence el {fechaLarga(d.fecha_vencimiento)}</p>
-                    {d.notas && <p className="mt-0.5 truncate text-xs text-gray-400">{d.notas}</p>}
+                    <p className="truncate font-semibold text-gray-800 dark:text-white">{d.nombre}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Vence el {fechaLarga(d.fecha_vencimiento)}</p>
+                    {d.notas && <p className="mt-0.5 truncate text-xs text-gray-400 dark:text-gray-500">{d.notas}</p>}
                   </div>
                 </div>
                 <span className={`mt-2.5 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTADO_ESTILO[estado]}`}>
                   {estadoTexto(dias, estado)}
                 </span>
-                <div className="mt-3 flex gap-2 border-t border-gray-50 pt-3">
+                <div className="mt-3 flex gap-2 border-t border-gray-50 dark:border-white/10 pt-3">
                   <button
                     onClick={() => iniciarEdicion(d)}
-                    className="flex-1 rounded-lg bg-gray-50 py-1.5 text-xs font-semibold text-gray-500"
+                    className="flex-1 rounded-lg bg-gray-50 dark:bg-white/5 py-1.5 text-xs font-semibold text-gray-500 dark:text-gray-400"
                   >
                     Editar
                   </button>
                   <button
                     onClick={() => eliminar(d.id)}
-                    className="flex-1 rounded-lg bg-gray-50 py-1.5 text-xs font-semibold text-gray-400 hover:text-red-400"
+                    className="flex-1 rounded-lg bg-gray-50 dark:bg-white/5 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 hover:text-red-400"
                   >
                     Eliminar
                   </button>
@@ -300,7 +300,7 @@ export function DocumentosVencimiento() {
         </div>
       )}
 
-      {error && !mostrarForm && <p className="text-center text-xs text-red-500">{error}</p>}
+      {error && !mostrarForm && <p className="text-center text-xs text-red-500 dark:text-red-400">{error}</p>}
     </div>
   );
 }

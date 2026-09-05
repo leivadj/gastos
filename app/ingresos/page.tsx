@@ -59,7 +59,7 @@ export default function IngresosPage() {
   return (
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-800">Ingresos</h1>
+        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Ingresos</h1>
         <button
           onClick={() => setMostrarForm((v) => !v)}
           className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
@@ -72,12 +72,12 @@ export default function IngresosPage() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500">Persona</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Persona</label>
               <select
                 required
                 value={personaId}
                 onChange={(e) => setPersonaId(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
               >
                 <option value="">Selecciona…</option>
                 {personas.map((p) => (
@@ -89,33 +89,33 @@ export default function IngresosPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500">Monto</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
                 <input
                   required
                   type="number"
                   min={0}
                   value={monto}
                   onChange={(e) => setMonto(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">Mes</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Mes</label>
                 <input
                   required
                   type="date"
                   value={mes}
                   onChange={(e) => setMes(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Descripción (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Descripción (opcional)</label>
               <input
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
                 placeholder="Ej: Sueldo"
               />
             </div>
@@ -135,21 +135,21 @@ export default function IngresosPage() {
           <Card key={i.id}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-semibold text-gray-800">{nombrePersona(i.persona_id)}</p>
-                <p className="text-xs text-gray-400 capitalize">
+                <p className="font-semibold text-gray-800 dark:text-white">{nombrePersona(i.persona_id)}</p>
+                <p className="text-xs text-gray-400 capitalize dark:text-gray-500">
                   {nombreMes(i.mes)} {i.descripcion ? `· ${i.descripcion}` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                <p className="font-semibold text-gray-800">{formatCLP(i.monto)}</p>
-                <button onClick={() => eliminar(i.id)} className="text-xs text-gray-300 hover:text-red-400">
+                <p className="font-semibold text-gray-800 dark:text-white">{formatCLP(i.monto)}</p>
+                <button onClick={() => eliminar(i.id)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
                   eliminar
                 </button>
               </div>
             </div>
           </Card>
         ))}
-        {ingresos.length === 0 && <p className="text-center text-sm text-gray-400">Aún no hay ingresos registrados.</p>}
+        {ingresos.length === 0 && <p className="text-center text-sm text-gray-400 dark:text-gray-500">Aún no hay ingresos registrados.</p>}
       </div>
     </div>
   );

@@ -154,7 +154,7 @@ export function PerfilPropioCard() {
 
   return (
     <Card>
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">Tu perfil</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Tu perfil</p>
       <div className="flex items-center gap-3">
         <label className="group relative cursor-pointer">
           <PersonaAvatar fotoUrl={perfilPropio.foto_url} nombre={perfilPropio.nombre} className="h-16 w-16" />
@@ -178,43 +178,43 @@ export function PerfilPropioCard() {
                 required
                 value={nombrePerfil}
                 onChange={(e) => setNombrePerfil(e.target.value)}
-                className="w-full min-w-0 rounded-lg border border-gray-200 px-2 py-1 text-sm"
+                className="w-full min-w-0 rounded-lg border border-gray-200 px-2 py-1 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
               <button
                 type="submit"
                 disabled={guardandoPerfil}
-                className="shrink-0 text-xs font-semibold text-brand-from disabled:opacity-60"
+                className="shrink-0 text-xs font-semibold text-brand-from dark:text-pink-400 disabled:opacity-60"
               >
                 Guardar
               </button>
-              <button type="button" onClick={() => setEditandoPerfil(false)} className="shrink-0 text-xs text-gray-400">
+              <button type="button" onClick={() => setEditandoPerfil(false)} className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
                 cancelar
               </button>
             </form>
           ) : (
             <div className="flex items-center gap-2">
-              <p className="truncate font-semibold text-gray-800">{perfilPropio.nombre}</p>
-              <button onClick={iniciarEdicionPerfil} className="shrink-0 text-xs text-brand-from">
+              <p className="truncate font-semibold text-gray-800 dark:text-white">{perfilPropio.nombre}</p>
+              <button onClick={iniciarEdicionPerfil} className="shrink-0 text-xs text-brand-from dark:text-pink-400">
                 editar
               </button>
             </div>
           )}
-          <p className="truncate text-xs text-gray-400">{correo}</p>
+          <p className="truncate text-xs text-gray-400 dark:text-gray-500">{correo}</p>
         </div>
       </div>
 
-      {errorPerfil && <p className="mt-2 text-xs text-red-500">{errorPerfil}</p>}
+      {errorPerfil && <p className="mt-2 text-xs text-red-500 dark:text-red-400">{errorPerfil}</p>}
 
       <div className="mt-3 flex items-center justify-between text-sm">
         <div>
-          <p className="text-[11px] text-gray-400">Debe este mes</p>
-          <p className="font-semibold text-gray-800">
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">Debe este mes</p>
+          <p className="font-semibold text-gray-800 dark:text-white">
             <ContadorOdometro texto={formatCLP(debeEstaPersona(perfilPropio.id))} />
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[11px] text-gray-400">Ingresó este mes</p>
-          <p className="font-semibold text-gray-800">
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">Ingresó este mes</p>
+          <p className="font-semibold text-gray-800 dark:text-white">
             <ContadorOdometro texto={formatCLP(ingresoEstaPersona(perfilPropio.id))} />
           </p>
         </div>
@@ -229,7 +229,7 @@ export function PerfilPropioCard() {
         </Link>
         <Link
           href="/tarjetas"
-          className="flex-1 rounded-lg border border-gray-200 py-2 text-center text-xs font-semibold text-gray-500"
+          className="flex-1 rounded-lg border border-gray-200 dark:border-white/10 py-2 text-center text-xs font-semibold text-gray-500 dark:text-gray-300"
         >
           Ver mis tarjetas
         </Link>
@@ -242,7 +242,7 @@ export function PerfilPropioCard() {
 
       <button
         onClick={() => supabase.auth.signOut()}
-        className="mt-2 w-full rounded-lg border border-gray-200 py-2 text-xs font-semibold text-gray-500 hover:border-red-200 hover:text-red-500"
+        className="mt-2 w-full rounded-lg border border-gray-200 dark:border-white/10 py-2 text-xs font-semibold text-gray-500 dark:text-gray-300 hover:border-red-200 hover:text-red-500"
       >
         Cerrar sesión
       </button>

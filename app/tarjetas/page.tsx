@@ -315,15 +315,15 @@ export default function TarjetasPage() {
   }, [cuotas, gastosFijos, transferencias, activaId, categorias, entidades]);
 
   if (cargando) {
-    return <p className="py-10 text-center text-gray-400">Cargando…</p>;
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
   return (
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-gray-800">Tus tarjetas y cuentas</h1>
-          <p className="text-xs text-gray-400">Bancos, casas comerciales, efectivo — las que uses para pagar.</p>
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">Tus tarjetas y cuentas</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Bancos, casas comerciales, efectivo — las que uses para pagar.</p>
         </div>
         <button
           onClick={() => (mostrarForm ? cancelarForm() : setMostrarForm(true))}
@@ -337,7 +337,7 @@ export default function TarjetasPage() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="text-xs text-gray-500">Elegir del catálogo (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Elegir del catálogo (opcional)</label>
               <div className="mt-1 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
                 {marcas.map((m) => (
                   <button
@@ -345,7 +345,7 @@ export default function TarjetasPage() {
                     key={m.id}
                     onClick={() => elegirMarca(m.id === marcaId ? "" : m.id)}
                     className={`flex flex-col items-center gap-1 rounded-lg border p-2 ${
-                      marcaId === m.id ? "border-brand-from bg-purple-50" : "border-gray-200"
+                      marcaId === m.id ? "border-brand-from bg-purple-50 dark:bg-white/10 dark:text-white" : "border-gray-200 dark:border-white/10"
                     }`}
                   >
                     {m.logo_url ? (
@@ -359,23 +359,23 @@ export default function TarjetasPage() {
                         {m.nombre.charAt(0)}
                       </span>
                     )}
-                    <span className="text-center text-[10px] text-gray-600">{m.nombre}</span>
+                    <span className="text-center text-[10px] text-gray-600 dark:text-gray-300">{m.nombre}</span>
                   </button>
                 ))}
               </div>
               {marcas.length === 0 && (
-                <p className="mt-1 text-xs text-gray-400">
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
                   Todavía no hay marcas cargadas — puedes seguir y escribir el nombre a mano.
                 </p>
               )}
             </div>
             <div>
-              <label className="text-xs text-gray-500">Nombre</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
               <input
                 required
                 value={nombre}
                 onChange={(e) => onNombreChange(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
                 placeholder="Ej: Falabella"
               />
               {marcaAutodetectada && (
@@ -385,11 +385,11 @@ export default function TarjetasPage() {
               )}
             </div>
             <div>
-              <label className="text-xs text-gray-500">Tipo</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Tipo</label>
               <select
                 value={tipo}
                 onChange={(e) => setTipo(e.target.value as Entidad["tipo"])}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
               >
                 {TIPOS.map((t) => (
                   <option key={t.value} value={t.value}>
@@ -399,22 +399,22 @@ export default function TarjetasPage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Saldo actual (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Saldo actual (opcional)</label>
               <input
                 type="number"
                 value={saldo}
                 onChange={(e) => setSaldo(e.target.value)}
                 placeholder="Ej: 250000"
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                 Lo actualizas tú a mano cuando quieras — no se calcula solo a partir de tus gastos.
               </p>
             </div>
 
-            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3">
-              <p className="text-xs font-semibold text-gray-600">Diseño de la tarjeta</p>
-              <p className="mt-0.5 text-[11px] text-gray-400">
+            <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 dark:border-white/10 dark:bg-white/5">
+              <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Diseño de la tarjeta</p>
+              <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
                 Sube una foto/captura del diseño real (ej. de tu banco), o elige un color — si no eliges nada, se
                 usa un color automático.
               </p>
@@ -437,22 +437,22 @@ export default function TarjetasPage() {
               </div>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 text-xs text-gray-600">
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
                   Color
                   <input
                     type="color"
                     value={colorHex || colorFor(nombre || "?")}
                     onChange={(e) => setColorHex(e.target.value)}
-                    className="h-8 w-10 cursor-pointer rounded border border-gray-200 bg-white p-0.5"
+                    className="h-8 w-10 cursor-pointer rounded border border-gray-200 bg-white p-0.5 dark:border-white/10 dark:bg-gray-800"
                   />
                 </label>
                 {colorHex && (
-                  <button type="button" onClick={() => setColorHex(null)} className="text-[11px] text-brand-from">
+                  <button type="button" onClick={() => setColorHex(null)} className="text-[11px] text-brand-from dark:text-pink-400">
                     usar color automático
                   </button>
                 )}
 
-                <label className="cursor-pointer rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-brand-from">
+                <label className="cursor-pointer rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:border-brand-from dark:border-white/10 dark:bg-gray-800 dark:text-gray-300">
                   {previewFondo || imagenFondoUrl ? "Cambiar imagen" : "+ Subir imagen"}
                   <input
                     type="file"
@@ -462,14 +462,14 @@ export default function TarjetasPage() {
                   />
                 </label>
                 {(previewFondo || imagenFondoUrl) && (
-                  <button type="button" onClick={quitarImagenFondo} className="text-[11px] text-gray-400 hover:text-red-400">
+                  <button type="button" onClick={quitarImagenFondo} className="text-[11px] text-gray-400 hover:text-red-400 dark:text-gray-500">
                     quitar imagen
                   </button>
                 )}
               </div>
             </div>
 
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -482,14 +482,14 @@ export default function TarjetasPage() {
       )}
 
       {entidades.length === 0 ? (
-        <p className="text-center text-sm text-gray-400">Aún no tienes tarjetas o cuentas creadas.</p>
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500">Aún no tienes tarjetas o cuentas creadas.</p>
       ) : (
         <>
           {hayAlgunSaldo && (
             <Card className="!py-3">
-              <p className="text-xs text-gray-400">Total en tus cuentas</p>
-              <p className="text-2xl font-bold text-gray-800">{formatCLP(totalSaldo)}</p>
-              <p className="mt-0.5 text-[11px] text-gray-400">
+              <p className="text-xs text-gray-400 dark:text-gray-500">Total en tus cuentas</p>
+              <p className="text-2xl font-bold text-gray-800 dark:text-white">{formatCLP(totalSaldo)}</p>
+              <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
                 Solo suma las cuentas a las que ya les pusiste un saldo.
               </p>
             </Card>
@@ -505,14 +505,14 @@ export default function TarjetasPage() {
 
           {entidadActiva && (
             <div className="flex items-center justify-between px-1">
-              <p className="text-sm font-semibold text-gray-700">
-                {entidadActiva.nombre} <span className="font-normal text-gray-400">· {TIPO_LABEL[entidadActiva.tipo]}</span>
+              <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                {entidadActiva.nombre} <span className="font-normal text-gray-400 dark:text-gray-500">· {TIPO_LABEL[entidadActiva.tipo]}</span>
               </p>
               <div className="flex shrink-0 items-center gap-3">
-                <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from">
+                <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from dark:text-pink-400">
                   editar
                 </button>
-                <button onClick={() => eliminar(entidadActiva.id)} className="text-xs text-gray-300 hover:text-red-400">
+                <button onClick={() => eliminar(entidadActiva.id)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
                   eliminar
                 </button>
               </div>
@@ -520,18 +520,18 @@ export default function TarjetasPage() {
           )}
 
           <Card>
-            <p className="mb-1 text-sm font-semibold text-gray-600">Movimientos</p>
-            <p className="mb-3 text-xs capitalize text-gray-400">{nombreMes()}</p>
+            <p className="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-300">Movimientos</p>
+            <p className="mb-3 text-xs capitalize text-gray-400 dark:text-gray-500">{nombreMes()}</p>
             {itemsActivos.length === 0 ? (
-              <p className="py-2 text-sm text-gray-400">Sin movimientos este mes con esta cuenta.</p>
+              <p className="py-2 text-sm text-gray-400 dark:text-gray-500">Sin movimientos este mes con esta cuenta.</p>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-gray-100 dark:divide-white/10">
                 {itemsActivos.map((it) => (
                   <li key={it.key} className="flex items-center gap-3 py-2.5">
                     <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-8 w-8" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-gray-700">{it.descripcion}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{it.descripcion}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
                         {it.categoria} · {it.detalle}
                       </p>
                     </div>
@@ -547,7 +547,7 @@ export default function TarjetasPage() {
 
           {entidades.length > 1 && (
             <div>
-              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
+              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
                 Todas tus tarjetas y cuentas
               </p>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -558,14 +558,14 @@ export default function TarjetasPage() {
                       <button type="button" onClick={() => setActivaId(e.id)} className="flex w-full items-center gap-3 text-left">
                         <EntidadAvatar entidad={e} marca={marca} className="h-9 w-9" />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-gray-800">{e.nombre}</p>
-                          <p className="text-xs text-gray-400">{TIPO_LABEL[e.tipo]}</p>
+                          <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{e.nombre}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">{TIPO_LABEL[e.tipo]}</p>
                         </div>
                         <div className="shrink-0 text-right">
-                          <p className="text-xs font-medium text-gray-700">
+                          <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
                             {formatCLP(e.saldo ?? gastoPorEntidad[e.id] ?? 0)}
                           </p>
-                          <p className="text-[10px] text-gray-400">{e.saldo != null ? "saldo" : "gastado este mes"}</p>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500">{e.saldo != null ? "saldo" : "gastado este mes"}</p>
                         </div>
                       </button>
                     </Card>

@@ -242,18 +242,18 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500">Descripción</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Descripción</label>
               <input
                 required
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
                 placeholder="Ej: Luz"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500">
+                <label className="text-xs text-gray-500 dark:text-gray-400">
                   {tipoMonto === "variable" ? "Monto estimado (inicial)" : "Monto"}
                 </label>
                 <input
@@ -262,31 +262,31 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                   min={0}
                   value={monto}
                   onChange={(e) => setMonto(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">Día de pago</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Día de pago</label>
                 <input
                   type="number"
                   min={1}
                   max={31}
                   value={diaMes}
                   onChange={(e) => setDiaMes(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500">¿Cobra siempre lo mismo?</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">¿Cobra siempre lo mismo?</label>
               <div className="mt-1 grid grid-cols-2 gap-2">
                 <button
                   type="button"
                   onClick={() => setTipoMonto("fijo")}
                   className={`rounded-lg border px-3 py-2 text-left text-xs font-medium ${
                     tipoMonto === "fijo"
-                      ? "border-brand-from bg-purple-50 text-brand-from"
-                      : "border-gray-200 text-gray-500"
+                      ? "border-brand-from bg-purple-50 text-brand-from dark:bg-white/10 dark:text-white"
+                      : "border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   Monto fijo
@@ -297,8 +297,8 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                   onClick={() => setTipoMonto("variable")}
                   className={`rounded-lg border px-3 py-2 text-left text-xs font-medium ${
                     tipoMonto === "variable"
-                      ? "border-brand-from bg-purple-50 text-brand-from"
-                      : "border-gray-200 text-gray-500"
+                      ? "border-brand-from bg-purple-50 text-brand-from dark:bg-white/10 dark:text-white"
+                      : "border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400"
                   }`}
                 >
                   Monto variable
@@ -306,14 +306,14 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                 </button>
               </div>
               {tipoMonto === "variable" && (
-                <p className="mt-1.5 rounded-lg bg-purple-50 px-3 py-2 text-[11px] text-brand-from">
+                <p className="mt-1.5 rounded-lg bg-purple-50 px-3 py-2 text-[11px] text-brand-from dark:bg-white/10 dark:text-white">
                   Vence siempre el mismo día, pero el monto cambia cada mes. Una vez que registres pagos reales en el
                   Calendario de pagos, acá se va a mostrar el promedio móvil en vez del monto estimado.
                 </p>
               )}
             </div>
             <div>
-              <label className="text-xs text-gray-500">Medio de pago</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Medio de pago</label>
               <div className="mt-1">
                 <EntidadPicker
                   entidades={entidades}
@@ -325,7 +325,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Categoría</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
               <select
                 value={categoriaId}
                 onChange={(e) => {
@@ -335,7 +335,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                   }
                   setCategoriaId(e.target.value);
                 }}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
                 <option value="">—</option>
                 {categorias.map((c) => (
@@ -347,7 +347,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
             </div>
             {categoriaSeleccionada?.tipo_marca_sugerido && (
               <div>
-                <label className="text-xs text-gray-500">
+                <label className="text-xs text-gray-500 dark:text-gray-400">
                   ¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)
                 </label>
                 <div className="mt-1">
@@ -362,11 +362,11 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
               </div>
             )}
             <div>
-              <label className="text-xs text-gray-500">Grupo (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Grupo (opcional)</label>
               <select
                 value={grupoId}
                 onChange={(e) => setGrupoId(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
                 <option value="">— Sin grupo —</option>
                 {grupos.map((g) => (
@@ -377,13 +377,13 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
               </select>
             </div>
             {grupoId ? (
-              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from">
+              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                 El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;. Para cambiarlo, ve a Grupos.
               </p>
             ) : unicaPersona ? null : (
               <div>
-                <label className="text-xs text-gray-500">¿Quiénes participan?</label>
-                <p className="mb-1 text-[11px] text-gray-400">
+                <label className="text-xs text-gray-500 dark:text-gray-400">¿Quiénes participan?</label>
+                <p className="mb-1 text-[11px] text-gray-400 dark:text-gray-500">
                   Deja el % en blanco para repartir en partes iguales el resto.
                 </p>
                 <ParticipantesPicker
@@ -395,12 +395,12 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
               </div>
             )}
             <div>
-              <label className="text-xs text-gray-500">Ícono del item (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Ícono del item (opcional)</label>
               <div className="mt-1">
                 <IconoPicker value={icono} onChange={setIcono} />
               </div>
             </div>
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -415,10 +415,10 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
       {lista.length > 0 && (
         <Card>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500">
+            <span className="text-gray-500 dark:text-gray-400">
               {tabTipoMonto === "fijo" ? "Total monto fijo / mes" : "Total variable (promedio móvil) / mes"}
             </span>
-            <span className="font-semibold text-gray-800">{formatCLP(total)}</span>
+            <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(total)}</span>
           </div>
         </Card>
       )}
@@ -442,8 +442,8 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                           className="h-9 w-9"
                         />
                         <div>
-                          <p className="font-semibold text-gray-800">{g.descripcion}</p>
-                          <p className="text-xs text-gray-400">
+                          <p className="font-semibold text-gray-800 dark:text-white">{g.descripcion}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
                             {nombreEntidad(g.entidad_id) ? `${nombreEntidad(g.entidad_id)} · ` : ""}
                             {nombreCategoria(g.categoria_id)}
                             {marcaItem ? ` (${marcaItem.nombre})` : ""} · día {g.dia_mes_pago ?? "—"} · {resumenReparto(g)}
@@ -451,19 +451,19 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                         </div>
                       </button>
                       <div className="flex shrink-0 items-center gap-3 pt-0.5">
-                        <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from">
+                        <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from dark:text-pink-400">
                           editar
                         </button>
-                        <button onClick={() => desactivar(g.id)} className="text-xs text-gray-300 hover:text-red-400">
+                        <button onClick={() => desactivar(g.id)} className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400">
                           quitar
                         </button>
                       </div>
                     </div>
-                    <p className="mt-2 text-right font-semibold text-gray-800">
-                      {esPromedio && <span className="mr-1 text-xs font-normal text-gray-400">~</span>}
+                    <p className="mt-2 text-right font-semibold text-gray-800 dark:text-white">
+                      {esPromedio && <span className="mr-1 text-xs font-normal text-gray-400 dark:text-gray-500">~</span>}
                       {formatCLP(montoActual)}
                     </p>
-                    {esPromedio && <p className="text-right text-[10.5px] text-gray-400">promedio móvil</p>}
+                    {esPromedio && <p className="text-right text-[10.5px] text-gray-400 dark:text-gray-500">promedio móvil</p>}
                   </div>
                 )}
                 detalle={({ onClick }) => (
@@ -476,35 +476,35 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                           icono={g.icono}
                           className="h-9 w-9"
                         />
-                        <p className="pt-1.5 font-semibold text-gray-800">{g.descripcion}</p>
+                        <p className="pt-1.5 font-semibold text-gray-800 dark:text-white">{g.descripcion}</p>
                       </div>
-                      <button type="button" onClick={onClick} className="shrink-0 pt-1.5 text-xs text-gray-400">
+                      <button type="button" onClick={onClick} className="shrink-0 pt-1.5 text-xs text-gray-400 dark:text-gray-500">
                         cerrar ✕
                       </button>
                     </div>
                     <dl className="mt-3 space-y-1.5 text-xs">
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">{esPromedio ? "Promedio móvil" : g.tipo_monto === "variable" ? "Monto estimado" : "Monto"}</dt>
-                        <dd className="font-medium text-gray-700">{formatCLP(montoActual)}</dd>
+                        <dt className="text-gray-400 dark:text-gray-500">{esPromedio ? "Promedio móvil" : g.tipo_monto === "variable" ? "Monto estimado" : "Monto"}</dt>
+                        <dd className="font-medium text-gray-700 dark:text-gray-200">{formatCLP(montoActual)}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Día de pago</dt>
-                        <dd className="font-medium text-gray-700">{g.dia_mes_pago ?? "—"}</dd>
+                        <dt className="text-gray-400 dark:text-gray-500">Día de pago</dt>
+                        <dd className="font-medium text-gray-700 dark:text-gray-200">{g.dia_mes_pago ?? "—"}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Medio de pago</dt>
-                        <dd className="font-medium text-gray-700">{nombreEntidad(g.entidad_id) ?? "—"}</dd>
+                        <dt className="text-gray-400 dark:text-gray-500">Medio de pago</dt>
+                        <dd className="font-medium text-gray-700 dark:text-gray-200">{nombreEntidad(g.entidad_id) ?? "—"}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="shrink-0 text-gray-400">Categoría</dt>
-                        <dd className="text-right font-medium text-gray-700">
+                        <dt className="shrink-0 text-gray-400 dark:text-gray-500">Categoría</dt>
+                        <dd className="text-right font-medium text-gray-700 dark:text-gray-200">
                           {nombreCategoria(g.categoria_id)}
                           {marcaItem ? ` (${marcaItem.nombre})` : ""}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="shrink-0 text-gray-400">Reparto</dt>
-                        <dd className="text-right font-medium text-gray-700">
+                        <dt className="shrink-0 text-gray-400 dark:text-gray-500">Reparto</dt>
+                        <dd className="text-right font-medium text-gray-700 dark:text-gray-200">
                           {g.grupo_id
                             ? `Grupo: ${grupoDe(g.grupo_id)?.nombre ?? "—"}`
                             : filasReparto.length === 0
@@ -521,13 +521,13 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                     <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => iniciarEdicion(g)}
-                        className="flex-1 rounded-lg bg-purple-50 py-2 text-xs font-semibold text-brand-from"
+                        className="flex-1 rounded-lg bg-purple-50 py-2 text-xs font-semibold text-brand-from dark:bg-white/10 dark:text-white"
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => desactivar(g.id)}
-                        className="flex-1 rounded-lg bg-gray-50 py-2 text-xs font-semibold text-gray-400 hover:text-red-400"
+                        className="flex-1 rounded-lg bg-gray-50 dark:bg-white/5 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 hover:text-red-400"
                       >
                         Quitar
                       </button>
@@ -539,7 +539,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
           );
         })}
         {lista.length === 0 && !mostrarForm && (
-          <p className="text-center text-sm text-gray-400">
+          <p className="text-center text-sm text-gray-400 dark:text-gray-500">
             {tabTipoMonto === "fijo" ? "Aún no hay gastos de monto fijo." : "Aún no hay gastos de monto variable."}
           </p>
         )}

@@ -226,7 +226,7 @@ export function CuotasLista() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400">La cuota vigente se calcula sola cada mes, con la fecha de hoy.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">La cuota vigente se calcula sola cada mes, con la fecha de hoy.</p>
         <button
           onClick={() => (mostrarForm ? cancelarForm() : abrirFormNuevo())}
           className="shrink-0 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
@@ -237,51 +237,51 @@ export function CuotasLista() {
 
       <Link
         href="/tarjetas"
-        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm"
+        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm dark:bg-gray-900 dark:shadow-none"
       >
-        <span className="text-gray-600">Gestionar tus tarjetas y cuentas</span>
-        <span className="text-brand-from">→</span>
+        <span className="text-gray-600 dark:text-gray-300">Gestionar tus tarjetas y cuentas</span>
+        <span className="text-brand-from dark:text-pink-400">→</span>
       </Link>
 
       {mostrarForm && (
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500">Descripción</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Descripción</label>
               <input
                 required
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
                 placeholder="Ej: Refrigerador nuevo"
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500">N° de cuotas</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">N° de cuotas</label>
                 <input
                   required
                   type="number"
                   min={1}
                   value={nCuotas}
                   onChange={(e) => setNCuotas(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">Valor de la cuota</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Valor de la cuota</label>
                 <input
                   required
                   type="number"
                   min={1}
                   value={montoCuota}
                   onChange={(e) => setMontoCuota(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
                 />
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500">¿En qué cuota vas?</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">¿En qué cuota vas?</label>
               <input
                 required
                 type="number"
@@ -289,21 +289,21 @@ export function CuotasLista() {
                 max={nCuotas || undefined}
                 value={cuotaActual}
                 onChange={(e) => setCuotaActual(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               />
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
                 Si es una compra nueva, deja &quot;1&quot;. Si ya venías pagando, escribe en qué cuota vas hoy — no
                 hace falta calcular la fecha de la primera cuota, se calcula sola.
               </p>
             </div>
             {nCuotas && montoCuota && (
-              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from">
+              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                 Total del crédito: {formatCLP(Number(nCuotas) * Number(montoCuota))} — aproximado, sin contar
                 intereses u otros cargos que el banco sume aparte.
               </p>
             )}
             <div>
-              <label className="text-xs text-gray-500">Tarjeta / medio de pago</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Tarjeta / medio de pago</label>
               <div className="mt-1">
                 <EntidadPicker
                   entidades={entidades}
@@ -315,7 +315,7 @@ export function CuotasLista() {
               </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Categoría</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
               <select
                 value={categoriaId}
                 onChange={(e) => {
@@ -325,7 +325,7 @@ export function CuotasLista() {
                   }
                   setCategoriaId(e.target.value);
                 }}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
                 <option value="">—</option>
                 {categorias.map((c) => (
@@ -337,7 +337,7 @@ export function CuotasLista() {
             </div>
             {categoriaSeleccionada?.tipo_marca_sugerido && (
               <div>
-                <label className="text-xs text-gray-500">
+                <label className="text-xs text-gray-500 dark:text-gray-400">
                   ¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)
                 </label>
                 <div className="mt-1">
@@ -352,11 +352,11 @@ export function CuotasLista() {
               </div>
             )}
             <div>
-              <label className="text-xs text-gray-500">Grupo (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Grupo (opcional)</label>
               <select
                 value={grupoId}
                 onChange={(e) => setGrupoId(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
                 <option value="">— Sin grupo —</option>
                 {grupos.map((g) => (
@@ -367,13 +367,13 @@ export function CuotasLista() {
               </select>
             </div>
             {grupoId ? (
-              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from">
+              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                 El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;. Para cambiarlo, ve a Grupos.
               </p>
             ) : unicaPersona ? null : (
               <div>
-                <label className="text-xs text-gray-500">¿Quiénes participan?</label>
-                <p className="mb-1 text-[11px] text-gray-400">
+                <label className="text-xs text-gray-500 dark:text-gray-400">¿Quiénes participan?</label>
+                <p className="mb-1 text-[11px] text-gray-400 dark:text-gray-500">
                   Deja el % en blanco para repartir en partes iguales el resto.
                 </p>
                 <ParticipantesPicker
@@ -385,12 +385,12 @@ export function CuotasLista() {
               </div>
             )}
             <div>
-              <label className="text-xs text-gray-500">Ícono del item (opcional)</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Ícono del item (opcional)</label>
               <div className="mt-1">
                 <IconoPicker value={icono} onChange={setIcono} />
               </div>
             </div>
-            {error && <p className="text-xs text-red-500">{error}</p>}
+            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -409,7 +409,7 @@ export function CuotasLista() {
           const marcaItem = marcaDe(c.marca_id);
           const filasReparto = participantesPorItem[c.compra_id] ?? [];
           const barraProgreso = (
-            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
               <div className="h-full bg-brand-gradient" style={{ width: `${progreso}%` }} />
             </div>
           );
@@ -427,27 +427,27 @@ export function CuotasLista() {
                           className="h-9 w-9"
                         />
                         <div>
-                          <p className="font-semibold text-gray-800">{c.descripcion}</p>
-                          <p className="text-xs text-gray-400">
+                          <p className="font-semibold text-gray-800 dark:text-white">{c.descripcion}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500">
                             {nombreEntidad(c.entidad_id)} · {nombreCategoria(c.categoria_id)}
                             {marcaItem ? ` (${marcaItem.nombre})` : ""} · {resumenReparto(c)}
                           </p>
                         </div>
                       </button>
                       <div className="flex shrink-0 items-center gap-3 pt-0.5">
-                        <button onClick={() => iniciarEdicion(c)} className="text-xs text-brand-from">
+                        <button onClick={() => iniciarEdicion(c)} className="text-xs text-brand-from dark:text-pink-400">
                           editar
                         </button>
-                        <button onClick={() => eliminar(c.compra_id)} className="text-xs text-gray-300 hover:text-red-400">
+                        <button onClick={() => eliminar(c.compra_id)} className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400">
                           eliminar
                         </button>
                       </div>
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm">
-                      <span className="text-gray-500">
+                      <span className="text-gray-500 dark:text-gray-400">
                         {activa ? `Cuota ${c.cuota_actual} de ${c.n_cuotas}` : "Terminada"}
                       </span>
-                      <span className="font-semibold text-gray-800">{formatCLP(c.monto_cuota)}/mes</span>
+                      <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(c.monto_cuota)}/mes</span>
                     </div>
                     {barraProgreso}
                   </div>
@@ -462,42 +462,42 @@ export function CuotasLista() {
                           icono={c.icono}
                           className="h-9 w-9"
                         />
-                        <p className="pt-1.5 font-semibold text-gray-800">{c.descripcion}</p>
+                        <p className="pt-1.5 font-semibold text-gray-800 dark:text-white">{c.descripcion}</p>
                       </div>
-                      <button type="button" onClick={onClick} className="shrink-0 pt-1.5 text-xs text-gray-400">
+                      <button type="button" onClick={onClick} className="shrink-0 pt-1.5 text-xs text-gray-400 dark:text-gray-500">
                         cerrar ✕
                       </button>
                     </div>
                     <dl className="mt-3 space-y-1.5 text-xs">
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Total del crédito (aprox.)</dt>
-                        <dd className="font-medium text-gray-700">{formatCLP(c.monto_total)}</dd>
+                        <dt className="text-gray-400 dark:text-gray-500">Total del crédito (aprox.)</dt>
+                        <dd className="font-medium text-gray-700 dark:text-gray-200">{formatCLP(c.monto_total)}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Cuota</dt>
-                        <dd className="font-medium text-gray-700">
+                        <dt className="text-gray-400 dark:text-gray-500">Cuota</dt>
+                        <dd className="font-medium text-gray-700 dark:text-gray-200">
                           {activa ? `${c.cuota_actual} de ${c.n_cuotas}` : `${c.n_cuotas} (terminada)`} ·{" "}
                           {formatCLP(c.monto_cuota)}/mes
                         </dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Vence</dt>
-                        <dd className="font-medium text-gray-700">Día {diaDelMes(c.fecha_primera_cuota)} de cada mes</dd>
+                        <dt className="text-gray-400 dark:text-gray-500">Vence</dt>
+                        <dd className="font-medium text-gray-700 dark:text-gray-200">Día {diaDelMes(c.fecha_primera_cuota)} de cada mes</dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Tarjeta / medio de pago</dt>
-                        <dd className="font-medium text-gray-700">{nombreEntidad(c.entidad_id)}</dd>
+                        <dt className="text-gray-400 dark:text-gray-500">Tarjeta / medio de pago</dt>
+                        <dd className="font-medium text-gray-700 dark:text-gray-200">{nombreEntidad(c.entidad_id)}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="shrink-0 text-gray-400">Categoría</dt>
-                        <dd className="text-right font-medium text-gray-700">
+                        <dt className="shrink-0 text-gray-400 dark:text-gray-500">Categoría</dt>
+                        <dd className="text-right font-medium text-gray-700 dark:text-gray-200">
                           {nombreCategoria(c.categoria_id)}
                           {marcaItem ? ` (${marcaItem.nombre})` : ""}
                         </dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="shrink-0 text-gray-400">Reparto</dt>
-                        <dd className="text-right font-medium text-gray-700">
+                        <dt className="shrink-0 text-gray-400 dark:text-gray-500">Reparto</dt>
+                        <dd className="text-right font-medium text-gray-700 dark:text-gray-200">
                           {c.grupo_id
                             ? `Grupo: ${grupoDe(c.grupo_id)?.nombre ?? "—"}`
                             : filasReparto.length === 0
@@ -515,13 +515,13 @@ export function CuotasLista() {
                     <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => iniciarEdicion(c)}
-                        className="flex-1 rounded-lg bg-purple-50 py-2 text-xs font-semibold text-brand-from"
+                        className="flex-1 rounded-lg bg-purple-50 py-2 text-xs font-semibold text-brand-from dark:bg-white/10 dark:text-white"
                       >
                         Editar
                       </button>
                       <button
                         onClick={() => eliminar(c.compra_id)}
-                        className="flex-1 rounded-lg bg-gray-50 py-2 text-xs font-semibold text-gray-400 hover:text-red-400"
+                        className="flex-1 rounded-lg bg-gray-50 dark:bg-white/5 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 hover:text-red-400"
                       >
                         Eliminar
                       </button>
@@ -532,7 +532,7 @@ export function CuotasLista() {
             </Card>
           );
         })}
-        {compras.length === 0 && <p className="text-center text-sm text-gray-400">Aún no hay compras en cuotas.</p>}
+        {compras.length === 0 && <p className="text-center text-sm text-gray-400 dark:text-gray-500">Aún no hay compras en cuotas.</p>}
       </div>
     </div>
   );

@@ -55,7 +55,7 @@ export function ParticipantesPicker({
           <div
             key={p.id}
             className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
-              seleccionada ? "border-brand-from bg-purple-50" : "border-gray-200"
+              seleccionada ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
             }`}
           >
             <button type="button" onClick={() => toggle(p.id)} className="flex flex-1 items-center gap-2 text-left">
@@ -66,7 +66,7 @@ export function ParticipantesPicker({
               >
                 {seleccionada && "✓"}
               </span>
-              <span className="text-sm text-gray-700">{p.nombre}</span>
+              <span className="text-sm text-gray-700 dark:text-gray-200">{p.nombre}</span>
             </button>
             {seleccionada && participante && (
               <div className="flex shrink-0 items-center gap-1">
@@ -77,19 +77,19 @@ export function ParticipantesPicker({
                   value={participante.porcentaje ?? ""}
                   onChange={(e) => setPorcentaje(p.id, e.target.value)}
                   placeholder={`≈${Math.round(porcentajeEfectivo(participante))}`}
-                  className="w-16 rounded-lg border border-gray-200 px-2 py-1 text-right text-xs"
+                  className="w-16 rounded-lg border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white px-2 py-1 text-right text-xs"
                 />
-                <span className="text-xs text-gray-400">%</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
               </div>
             )}
           </div>
         );
       })}
       {activas.length === 0 && (
-        <p className="text-xs text-gray-400">Primero agrega personas en la sección &quot;Personas&quot;.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">Primero agrega personas en la sección &quot;Personas&quot;.</p>
       )}
       {value.length > 0 && (
-        <p className="text-[11px] text-gray-400">
+        <p className="text-[11px] text-gray-400 dark:text-gray-500">
           {value
             .map((v) => {
               const nombre = activas.find((p) => p.id === v.persona_id)?.nombre ?? "?";

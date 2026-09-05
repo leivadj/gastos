@@ -43,12 +43,6 @@ import { useDeviceType } from "@/lib/useDeviceType";
 const COLORES = ["#7C3AED", "#EC4899", "#F97316", "#10B981", "#3B82F6", "#F43F5E", "#8B5CF6", "#14B8A6"];
 const AVATAR_COLORES = ["#F59E0B", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6"];
 
-// Se agrega a cada <Card> de este dashboard (nunca al Card.tsx compartido,
-// ver la nota en lib/theme.tsx) — el resto de las pantallas todavía no
-// migran a oscuro, así que sus <Card> sin esta clase siguen viéndose
-// claros a propósito.
-const CARD_OSCURA = "dark:bg-gray-900 dark:shadow-none";
-
 function formatCompacto(valor: number): string {
   return new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 1 }).format(valor);
 }
@@ -309,7 +303,7 @@ export default function DashboardPage() {
   // ---- Piezas reutilizadas entre el layout mobile y el de escritorio ----
 
   const tarjetaCategoria = (
-    <Card className={CARD_OSCURA}>
+    <Card>
       <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Gastos por categoría</p>
       {dataCategoria.length === 0 ? (
         <p className="text-sm text-gray-400 dark:text-gray-500">Sin datos este mes todavía.</p>
@@ -357,7 +351,7 @@ export default function DashboardPage() {
   );
 
   const tarjetaFijoVariable = totalGastos > 0 && (
-    <Card className={CARD_OSCURA}>
+    <Card>
       <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Fijo vs. variable</p>
       <div className="h-2.5 w-full overflow-hidden rounded-full bg-pink-100 dark:bg-pink-950/50">
         <div className="h-full bg-brand-gradient" style={{ width: `${pctFijo}%` }} />
@@ -376,7 +370,7 @@ export default function DashboardPage() {
   );
 
   const tarjetaPersonas = (
-    <Card className={CARD_OSCURA}>
+    <Card>
       <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Cuánto le toca a cada persona</p>
       {dataPersonas.length === 0 ? (
         <p className="text-sm text-gray-400 dark:text-gray-500">Sin datos este mes todavía.</p>
@@ -405,7 +399,7 @@ export default function DashboardPage() {
   );
 
   const tarjetaCuotas = (
-    <Card className={CARD_OSCURA}>
+    <Card>
       <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Cuotas activas este mes</p>
       {cuotas.length === 0 ? (
         <p className="text-sm text-gray-400 dark:text-gray-500">No hay compras en cuotas vigentes.</p>
@@ -428,7 +422,7 @@ export default function DashboardPage() {
   );
 
   const tarjetaPromedioDiario = (
-    <Card className={CARD_OSCURA}>
+    <Card>
       <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
         <IconoPromedio className="text-gray-400 dark:text-gray-500" />
         Gasto promedio diario
@@ -439,7 +433,7 @@ export default function DashboardPage() {
   );
 
   const tarjetaProximosPagos = (
-    <Card className={CARD_OSCURA}>
+    <Card>
       <div className="mb-1 flex items-center justify-between">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300">
           <IconoProximosPagos className="text-gray-400 dark:text-gray-500" />
@@ -476,7 +470,7 @@ export default function DashboardPage() {
   );
 
   const tarjetaMetas = (
-    <Card className={CARD_OSCURA}>
+    <Card>
       <div className="mb-2 flex items-center justify-between">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300">
           <IconoMetas className="text-gray-400 dark:text-gray-500" />
@@ -648,7 +642,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <Card className={CARD_OSCURA}>
+        <Card>
           <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
             <IconoCuentas className="text-gray-400 dark:text-gray-500" />
             Total en cuentas
@@ -659,7 +653,7 @@ export default function DashboardPage() {
           <p className="text-[11px] text-gray-400 dark:text-gray-500">saldo de tus cuentas</p>
         </Card>
 
-        <Card className={CARD_OSCURA}>
+        <Card>
           <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
             <IconoGastos className="text-gray-400 dark:text-gray-500" />
             Gastos este mes
@@ -669,7 +663,7 @@ export default function DashboardPage() {
           </p>
         </Card>
 
-        <Card className={CARD_OSCURA}>
+        <Card>
           <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
             <IconoComprometido className="text-gray-400 dark:text-gray-500" />
             Comprometido

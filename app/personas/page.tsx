@@ -68,15 +68,15 @@ export default function PersonasPage() {
   return (
     <div className="space-y-4 pb-10">
       <div>
-        <h1 className="text-lg font-bold text-gray-800">Personas</h1>
-        <p className="text-xs capitalize text-gray-400">
+        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Personas</h1>
+        <p className="text-xs capitalize text-gray-400 dark:text-gray-500">
           Quiénes participan en los repartos, y lo que debe e ingresó cada una en {nombreMes()}. El reparto se
           define en cada gasto/compra o en Grupos.
         </p>
       </div>
 
       <div className="flex items-center justify-between pt-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Otras personas (repartos)</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Otras personas (repartos)</p>
         <button
           onClick={() => {
             setMostrarForm((v) => !v);
@@ -92,15 +92,15 @@ export default function PersonasPage() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label className="text-xs text-gray-500">Nombre</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
               <input
                 required
                 value={nombre}
                 onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
               />
             </div>
-            {errorNueva && <p className="text-xs text-red-500">{errorNueva}</p>}
+            {errorNueva && <p className="text-xs text-red-500 dark:text-red-400">{errorNueva}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -118,22 +118,22 @@ export default function PersonasPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <PersonaAvatar fotoUrl={p.foto_url} nombre={p.nombre} className="h-8 w-8" />
-                <p className="font-semibold text-gray-800">{p.nombre}</p>
+                <p className="font-semibold text-gray-800 dark:text-white">{p.nombre}</p>
               </div>
-              <button onClick={() => desactivar(p.id)} className="text-xs text-gray-300 hover:text-red-400">
+              <button onClick={() => desactivar(p.id)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
                 quitar
               </button>
             </div>
             <div className="mt-2 flex items-center justify-between text-sm">
               <div>
-                <p className="text-[11px] text-gray-400">Debe este mes</p>
-                <p className="font-semibold text-gray-800">
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">Debe este mes</p>
+                <p className="font-semibold text-gray-800 dark:text-white">
                   <ContadorOdometro texto={formatCLP(debeEstaPersona(p.id))} />
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-[11px] text-gray-400">Ingresó este mes</p>
-                <p className="font-semibold text-gray-800">
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">Ingresó este mes</p>
+                <p className="font-semibold text-gray-800 dark:text-white">
                   <ContadorOdometro texto={formatCLP(ingresoEstaPersona(p.id))} />
                 </p>
               </div>
@@ -141,7 +141,7 @@ export default function PersonasPage() {
           </Card>
         ))}
         {otrasPersonas.length === 0 && (
-          <p className="text-center text-sm text-gray-400">
+          <p className="text-center text-sm text-gray-400 dark:text-gray-500">
             Aún no agregaste otras personas para repartir gastos (ej. Marian).
           </p>
         )}
