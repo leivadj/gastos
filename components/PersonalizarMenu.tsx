@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { mensajeError } from "@/lib/supabaseError";
 import { PreferenciasMenu } from "@/lib/types";
 
-type ItemBase = { key: string; label: string; icon: (active: boolean) => ReactNode };
+type ItemBase = { key: string; label: string; icon: (active: boolean) => ReactNode; ocultoPorDefecto?: boolean };
 type ItemEditable = { key: string; label: string; icon: (active: boolean) => ReactNode; oculto: boolean };
 
 function mover<T>(lista: T[], desde: number, hasta: number): T[] {
@@ -20,16 +20,21 @@ function mover<T>(lista: T[], desde: number, hasta: number): T[] {
 // aplicando el `orden` guardado y agregando al final cualquier ítem nuevo
 // que el código haya sumado después de la última vez que se guardó — mismo
 // criterio que aplicarPreferencias() de DesktopSidebar.tsx, pero sin filtrar
-// los ocultos (acá se muestran apagados, no se sacan de la lista).
+// los ocultos (acá se muestran apagados, no se sacan de la lista). Un ítem
+// nuevo con `ocultoPorDefecto` (ej. Calendario, Auto — ver ITEMS_OPCIONALES)
+// arranca con el interruptor apagado: es "opcional", no algo que ya estaba
+// guardado como oculto a propósito.
 function listaInicial(items: ItemBase[], prefs: PreferenciasMenu | null): ItemEditable[] {
   const porKey = new Map(items.map((i) => [i.key, i]));
   const desdeOrden = (prefs?.orden ?? []).filter((k) => porKey.has(k));
   const yaIncluidos = new Set(desdeOrden);
   const nuevos = items.filter((i) => !yaIncluidos.has(i.key)).map((i) => i.key);
+  const nuevosSet = new Set(nuevos);
   const ocultosSet = new Set(prefs?.ocultos ?? []);
   return [...desdeOrden, ...nuevos].map((k) => {
     const item = porKey.get(k)!;
-    return { key: item.key, label: item.label, icon: item.icon, oculto: ocultosSet.has(k) };
+    const ocultoPorDefecto = nuevosSet.has(k) && !!item.ocultoPorDefecto;
+    return { key: item.key, label: item.label, icon: item.icon, oculto: ocultosSet.has(k) || ocultoPorDefecto };
   });
 }
 
@@ -73,8 +78,11 @@ export function PersonalizarMenu({
     setLista((actual) => actual.map((i) => (i.key === key ? { ...i, oculto: !i.oculto } : i)));
   }
 
+  // Vuelve al estado de fábrica: los ítems de siempre visibles, los
+  // opcionales (Calendario, Auto, etc. — ver `ocultoPorDefecto` en
+  // ITEMS_OPCIONALES de DesktopSidebar.tsx) de nuevo apagados.
   function restablecer() {
-    setLista(items.map((i) => ({ key: i.key, label: i.label, icon: i.icon, oculto: false })));
+    setLista(items.map((i) => ({ key: i.key, label: i.label, icon: i.icon, oculto: !!i.ocultoPorDefecto })));
   }
 
   const todosOcultos = lista.every((i) => i.oculto);
@@ -116,7 +124,10 @@ export function PersonalizarMenu({
         <div className="flex items-start justify-between gap-2">
           <div>
             <p className="text-lg font-bold text-gray-800 dark:text-white">Personalizar menú</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Arrastrá para reordenar, o apagá los que no usás.</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Arrastrá para reordenar, o prendé/apagá los que querés ver acá — incluye ítems de "Más" como
+              Calendario o Auto.
+            </p>
           </div>
           <button onClick={cerrar} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-white/10">
             ✕

@@ -22,10 +22,12 @@ import { PreferenciasMenu } from "@/lib/types";
 //    para que la barra lateral se lea como el resto de apps de este tipo —
 //    la pantalla de destino sigue siendo la misma (/gastos con pestañas),
 //    así que no hace falta ninguna pantalla nueva.
-//  - No incluye Auto/Salud/Ingresos/Calendario/Admin — esos quedan
-//    alcanzables desde "Más" (al final de esta lista), igual que en el
-//    celular, para no saturar la barra. Quedará para otra pasada decidir
-//    si conviene subir alguno acá.
+//  - Calendario/Movimientos/Auto/Salud/Ingresos no vienen en el menú por
+//    defecto (ver ITEMS_OPCIONALES más abajo) — están ahí para no saturar
+//    la barra de entrada, pero desde "Personalizar menú" se pueden prender
+//    y sumar al lado de los demás. Admin sigue aparte (bloque propio más
+//    abajo, gateado por esAdmin): no es personalizable a propósito, la
+//    visibilidad ya la decide si la cuenta es admin o no.
 // `key` es la identidad ESTABLE de cada ítem para personalizar el menú (ver
 // PersonalizarMenu.tsx y migration_24_preferencias_menu.sql) — no se usa el
 // href porque dos ítems ("fijos"/"cuotas") comparten el mismo href base
@@ -38,12 +40,17 @@ import { PreferenciasMenu } from "@/lib/types";
 // `activo` opcional, y se pueden combinar con spread (`[...itemsFiltrados,
 // ITEM_MAS]`) sin que TypeScript se queje de que "activo" no existe en
 // alguno de los dos — cosa que si pasaba dejando que se infiriera solo.
+//
+// `ocultoPorDefecto` marca los ítems "opcionales" (ver ITEMS_OPCIONALES):
+// no vienen activados de fábrica, el usuario los suma a mano desde
+// "Personalizar menú" prendiendo su interruptor — ver aplicarPreferencias.
 type ItemMenu = {
   key: string;
   href: string;
   label: string;
   icon: (activo: boolean) => ReactNode;
   activo?: (pathname: string) => boolean;
+  ocultoPorDefecto?: boolean;
 };
 
 const ITEMS: ItemMenu[] = [
@@ -156,6 +163,88 @@ const ITEMS: ItemMenu[] = [
   },
 ];
 
+// Ítems que hoy solo se ven en "Más" (celular y el propio "Más" de esta
+// barra) pero se pueden sumar al menú lateral desde "Personalizar menú" —
+// mismos íconos que navItems.tsx, para que se vean igual que en el celular.
+// `ocultoPorDefecto: true` es lo que los mantiene afuera hasta que el
+// usuario los prenda a mano (ver aplicarPreferencias).
+const ITEMS_OPCIONALES: ItemMenu[] = [
+  {
+    key: "calendario",
+    href: "/calendario-pagos",
+    label: "Calendario",
+    ocultoPorDefecto: true,
+    icon: (a: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+        <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
+        <path d="M3.5 9.5h17" strokeLinecap="round" />
+        <path d="M8 3v3M16 3v3" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "movimientos",
+    href: "/movimientos",
+    label: "Movimientos",
+    ocultoPorDefecto: true,
+    icon: (a: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+        <path d="M4 8h13.5M14 4.5 17.5 8 14 11.5" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M20 16H6.5M10 12.5 6.5 16 10 19.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "auto",
+    href: "/auto",
+    label: "Auto",
+    ocultoPorDefecto: true,
+    icon: (a: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+        <path
+          d="M4 16v-3.5a2 2 0 0 1 1.2-1.8l1.3-3.4A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.3l1.3 3.4a2 2 0 0 1 1.2 1.8V16"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M4 16h16" strokeLinecap="round" />
+        <circle cx="7.5" cy="16.5" r="1.5" />
+        <circle cx="16.5" cy="16.5" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    key: "salud",
+    href: "/salud",
+    label: "Salud",
+    ocultoPorDefecto: true,
+    icon: (a: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+        <path
+          d="M12 20s-7-4.35-9.5-8.5C.8 8.2 2.4 5 5.6 5c1.8 0 3.1 1 4.4 2.6C11.3 6 12.6 5 14.4 5c3.2 0 4.8 3.2 3.1 6.5C15 15.65 12 20 12 20Z"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "ingresos",
+    href: "/ingresos",
+    label: "Ingresos",
+    ocultoPorDefecto: true,
+    icon: (a: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+        <path d="M4 16 9.5 10.5 13.5 14.5 20 8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14.5 8H20v5.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+];
+
+// Pool completo de ítems personalizables: los de fábrica + los opcionales.
+// "Más" no entra acá — no es personalizable, se agrega aparte al final.
+const ITEMS_TODOS: ItemMenu[] = [...ITEMS, ...ITEMS_OPCIONALES];
+
 const ITEM_MAS: ItemMenu = {
   key: "mas",
   href: "/mas",
@@ -173,15 +262,23 @@ const ITEM_MAS: ItemMenu = {
 // Aplica la personalización guardada (orden + ocultos) sobre la lista base:
 // primero los ítems que están en `orden` (en ese orden), después cualquier
 // ítem nuevo que no estuviera guardado todavía (agregado al código después
-// de que la cuenta personalizó por última vez), y al final se sacan los
-// ocultos. "Más" no pasa por acá: se agrega siempre al final, aparte.
+// de que la cuenta personalizó por última vez, o un opcional que todavía
+// nunca se guardó), y al final se sacan los ocultos. Un ítem "nuevo" con
+// `ocultoPorDefecto` (ver ITEMS_OPCIONALES) arranca oculto hasta que el
+// usuario lo prenda a mano y guarde — así sumar Calendario/Auto/etc. al
+// catálogo personalizable no hace que aparezcan solos en el menú de nadie.
+// "Más" no pasa por acá: se agrega siempre al final, aparte.
 function aplicarPreferencias(base: ItemMenu[], prefs: PreferenciasMenu | null): ItemMenu[] {
-  if (!prefs || prefs.orden.length === 0) return base;
+  const orden = prefs?.orden ?? [];
   const porKey = new Map(base.map((item) => [item.key, item]));
-  const ordenados = prefs.orden.map((k) => porKey.get(k)).filter((i): i is ItemMenu => !!i);
-  const yaIncluidos = new Set(prefs.orden);
+  const ordenados = orden.map((k) => porKey.get(k)).filter((i): i is ItemMenu => !!i);
+  const yaIncluidos = new Set(orden);
   const nuevos = base.filter((item) => !yaIncluidos.has(item.key));
-  return [...ordenados, ...nuevos].filter((item) => !prefs.ocultos.includes(item.key));
+  const ocultos = new Set(prefs?.ocultos ?? []);
+  nuevos.forEach((item) => {
+    if (item.ocultoPorDefecto) ocultos.add(item.key);
+  });
+  return [...ordenados, ...nuevos].filter((item) => !ocultos.has(item.key));
 }
 
 export function DesktopSidebar() {
@@ -206,7 +303,7 @@ export function DesktopSidebar() {
   }, [session]);
 
   const esAdmin = checkEsAdmin(session?.user?.email);
-  const itemsOrdenados = [...aplicarPreferencias(ITEMS, prefs), ITEM_MAS];
+  const itemsOrdenados = [...aplicarPreferencias(ITEMS_TODOS, prefs), ITEM_MAS];
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -299,7 +396,7 @@ export function DesktopSidebar() {
 
       {mostrarPersonalizar && (
         <PersonalizarMenu
-          items={ITEMS}
+          items={ITEMS_TODOS}
           prefs={prefs}
           onClose={() => setMostrarPersonalizar(false)}
           onGuardado={(nuevo) => {
