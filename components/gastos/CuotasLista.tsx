@@ -12,7 +12,8 @@ import { IconoPicker } from "@/components/IconoPicker";
 import { ItemDesplegable } from "@/components/ItemDesplegable";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
-import { formatCLP } from "@/lib/format";
+import { diaDelMes, formatCLP } from "@/lib/format";
+import { fechaPrimeraCuotaDesde } from "@/lib/cuotas";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { Categoria, CompraVigente, Entidad, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
 
@@ -33,15 +34,27 @@ export function CuotasLista() {
   const [error, setError] = useState("");
 
   const [descripcion, setDescripcion] = useState("");
-  const [montoTotal, setMontoTotal] = useState("");
+  const [montoCuota, setMontoCuota] = useState("");
   const [nCuotas, setNCuotas] = useState("1");
-  const [fechaPrimeraCuota, setFechaPrimeraCuota] = useState(() => new Date().toISOString().slice(0, 10));
+  // "¿En qué cuota vas?" reemplaza el antiguo campo "Fecha de la primera
+  // cuota": casi nadie sabe esa fecha de memoria, pero sí en qué número de
+  // cuota va. diaVencimiento es interno (no se pide en el formulario): al
+  // crear, se usa el día de hoy; al editar, se conserva el día que ya tenía
+  // guardado la compra — ver fechaPrimeraCuotaDesde en lib/cuotas.ts.
+  const [cuotaActual, setCuotaActual] = useState("1");
+  const [diaVencimiento, setDiaVencimiento] = useState<number>(() => new Date().getDate());
   const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [grupoId, setGrupoId] = useState("");
   const [marcaId, setMarcaId] = useState("");
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
+
+  // Si en la cuenta solo hay una persona activa (el caso normal de una sola
+  // persona usando la app), no tiene sentido preguntar "¿quiénes
+  // participan?" — se asigna sola, sin mostrar el selector. Apenas se
+  // agregue una segunda persona, el selector vuelve a aparecer.
+  const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargarTodo() {
     const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: ip }] =
@@ -78,9 +91,10 @@ export function CuotasLista() {
     setMostrarForm(false);
     setEditandoId(null);
     setDescripcion("");
-    setMontoTotal("");
+    setMontoCuota("");
     setNCuotas("1");
-    setFechaPrimeraCuota(new Date().toISOString().slice(0, 10));
+    setCuotaActual("1");
+    setDiaVencimiento(new Date().getDate());
     setEntidadId("");
     setCategoriaId("");
     setGrupoId("");
@@ -90,19 +104,33 @@ export function CuotasLista() {
     setError("");
   }
 
+  function abrirFormNuevo() {
+    if (unicaPersona) setParticipantes([{ persona_id: unicaPersona.id, porcentaje: null }]);
+    setMostrarForm(true);
+  }
+
   function iniciarEdicion(c: CompraVigente) {
     setEditandoId(c.compra_id);
     setDescripcion(c.descripcion);
-    setMontoTotal(String(c.monto_total));
+    setMontoCuota(String(c.monto_cuota));
     setNCuotas(String(c.n_cuotas));
-    setFechaPrimeraCuota(c.fecha_primera_cuota.slice(0, 10));
+    setCuotaActual(String(c.cuota_actual));
+    setDiaVencimiento(diaDelMes(c.fecha_primera_cuota));
     setEntidadId(c.entidad_id ?? "");
     setCategoriaId(c.categoria_id ?? "");
     setGrupoId(c.grupo_id ?? "");
     setMarcaId(c.marca_id ?? "");
     setIcono(c.icono ?? "");
+    const participantesExistentes = (participantesPorItem[c.compra_id] ?? []).map((row) => ({
+      persona_id: row.persona_id,
+      porcentaje: row.porcentaje,
+    }));
     setParticipantes(
-      (participantesPorItem[c.compra_id] ?? []).map((row) => ({ persona_id: row.persona_id, porcentaje: row.porcentaje }))
+      participantesExistentes.length > 0
+        ? participantesExistentes
+        : unicaPersona
+          ? [{ persona_id: unicaPersona.id, porcentaje: null }]
+          : []
     );
     setMostrarForm(true);
   }
@@ -131,11 +159,18 @@ export function CuotasLista() {
     }
     setGuardando(true);
     try {
+      const nCuotasNum = Math.max(1, Number(nCuotas) || 1);
+      const montoCuotaNum = Number(montoCuota);
+      // "En qué cuota vas" no puede pasarse de la cantidad total de cuotas.
+      const cuotaActualNum = Math.min(Math.max(1, Number(cuotaActual) || 1), nCuotasNum);
       const payload = {
         descripcion,
-        monto_total: Number(montoTotal),
-        n_cuotas: Number(nCuotas),
-        fecha_primera_cuota: fechaPrimeraCuota,
+        // No se guarda un "monto total" que la persona tenga que calcular:
+        // se deriva de cuota × cantidad de cuotas (ver nota del campo en el
+        // formulario sobre intereses/cargos que el banco pueda sumar aparte).
+        monto_total: Math.round(montoCuotaNum * nCuotasNum),
+        n_cuotas: nCuotasNum,
+        fecha_primera_cuota: fechaPrimeraCuotaDesde(cuotaActualNum, diaVencimiento),
         entidad_id: entidadId || null,
         categoria_id: categoriaId || null,
         grupo_id: grupoId || null,
@@ -193,7 +228,7 @@ export function CuotasLista() {
       <div className="flex items-center justify-between">
         <p className="text-xs text-gray-400">La cuota vigente se calcula sola cada mes, con la fecha de hoy.</p>
         <button
-          onClick={() => (mostrarForm ? cancelarForm() : setMostrarForm(true))}
+          onClick={() => (mostrarForm ? cancelarForm() : abrirFormNuevo())}
           className="shrink-0 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
         >
           {mostrarForm ? "Cancelar" : "+ Nueva"}
@@ -223,17 +258,6 @@ export function CuotasLista() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-500">Monto total</label>
-                <input
-                  required
-                  type="number"
-                  min={1}
-                  value={montoTotal}
-                  onChange={(e) => setMontoTotal(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
-                />
-              </div>
-              <div>
                 <label className="text-xs text-gray-500">N° de cuotas</label>
                 <input
                   required
@@ -244,17 +268,40 @@ export function CuotasLista() {
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
                 />
               </div>
+              <div>
+                <label className="text-xs text-gray-500">Valor de la cuota</label>
+                <input
+                  required
+                  type="number"
+                  min={1}
+                  value={montoCuota}
+                  onChange={(e) => setMontoCuota(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
+                />
+              </div>
             </div>
             <div>
-              <label className="text-xs text-gray-500">Fecha de la primera cuota</label>
+              <label className="text-xs text-gray-500">¿En qué cuota vas?</label>
               <input
                 required
-                type="date"
-                value={fechaPrimeraCuota}
-                onChange={(e) => setFechaPrimeraCuota(e.target.value)}
+                type="number"
+                min={1}
+                max={nCuotas || undefined}
+                value={cuotaActual}
+                onChange={(e) => setCuotaActual(e.target.value)}
                 className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm"
               />
+              <p className="mt-1 text-[11px] text-gray-400">
+                Si es una compra nueva, deja &quot;1&quot;. Si ya venías pagando, escribe en qué cuota vas hoy — no
+                hace falta calcular la fecha de la primera cuota, se calcula sola.
+              </p>
             </div>
+            {nCuotas && montoCuota && (
+              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from">
+                Total del crédito: {formatCLP(Number(nCuotas) * Number(montoCuota))} — aproximado, sin contar
+                intereses u otros cargos que el banco sume aparte.
+              </p>
+            )}
             <div>
               <label className="text-xs text-gray-500">Tarjeta / medio de pago</label>
               <div className="mt-1">
@@ -323,7 +370,7 @@ export function CuotasLista() {
               <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from">
                 El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;. Para cambiarlo, ve a Grupos.
               </p>
-            ) : (
+            ) : unicaPersona ? null : (
               <div>
                 <label className="text-xs text-gray-500">¿Quiénes participan?</label>
                 <p className="mb-1 text-[11px] text-gray-400">
@@ -333,7 +380,7 @@ export function CuotasLista() {
                   personas={personas}
                   value={participantes}
                   onChange={setParticipantes}
-                  montoTotal={montoTotal ? Math.round(Number(montoTotal) / Number(nCuotas || "1")) : undefined}
+                  montoTotal={montoCuota ? Number(montoCuota) : undefined}
                 />
               </div>
             )}
@@ -423,7 +470,7 @@ export function CuotasLista() {
                     </div>
                     <dl className="mt-3 space-y-1.5 text-xs">
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Monto total</dt>
+                        <dt className="text-gray-400">Total del crédito (aprox.)</dt>
                         <dd className="font-medium text-gray-700">{formatCLP(c.monto_total)}</dd>
                       </div>
                       <div className="flex justify-between gap-3">
@@ -434,8 +481,8 @@ export function CuotasLista() {
                         </dd>
                       </div>
                       <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400">Primera cuota</dt>
-                        <dd className="font-medium text-gray-700">{c.fecha_primera_cuota.slice(0, 10)}</dd>
+                        <dt className="text-gray-400">Vence</dt>
+                        <dd className="font-medium text-gray-700">Día {diaDelMes(c.fecha_primera_cuota)} de cada mes</dd>
                       </div>
                       <div className="flex justify-between gap-3">
                         <dt className="text-gray-400">Tarjeta / medio de pago</dt>

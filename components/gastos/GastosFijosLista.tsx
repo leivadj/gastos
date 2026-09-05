@@ -47,6 +47,12 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
 
+  // Si en la cuenta solo hay una persona activa (el caso normal de una sola
+  // persona usando la app), no tiene sentido preguntar "¿quiénes
+  // participan?" — se asigna sola, sin mostrar el selector. Apenas se
+  // agregue una segunda persona, el selector vuelve a aparecer.
+  const unicaPersona = personas.length === 1 ? personas[0] : null;
+
   async function cargarTodo() {
     const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: ip }, { data: pg }] =
       await Promise.all([
@@ -99,6 +105,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
 
   function abrirFormNuevo() {
     setTipoMonto(tabTipoMonto);
+    if (unicaPersona) setParticipantes([{ persona_id: unicaPersona.id, porcentaje: null }]);
     setMostrarForm(true);
   }
 
@@ -113,8 +120,16 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setGrupoId(g.grupo_id ?? "");
     setMarcaId(g.marca_id ?? "");
     setIcono(g.icono ?? "");
+    const participantesExistentes = (participantesPorItem[g.id] ?? []).map((row) => ({
+      persona_id: row.persona_id,
+      porcentaje: row.porcentaje,
+    }));
     setParticipantes(
-      (participantesPorItem[g.id] ?? []).map((row) => ({ persona_id: row.persona_id, porcentaje: row.porcentaje }))
+      participantesExistentes.length > 0
+        ? participantesExistentes
+        : unicaPersona
+          ? [{ persona_id: unicaPersona.id, porcentaje: null }]
+          : []
     );
     setMostrarForm(true);
   }
@@ -365,7 +380,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
               <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from">
                 El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;. Para cambiarlo, ve a Grupos.
               </p>
-            ) : (
+            ) : unicaPersona ? null : (
               <div>
                 <label className="text-xs text-gray-500">¿Quiénes participan?</label>
                 <p className="mb-1 text-[11px] text-gray-400">
