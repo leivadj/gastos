@@ -7,9 +7,22 @@ import { ReactNode } from "react";
 // ilegible. Si en el futuro se agrega una pantalla nueva, sus <Card> ya
 // salen oscuras solas: solo hace falta agregarle las clases dark: al
 // contenido de adentro.
-export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function Card({
+  children,
+  className = "",
+  onClick,
+}: {
+  children: ReactNode;
+  className?: string;
+  // Opcional: para tarjetas clicleables (ej. las de /personas, que abren el
+  // desglose de esa persona) — el resto de los usos de Card no lo pasan y
+  // siguen igual que siempre.
+  onClick?: () => void;
+}) {
   return (
-    <div className={`rounded-2xl bg-white p-5 shadow-sm dark:bg-gray-900 dark:shadow-none ${className}`}>{children}</div>
+    <div className={`rounded-2xl bg-white p-5 shadow-sm dark:bg-gray-900 dark:shadow-none ${className}`} onClick={onClick}>
+      {children}
+    </div>
   );
 }
 

@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Categoria, Entidad, Marca, RepartoCuota, RepartoGastoFijo } from "@/lib/types";
+import { supabase } from "@/lib/supabaseClient";
+import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
+import { Categoria, Entidad, Ingreso, Marca, RepartoCuota, RepartoGastoFijo } from "@/lib/types";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
-import { formatCLP } from "@/lib/format";
+import { formatCLP, mesActualISO } from "@/lib/format";
+import { mensajeError } from "@/lib/supabaseError";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { exportarDesglosePersonaPdf } from "@/lib/exportarPdf";
 
@@ -17,6 +20,9 @@ export function PersonaBreakdown({
   entidades,
   marcas,
   onClose,
+  personaId,
+  ingresosPersona,
+  onIngresosActualizados,
 }: {
   personaNombre: string;
   mesLabel: string;
@@ -27,6 +33,13 @@ export function PersonaBreakdown({
   entidades: Entidad[];
   marcas: Marca[];
   onClose: () => void;
+  // Sección "Ingresos este mes", editable ahí mismo — opcional: solo aparece
+  // cuando quien abre el panel (hoy, /personas) pasa estos 3 props. El
+  // dashboard (Inicio) sigue abriendo este mismo panel sin ellos, sin
+  // cambios de comportamiento.
+  personaId?: string;
+  ingresosPersona?: Ingreso[];
+  onIngresosActualizados?: () => void | Promise<void>;
 }) {
   // Efecto "panel-reveal" (transitions.dev): el panel entra deslizándose
   // desde abajo con un leve cross-blur en vez de aparecer de golpe, y sale
@@ -76,6 +89,80 @@ export function PersonaBreakdown({
     })),
   ].sort((a, b) => b.monto - a.monto);
 
+  // --- Ingresos este mes: alta/edición/borrado ahí mismo, sin salir del
+  // panel (antes solo se podía desde /ingresos, filtrando a mano). ---
+  const [agregandoIngreso, setAgregandoIngreso] = useState(false);
+  const [montoNuevo, setMontoNuevo] = useState("");
+  const [descNuevo, setDescNuevo] = useState("");
+  const [editandoIngresoId, setEditandoIngresoId] = useState<string | null>(null);
+  const [montoEdit, setMontoEdit] = useState("");
+  const [descEdit, setDescEdit] = useState("");
+  const [guardandoIngreso, setGuardandoIngreso] = useState(false);
+  const [errorIngreso, setErrorIngreso] = useState("");
+
+  function avisarIngresoGuardado() {
+    window.dispatchEvent(new CustomEvent(EVENTO_MOVIMIENTO_GUARDADO, { detail: { tipo: "ingreso" } }));
+  }
+
+  async function actualizar() {
+    if (onIngresosActualizados) await onIngresosActualizados();
+    avisarIngresoGuardado();
+  }
+
+  async function agregarIngreso() {
+    if (!personaId || !montoNuevo) return;
+    setErrorIngreso("");
+    setGuardandoIngreso(true);
+    const { error } = await supabase.from("ingresos").insert({
+      persona_id: personaId,
+      monto: Number(montoNuevo),
+      mes: mesActualISO(),
+      descripcion: descNuevo || null,
+    });
+    setGuardandoIngreso(false);
+    if (error) {
+      setErrorIngreso(mensajeError(error) || "No se pudo agregar el ingreso.");
+      return;
+    }
+    setMontoNuevo("");
+    setDescNuevo("");
+    setAgregandoIngreso(false);
+    await actualizar();
+  }
+
+  function iniciarEdicionIngreso(ing: Ingreso) {
+    setEditandoIngresoId(ing.id);
+    setMontoEdit(String(ing.monto));
+    setDescEdit(ing.descripcion ?? "");
+    setErrorIngreso("");
+  }
+
+  async function guardarEdicionIngreso(id: string) {
+    if (!montoEdit) return;
+    setErrorIngreso("");
+    setGuardandoIngreso(true);
+    const { error } = await supabase
+      .from("ingresos")
+      .update({ monto: Number(montoEdit), descripcion: descEdit || null })
+      .eq("id", id);
+    setGuardandoIngreso(false);
+    if (error) {
+      setErrorIngreso(mensajeError(error) || "No se pudo guardar el ingreso.");
+      return;
+    }
+    setEditandoIngresoId(null);
+    await actualizar();
+  }
+
+  async function eliminarIngreso(id: string) {
+    const { error } = await supabase.from("ingresos").delete().eq("id", id);
+    if (error) {
+      setErrorIngreso(mensajeError(error) || "No se pudo eliminar el ingreso.");
+      return;
+    }
+    await actualizar();
+  }
+
   function exportarPdf() {
     exportarDesglosePersonaPdf({
       personaNombre,
@@ -113,6 +200,125 @@ export function PersonaBreakdown({
 
         <p className="mt-3 text-2xl font-bold text-brand-from dark:text-pink-400">{formatCLP(total)}</p>
         <p className="text-xs text-gray-400 dark:text-gray-500">Total que le corresponde este mes</p>
+
+        {personaId && ingresosPersona && (
+          <div className="mt-4 rounded-xl border border-gray-100 p-3 dark:border-white/10">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Ingresos este mes</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setAgregandoIngreso((v) => !v);
+                  setErrorIngreso("");
+                }}
+                className="text-xs font-medium text-brand-from dark:text-pink-400"
+              >
+                {agregandoIngreso ? "cancelar" : "+ Agregar"}
+              </button>
+            </div>
+
+            <div className="mt-2 space-y-1.5">
+              {ingresosPersona.length === 0 && !agregandoIngreso && (
+                <p className="text-xs text-gray-400 dark:text-gray-500">Sin ingresos cargados este mes.</p>
+              )}
+              {ingresosPersona.map((ing) =>
+                editandoIngresoId === ing.id ? (
+                  <div key={ing.id} className="space-y-1.5 rounded-lg bg-gray-50 p-2 dark:bg-white/5">
+                    <div className="flex gap-1.5">
+                      <input
+                        type="number"
+                        min={0}
+                        autoFocus
+                        value={montoEdit}
+                        onChange={(e) => setMontoEdit(e.target.value)}
+                        placeholder="Monto"
+                        className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      />
+                      <input
+                        value={descEdit}
+                        onChange={(e) => setDescEdit(e.target.value)}
+                        placeholder="Descripción (opcional)"
+                        className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => guardarEdicionIngreso(ing.id)}
+                        disabled={guardandoIngreso || !montoEdit}
+                        className="rounded-lg bg-brand-gradient px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-60"
+                      >
+                        Guardar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditandoIngresoId(null)}
+                        className="text-xs text-gray-400 dark:text-gray-500"
+                      >
+                        cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div key={ing.id} className="flex items-center justify-between gap-2 py-1">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-gray-700 dark:text-gray-200">{ing.descripcion || "Ingreso"}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <span className="text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(ing.monto)}</span>
+                      <button
+                        type="button"
+                        onClick={() => iniciarEdicionIngreso(ing)}
+                        className="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300"
+                      >
+                        editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => eliminarIngreso(ing.id)}
+                        className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+
+            {agregandoIngreso && (
+              <div className="mt-2 space-y-1.5 rounded-lg bg-gray-50 p-2 dark:bg-white/5">
+                <div className="flex gap-1.5">
+                  <input
+                    type="number"
+                    min={0}
+                    autoFocus
+                    value={montoNuevo}
+                    onChange={(e) => setMontoNuevo(e.target.value)}
+                    placeholder="Monto"
+                    className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  />
+                  <input
+                    value={descNuevo}
+                    onChange={(e) => setDescNuevo(e.target.value)}
+                    placeholder="Ej: Sueldo"
+                    className="flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={agregarIngreso}
+                  disabled={guardandoIngreso || !montoNuevo}
+                  className="w-full rounded-lg bg-brand-gradient py-1.5 text-xs font-semibold text-white disabled:opacity-60"
+                >
+                  {guardandoIngreso ? "Guardando…" : "Guardar ingreso"}
+                </button>
+              </div>
+            )}
+
+            {errorIngreso && <p className="mt-1.5 text-xs text-red-500 dark:text-red-400">{errorIngreso}</p>}
+          </div>
+        )}
 
         <div className="mt-4 divide-y divide-gray-100 dark:divide-white/10">
           {items.length === 0 && <p className="py-4 text-sm text-gray-400 dark:text-gray-500">Sin ítems este mes.</p>}
