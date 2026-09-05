@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
+import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { MovimientoFab } from "@/components/MovimientoRapido";
 import { PersonalizarMenu } from "@/components/PersonalizarMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { PreferenciasMenu } from "@/lib/types";
+import { resolverMarca } from "@/lib/resolverMarca";
+import { Entidad, Grupo, Marca, PreferenciasMenu } from "@/lib/types";
 
 // Sidebar fijo de escritorio — reemplaza al antiguo header horizontal
 // (DesktopNav.tsx, eliminado). El celular no se toca: sigue usando
@@ -242,7 +244,13 @@ const ITEMS_OPCIONALES: ItemMenu[] = [
 ];
 
 // Pool completo de ítems personalizables: los de fábrica + los opcionales.
-// "Más" no entra acá — no es personalizable, se agrega aparte al final.
+// "Más" no entra acá — no es personalizable, se agrega aparte al final. Ver
+// también itemsDinamicos más abajo (dentro de DesktopSidebar): agrega a este
+// mismo pool, en tiempo de ejecución, una entrada por cada cuenta/tarjeta
+// (entidades) y por cada grupo de reparto (grupos) que ya tenga cargados el
+// usuario — así "Falabella", "Paris", "Banco Estado" o "Hogar" se pueden
+// anclar al menú lateral desde "Personalizar menú" igual que Calendario o
+// Auto, sin que haya que codear cada una a mano (ver Novedades 2026-09-05).
 const ITEMS_TODOS: ItemMenu[] = [...ITEMS, ...ITEMS_OPCIONALES];
 
 const ITEM_MAS: ItemMenu = {
@@ -286,6 +294,11 @@ export function DesktopSidebar() {
   const [session, setSession] = useState<Session | null>(null);
   const [prefs, setPrefs] = useState<PreferenciasMenu | null>(null);
   const [mostrarPersonalizar, setMostrarPersonalizar] = useState(false);
+  // Para las entradas dinámicas del menú (una por cuenta/tarjeta y una por
+  // grupo de reparto) — ver itemsDinamicos más abajo y Novedades 2026-09-05.
+  const [entidades, setEntidades] = useState<Entidad[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -298,12 +311,55 @@ export function DesktopSidebar() {
     setPrefs(data ? { orden: data.orden ?? [], ocultos: data.ocultos ?? [] } : { orden: [], ocultos: [] });
   }
 
+  async function cargarCatalogosDinamicos() {
+    const [{ data: e }, { data: g }, { data: m }] = await Promise.all([
+      supabase.from("entidades").select("*").order("nombre"),
+      supabase.from("grupos").select("*").order("nombre"),
+      supabase.from("marcas").select("*"),
+    ]);
+    setEntidades((e as Entidad[]) ?? []);
+    setGrupos((g as Grupo[]) ?? []);
+    setMarcas((m as Marca[]) ?? []);
+  }
+
   useEffect(() => {
-    if (session) cargarPreferencias();
+    if (session) {
+      cargarPreferencias();
+      cargarCatalogosDinamicos();
+    }
   }, [session]);
 
+  // Una entrada de menú por cada cuenta/tarjeta (ej. "Falabella", "Paris",
+  // "Banco Estado", "Caja de Compensación") y por cada grupo de reparto (ej.
+  // "Hogar") — apuntan a /entidad/[id] y /grupo/[id] (ver esas pantallas),
+  // que listan todo lo activo de esa cuenta o grupo con sus cuotas
+  // restantes y quién debe pagar cada ítem. Igual que Calendario/Auto, nacen
+  // ocultas (ocultoPorDefecto) hasta que el usuario las prenda a mano desde
+  // "Personalizar menú" — así tener 6 tarjetas cargadas no llena el menú de
+  // nadie solo. El logo/ícono sale del catálogo de marcas cuando la cuenta
+  // tiene una asociada (mismo criterio que EntidadAvatar en /tarjetas).
+  const itemsDinamicos = useMemo<ItemMenu[]>(() => {
+    const deEntidades: ItemMenu[] = entidades.map((e) => ({
+      key: `entidad:${e.id}`,
+      href: `/entidad/${e.id}`,
+      label: e.nombre,
+      ocultoPorDefecto: true,
+      icon: () => <EntidadAvatar entidad={e} marca={resolverMarca(e, marcas)} className="h-5 w-5 rounded-md" />,
+    }));
+    const deGrupos: ItemMenu[] = grupos.map((g) => ({
+      key: `grupo:${g.id}`,
+      href: `/grupo/${g.id}`,
+      label: g.nombre,
+      ocultoPorDefecto: true,
+      icon: () => <EntidadAvatar icono={g.icono} nombreFallback={g.nombre} className="h-5 w-5 rounded-md" />,
+    }));
+    return [...deEntidades, ...deGrupos];
+  }, [entidades, grupos, marcas]);
+
+  const todosLosItems = useMemo(() => [...ITEMS_TODOS, ...itemsDinamicos], [itemsDinamicos]);
+
   const esAdmin = checkEsAdmin(session?.user?.email);
-  const itemsOrdenados = [...aplicarPreferencias(ITEMS_TODOS, prefs), ITEM_MAS];
+  const itemsOrdenados = [...aplicarPreferencias(todosLosItems, prefs), ITEM_MAS];
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -396,7 +452,7 @@ export function DesktopSidebar() {
 
       {mostrarPersonalizar && (
         <PersonalizarMenu
-          items={ITEMS_TODOS}
+          items={todosLosItems}
           prefs={prefs}
           onClose={() => setMostrarPersonalizar(false)}
           onGuardado={(nuevo) => {

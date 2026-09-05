@@ -126,7 +126,7 @@ export function PersonalizarMenu({
             <p className="text-lg font-bold text-gray-800 dark:text-white">Personalizar menú</p>
             <p className="text-xs text-gray-400 dark:text-gray-500">
               Arrastrá para reordenar, o prendé/apagá los que querés ver acá — incluye ítems de "Más" como
-              Calendario o Auto.
+              Calendario o Auto, y también tus cuentas/tarjetas y tus grupos de reparto (ej. Falabella, Hogar).
             </p>
           </div>
           <button onClick={cerrar} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-white/10">
