@@ -5,12 +5,10 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { EntidadPicker } from "@/components/EntidadPicker";
 import { IconoPicker } from "@/components/IconoPicker";
-import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
-import { TIPO_LABEL } from "@/components/TarjetaVisual";
 import { fechaPrimeraCuotaDesde } from "@/lib/cuotas";
-import { resolverMarca } from "@/lib/resolverMarca";
 import { formatCLP } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
 import {
@@ -31,37 +29,49 @@ type ItemFila = {
   key: string;
   descripcion: string;
   categoria: string;
+  entidad: string;
   detalle: string;
   monto: number;
-  marcaId: string | null;
   icono: string | null;
   reparto: { persona_nombre: string; monto_persona: number }[];
 };
 
 type TipoItem = "cuota" | "fijo";
 
-// Pantalla de detalle de UNA cuenta/tarjeta (ej. "Falabella", "Paris", "Banco
-// Estado", "Caja de Compensación") — se llega acá desde "Personalizar menú"
-// del sidebar de escritorio (ver DesktopSidebar.tsx), ancladas ahí a pedido
-// del usuario. Pensada para el caso real: Marian presta estas tarjetas a
-// terceros y necesita ver de un vistazo qué hay cargado en cada una, cuántas
-// cuotas quedan y a quién le corresponde pagar cada ítem — y desde acá mismo
-// cargar un ítem nuevo (compra en cuotas o gasto fijo) SIN tener que ir a
-// /gastos y elegir la tarjeta a mano, ya que ya se sabe con cuál se está
-// mirando.
+const LABEL_TIPO_MARCA: Record<string, string> = {
+  banco: "Banco",
+  casa_comercial: "Casa comercial",
+  caja_compensacion: "Caja de compensación",
+  autopista: "Autopista / TAG",
+  telecom: "Internet / Móvil",
+  servicio_basico: "Servicio básico",
+  supermercado: "Supermercado",
+  transporte: "Pasajes",
+  compras_online: "Compras online",
+  delivery: "Delivery",
+  suscripcion: "Suscripción",
+  otro: "Marca",
+};
+
+// Pantalla de detalle de UNA marca del catálogo compartido (ej. "Falabella",
+// "Ripley", "Banco Estado") — se llega acá desde "Personalizar menú" del
+// sidebar de escritorio (ver DesktopSidebar.tsx), que ahora también ofrece
+// anclar CUALQUIER marca de tipo "Casa comercial" o "Banco" del catálogo, no
+// solo las que ya se convirtieron en una cuenta/tarjeta propia (ver
+// /entidad/[id] para esa otra vista, filtrada por MEDIO DE PAGO en vez de
+// por marca del ítem — son dos cosas distintas: un mismo ítem puede estar
+// pagado con la tarjeta "Falabella" pero ser, como marca, "Ripley").
 //
-// A propósito NO filtra por mes (a diferencia de "Movimientos" en
-// /tarjetas): reutiliza las mismas vistas de "vigente ahora" que ya usa esa
-// pantalla (vista_cuotas_mes_actual ya representa la cuota activa de cada
-// compra, con su n_cuotas total — no hace falta un filtro de mes aparte para
-// ver "todo lo activo, con cuotas restantes") y gastos_fijos activos, así
-// que el resultado es siempre "el estado actual", listo para informar en
-// cualquier momento sin esperar a fin de mes.
-export default function EntidadDetallePage({ params }: { params: { id: string } }) {
+// Junta todo lo activo (cuotas vigentes + gastos fijos) cuyo `marca_id` sea
+// esta marca, sin importar con qué cuenta se pagó, y permite cargar un ítem
+// nuevo con esa marca ya fija (eligiendo con qué cuenta se paga, si
+// corresponde).
+export default function MarcaDetallePage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
-  const [entidad, setEntidad] = useState<Entidad | null>(null);
+  const [marca, setMarca] = useState<Marca | null>(null);
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
@@ -82,40 +92,42 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
   const [diaVencimiento, setDiaVencimiento] = useState<number>(() => new Date().getDate());
   const [montoEstimado, setMontoEstimado] = useState("");
   const [diaMesPago, setDiaMesPago] = useState<number>(() => new Date().getDate());
+  const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [grupoId, setGrupoId] = useState("");
-  const [marcaId, setMarcaId] = useState("");
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
   const [grupoEsAutomatico, setGrupoEsAutomatico] = useState(false);
 
   const unicaPersona = personas.length === 1 ? personas[0] : null;
-  const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId) ?? null;
 
   async function cargar() {
     setCargando(true);
     setNoEncontrada(false);
-    const [{ data: e }, { data: m }, { data: cat }, { data: gr }, { data: p }, { data: cgp }, { data: c }, { data: gf }, { data: rc }, { data: rg }] =
+    const [{ data: mc }, { data: m }, { data: ent }, { data: cat }, { data: gr }, { data: p }, { data: cgp }, { data: c }, { data: gf }, { data: rc }, { data: rg }] =
       await Promise.all([
-        supabase.from("entidades").select("*").eq("id", id).maybeSingle(),
+        supabase.from("marcas").select("*").eq("id", id).maybeSingle(),
         supabase.from("marcas").select("*"),
+        supabase.from("entidades").select("*").order("nombre"),
         supabase.from("categorias").select("*").order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("categoria_grupo_preferido").select("*"),
-        supabase.from("vista_cuotas_mes_actual").select("*").eq("entidad_id", id),
-        supabase.from("gastos_fijos").select("*").eq("entidad_id", id).eq("activo", true),
-        supabase.from("vista_reparto_cuotas_mes").select("*").eq("entidad_id", id),
-        supabase.from("vista_reparto_gastos_fijos").select("*").eq("entidad_id", id),
+        supabase.from("vista_cuotas_mes_actual").select("*").eq("marca_id", id),
+        supabase.from("gastos_fijos").select("*").eq("marca_id", id).eq("activo", true),
+        supabase.from("vista_reparto_cuotas_mes").select("*").eq("marca_id", id),
+        supabase.from("vista_reparto_gastos_fijos").select("*").eq("marca_id", id),
       ]);
-    if (!e) {
+    if (!mc) {
       setNoEncontrada(true);
-      setEntidad(null);
+      setMarca(null);
       setCargando(false);
       return;
     }
-    setEntidad(e as Entidad);
+    setMarca(mc as Marca);
     setMarcas((m as Marca[]) ?? []);
+    const entidadesData = (ent as Entidad[]) ?? [];
+    setEntidades(entidadesData);
     const categoriasData = (cat as Categoria[]) ?? [];
     setCategorias(categoriasData);
     setGrupos((gr as Grupo[]) ?? []);
@@ -127,6 +139,7 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
     setPreferidoPorCategoria(mapaPreferido);
 
     const categoriaNombre = (catId: string | null) => categoriasData.find((x) => x.id === catId)?.nombre ?? "Sin categoría";
+    const entidadNombre = (entId: string | null) => entidadesData.find((x) => x.id === entId)?.nombre ?? "Sin cuenta";
     const repartoCuotas = (rc as RepartoCuota[]) ?? [];
     const repartoGastos = (rg as RepartoGastoFijo[]) ?? [];
 
@@ -135,9 +148,9 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
         key: `c-${x.compra_id}`,
         descripcion: x.descripcion,
         categoria: categoriaNombre(x.categoria_id),
+        entidad: entidadNombre(x.entidad_id),
         detalle: `Cuota ${x.cuota_actual} de ${x.n_cuotas}`,
         monto: Number(x.monto_cuota),
-        marcaId: x.marca_id,
         icono: x.icono,
         reparto: repartoCuotas
           .filter((r) => r.compra_id === x.compra_id)
@@ -147,9 +160,9 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
         key: `g-${x.id}`,
         descripcion: x.descripcion,
         categoria: categoriaNombre(x.categoria_id),
+        entidad: entidadNombre(x.entidad_id),
         detalle: "Gasto fijo",
         monto: Number(x.monto_estimado),
-        marcaId: x.marca_id,
         icono: x.icono,
         reparto: repartoGastos
           .filter((r) => r.gasto_fijo_id === x.id)
@@ -176,9 +189,9 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
     setDiaVencimiento(new Date().getDate());
     setMontoEstimado("");
     setDiaMesPago(new Date().getDate());
+    setEntidadId("");
     setCategoriaId("");
     setGrupoId("");
-    setMarcaId("");
     setIcono("");
     setParticipantes([]);
     setGrupoEsAutomatico(false);
@@ -191,8 +204,6 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
   }
 
   function elegirCategoria(nuevaCategoriaId: string) {
-    const nuevaCategoria = categorias.find((c) => c.id === nuevaCategoriaId) ?? null;
-    if (nuevaCategoria?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
     setCategoriaId(nuevaCategoriaId);
     if (!grupoId || grupoEsAutomatico) {
       const sugerido = preferidoPorCategoria[nuevaCategoriaId] ?? "";
@@ -229,10 +240,10 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
             monto_total: Math.round(montoCuotaNum * nCuotasNum),
             n_cuotas: nCuotasNum,
             fecha_primera_cuota: fechaPrimeraCuotaDesde(cuotaActualNum, diaVencimiento),
-            entidad_id: id,
+            entidad_id: entidadId || null,
             categoria_id: categoriaId || null,
             grupo_id: grupoId || null,
-            marca_id: marcaId || null,
+            marca_id: id,
             icono: icono || null,
           })
           .select()
@@ -245,9 +256,9 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
           .insert({
             descripcion,
             categoria_id: categoriaId || null,
-            entidad_id: id,
+            entidad_id: entidadId || null,
             grupo_id: grupoId || null,
-            marca_id: marcaId || null,
+            marca_id: id,
             icono: icono || null,
             monto_estimado: Number(montoEstimado) || 0,
             dia_mes_pago: diaMesPago,
@@ -268,8 +279,6 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
     }
   }
 
-  const marcaEntidad = resolverMarca(entidad, marcas);
-  const marcaDe = (marcaId: string | null) => marcas.find((m) => m.id === marcaId) ?? null;
   const grupoDe = (grupoIdBuscado: string) => grupos.find((g) => g.id === grupoIdBuscado) ?? null;
   const totalMensual = useMemo(() => items.reduce((acc, it) => acc + it.monto, 0), [items]);
   const resumenPersonas = useMemo(() => {
@@ -284,13 +293,13 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
     return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
-  if (noEncontrada || !entidad) {
+  if (noEncontrada || !marca) {
     return (
       <div className="space-y-3 pb-10">
         <button onClick={() => router.back()} className="text-xs text-brand-from dark:text-pink-400">
           ‹ Volver
         </button>
-        <p className="text-center text-sm text-gray-400 dark:text-gray-500">No se encontró esta cuenta.</p>
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500">No se encontró esta marca.</p>
       </div>
     );
   }
@@ -303,10 +312,10 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <EntidadAvatar entidad={entidad} marca={marcaEntidad} className="h-11 w-11" />
+          <EntidadAvatar marca={marca} className="h-11 w-11" />
           <div>
-            <h1 className="text-lg font-bold text-gray-800 dark:text-white">{entidad.nombre}</h1>
-            <p className="text-xs text-gray-400 dark:text-gray-500">{TIPO_LABEL[entidad.tipo]}</p>
+            <h1 className="text-lg font-bold text-gray-800 dark:text-white">{marca.nombre}</h1>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{LABEL_TIPO_MARCA[marca.tipo] ?? "Marca"}</p>
           </div>
         </div>
         <button
@@ -348,7 +357,7 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
                 required
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                placeholder="Ej: Zapatillas Madi"
+                placeholder={`Ej: Compra en ${marca.nombre}`}
                 className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               />
             </div>
@@ -429,6 +438,13 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
             )}
 
             <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Tarjeta / medio de pago (opcional)</label>
+              <div className="mt-1">
+                <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} onCatalogoActualizado={cargar} />
+              </div>
+            </div>
+
+            <div>
               <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
               <select
                 value={categoriaId}
@@ -443,23 +459,6 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
                 ))}
               </select>
             </div>
-
-            {categoriaSeleccionada?.tipo_marca_sugerido && (
-              <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400">
-                  ¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)
-                </label>
-                <div className="mt-1">
-                  <MarcaSugeridaPicker
-                    marcas={marcas}
-                    tipo={categoriaSeleccionada.tipo_marca_sugerido}
-                    value={marcaId}
-                    onChange={setMarcaId}
-                    onCatalogoActualizado={cargar}
-                  />
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400">Grupo (opcional)</label>
@@ -527,7 +526,7 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
         <p className="text-xs text-gray-400 dark:text-gray-500">Total vigente</p>
         <p className="text-2xl font-bold text-gray-800 dark:text-white">{formatCLP(totalMensual)}</p>
         <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
-          Cuotas activas y gastos fijos cargados con esta cuenta, con lo que queda pendiente de cada uno.
+          Cuotas activas y gastos fijos con esta marca, sin importar con qué cuenta se pagaron.
         </p>
       </Card>
 
@@ -548,19 +547,19 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
       <Card>
         <p className="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle</p>
         <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
-          Todo lo activo cargado con {entidad.nombre}, con las cuotas que quedan y quién debe pagar cada ítem.
+          Todo lo activo con marca {marca.nombre}, con las cuotas que quedan y quién debe pagar cada ítem.
         </p>
         {items.length === 0 ? (
-          <p className="py-2 text-sm text-gray-400 dark:text-gray-500">Nada cargado con esta cuenta por ahora.</p>
+          <p className="py-2 text-sm text-gray-400 dark:text-gray-500">Nada cargado con esta marca por ahora.</p>
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-white/10">
             {items.map((it) => (
               <li key={it.key} className="flex items-start gap-3 py-2.5">
-                <EntidadAvatar marca={marcaDe(it.marcaId) ?? marcaEntidad} icono={it.icono} nombreFallback={it.descripcion} className="h-8 w-8" />
+                <EntidadAvatar marca={marca} icono={it.icono} nombreFallback={it.descripcion} className="h-8 w-8" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{it.descripcion}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {it.categoria} · {it.detalle}
+                    {it.categoria} · {it.detalle} · {it.entidad}
                   </p>
                   <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
                     {it.reparto.length > 0

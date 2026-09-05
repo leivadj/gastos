@@ -353,7 +353,23 @@ export function DesktopSidebar() {
       ocultoPorDefecto: true,
       icon: () => <EntidadAvatar icono={g.icono} nombreFallback={g.nombre} className="h-5 w-5 rounded-md" />,
     }));
-    return [...deEntidades, ...deGrupos];
+    // Además de las cuentas/tarjetas propias (entidades) de arriba, se puede
+    // anclar cualquier marca del catálogo compartido de tipo "casa comercial"
+    // o "banco" (ej. Ripley, Falabella, Santander) aunque la cuenta nunca la
+    // haya convertido en una entidad propia — apunta a /marca/[id], que lista
+    // los ítems cuyo marca_id (la marca del producto/servicio, no el medio de
+    // pago) coincide, sin importar con qué tarjeta se pagó cada uno. Ver
+    // distinción entidad_id vs. marca_id en schema.sql y Novedades 2026-09-05.
+    const deMarcas: ItemMenu[] = marcas
+      .filter((m) => m.tipo === "casa_comercial" || m.tipo === "banco")
+      .map((m) => ({
+        key: `marca:${m.id}`,
+        href: `/marca/${m.id}`,
+        label: m.nombre,
+        ocultoPorDefecto: true,
+        icon: () => <EntidadAvatar marca={m} className="h-5 w-5 rounded-md" />,
+      }));
+    return [...deEntidades, ...deGrupos, ...deMarcas];
   }, [entidades, grupos, marcas]);
 
   const todosLosItems = useMemo(() => [...ITEMS_TODOS, ...itemsDinamicos], [itemsDinamicos]);
