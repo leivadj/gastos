@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { mensajeError } from "@/lib/supabaseError";
 import { PreferenciasMenu } from "@/lib/types";
@@ -94,7 +95,14 @@ export function PersonalizarMenu({
     onGuardado({ orden, ocultos });
   }
 
-  return (
+  // Portal directo a document.body: este panel se abre desde DesktopSidebar,
+  // cuyo <aside> es `position: sticky` — eso crea su propio contexto de
+  // apilamiento (así lo define la spec de CSS: fixed/sticky SIEMPRE arman uno,
+  // tenga z-index o no), así que un z-index alto acá adentro no alcanza para
+  // ganarle a contenido posicionado del dashboard que venga después en el DOM
+  // (ej. tarjetas con `relative`). Renderizarlo en el body evita el problema
+  // de raíz en vez de perseguir un z-index cada vez más alto.
+  return createPortal(
     <div
       data-open={abierto}
       className="panel-reveal-backdrop fixed inset-0 z-30 flex items-end justify-center bg-black/40 px-0 sm:items-center sm:px-4"
@@ -180,6 +188,7 @@ export function PersonalizarMenu({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
