@@ -23,6 +23,29 @@ function traducirErrorMarca(err: unknown, nombreIntentado: string): string {
   return msg || "No se pudo guardar la marca.";
 }
 
+function traducirErrorMarcaEliminar(err: unknown, nombreIntentado: string): string {
+  const msg = mensajeError(err);
+  if (msg.includes("violates foreign key constraint")) {
+    return `"${nombreIntentado}" está en uso (alguna tarjeta/cuenta, gasto o compra la tiene asociada) — no se puede eliminar del catálogo mientras esté en uso.`;
+  }
+  return msg || "No se pudo eliminar la marca.";
+}
+
+// Categorías es compartida igual que marcas (sin owner_id), pero a
+// diferencia de marcas, hasta ahora solo se podía crear/renombrar/borrar por
+// SQL — el ícono y la marca sugerida ya eran editables acá. Mismo criterio
+// de traducción de errores que marcas: nombre duplicado y borrado en uso.
+function traducirErrorCategoria(err: unknown, nombreIntentado: string, accion: "guardar" | "eliminar"): string {
+  const msg = mensajeError(err);
+  if (msg.includes("categorias_nombre_key")) {
+    return `Ya existe una categoría llamada "${nombreIntentado}" — elige otro nombre o edita la que ya está en la lista.`;
+  }
+  if (accion === "eliminar" && msg.includes("violates foreign key constraint")) {
+    return `"${nombreIntentado}" está en uso (algún gasto o compra la tiene asociada) — no se puede eliminar mientras esté en uso. Podés dejarla sin usar en vez de borrarla.`;
+  }
+  return msg || (accion === "eliminar" ? "No se pudo eliminar la categoría." : "No se pudo guardar la categoría.");
+}
+
 const TIPOS: { value: TipoMarca; label: string }[] = [
   { value: "banco", label: "Banco" },
   { value: "casa_comercial", label: "Casa comercial" },
@@ -53,6 +76,17 @@ export default function AdminPage() {
   const [icono, setIcono] = useState("");
   const [archivo, setArchivo] = useState<File | null>(null);
   const [subiendoId, setSubiendoId] = useState<string | null>(null);
+
+  // --- Categorías: alta y edición de nombre/tipo (ícono y marca sugerida ya
+  // eran editables desde acá) ---
+  const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
+  const [guardandoCategoria, setGuardandoCategoria] = useState(false);
+  const [nombreCategoria, setNombreCategoria] = useState("");
+  const [tipoCategoria, setTipoCategoria] = useState<"fijo" | "variable">("variable");
+  const [iconoCategoria, setIconoCategoria] = useState("");
+  const [editandoDatosCat, setEditandoDatosCat] = useState<string | null>(null);
+  const [nombreCatEdit, setNombreCatEdit] = useState("");
+  const [tipoCatEdit, setTipoCatEdit] = useState<"fijo" | "variable">("variable");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -185,12 +219,71 @@ export default function AdminPage() {
   }
 
   async function eliminar(m: Marca) {
-    await supabase.from("marcas").delete().eq("id", m.id);
+    setError("");
+    const { error: delError } = await supabase.from("marcas").delete().eq("id", m.id);
+    if (delError) {
+      setError(traducirErrorMarcaEliminar(delError, m.nombre));
+      return;
+    }
     if (m.logo_url) {
       const path = m.logo_url.split("/marcas-logos/")[1];
       if (path) await supabase.storage.from("marcas-logos").remove([path]);
     }
     cargarMarcas();
+  }
+
+  async function crearCategoria(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setGuardandoCategoria(true);
+    try {
+      const { error: insertError } = await supabase.from("categorias").insert({
+        nombre: nombreCategoria,
+        tipo: tipoCategoria,
+        icono: iconoCategoria || null,
+      });
+      if (insertError) throw insertError;
+      setMostrarFormCategoria(false);
+      setNombreCategoria("");
+      setTipoCategoria("variable");
+      setIconoCategoria("");
+      cargarCategorias();
+    } catch (err) {
+      setError(traducirErrorCategoria(err, nombreCategoria, "guardar"));
+    } finally {
+      setGuardandoCategoria(false);
+    }
+  }
+
+  function iniciarEdicionCategoria(c: Categoria) {
+    setError("");
+    setEditandoDatosCat(c.id);
+    setNombreCatEdit(c.nombre);
+    setTipoCatEdit(c.tipo);
+  }
+
+  async function guardarDatosCategoria(id: string) {
+    setError("");
+    const { error: updateError } = await supabase
+      .from("categorias")
+      .update({ nombre: nombreCatEdit, tipo: tipoCatEdit })
+      .eq("id", id);
+    if (updateError) {
+      setError(traducirErrorCategoria(updateError, nombreCatEdit, "guardar"));
+      return;
+    }
+    setEditandoDatosCat(null);
+    cargarCategorias();
+  }
+
+  async function eliminarCategoria(c: Categoria) {
+    setError("");
+    const { error: delError } = await supabase.from("categorias").delete().eq("id", c.id);
+    if (delError) {
+      setError(traducirErrorCategoria(delError, c.nombre, "eliminar"));
+      return;
+    }
+    cargarCategorias();
   }
 
   if (session === undefined) {
@@ -225,6 +318,15 @@ export default function AdminPage() {
           {mostrarForm ? "Cancelar" : "+ Nueva"}
         </button>
       </div>
+
+      {/* Banner general de error: antes cada acción (ícono, marca sugerida,
+          eliminar) guardaba el mensaje en `error` pero solo se mostraba si el
+          formulario de "+ Nueva marca" estaba abierto — el resto de las
+          acciones fallaban en silencio para el usuario. Ahora se muestra acá
+          arriba, visible sin importar qué formulario esté abierto. */}
+      {error && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>
+      )}
 
       {mostrarForm && (
         <Card>
@@ -268,7 +370,6 @@ export default function AdminPage() {
               </label>
               <IconoPicker value={icono} onChange={setIcono} />
             </div>
-            {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
               disabled={guardando}
@@ -366,13 +467,61 @@ export default function AdminPage() {
       })}
 
       <div className="space-y-2 pt-4">
-        <div>
-          <h2 className="text-sm font-bold text-gray-800 dark:text-white">Categorías</h2>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Ícono, y qué marcas de arriba se ofrecen para elegir al usar esta categoría en un gasto/compra
-            (ej: &quot;Supermercado&quot; → Jumbo, Líder...).
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-bold text-gray-800 dark:text-white">Categorías</h2>
+            <p className="text-xs text-gray-400 dark:text-gray-500">
+              Nombre, tipo (para el desglose fijo/variable de Presupuesto y Reportes), ícono, y qué marcas de
+              arriba se ofrecen al usar esta categoría en un gasto/compra (ej: &quot;Supermercado&quot; → Jumbo, Líder...).
+            </p>
+          </div>
+          <button
+            onClick={() => setMostrarFormCategoria((v) => !v)}
+            className="shrink-0 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
+          >
+            {mostrarFormCategoria ? "Cancelar" : "+ Nueva"}
+          </button>
         </div>
+
+        {mostrarFormCategoria && (
+          <Card>
+            <form onSubmit={crearCategoria} className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
+                <input
+                  required
+                  value={nombreCategoria}
+                  onChange={(e) => setNombreCategoria(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  placeholder="Ej: Mascotas"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Tipo</label>
+                <select
+                  value={tipoCategoria}
+                  onChange={(e) => setTipoCategoria(e.target.value as "fijo" | "variable")}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                >
+                  <option value="variable">Variable (compras, ocio, mercado...)</option>
+                  <option value="fijo">Fijo (arriendo, suscripciones...)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Ícono (opcional)</label>
+                <IconoPicker value={iconoCategoria} onChange={setIconoCategoria} />
+              </div>
+              <button
+                type="submit"
+                disabled={guardandoCategoria}
+                className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {guardandoCategoria ? "Guardando…" : "Guardar categoría"}
+              </button>
+            </form>
+          </Card>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           {categorias.map((c) => (
             <Card key={c.id}>
@@ -383,9 +532,66 @@ export default function AdminPage() {
                 >
                   {c.icono || c.nombre.charAt(0)}
                 </span>
-                <p className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-800 dark:text-white">{c.nombre}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{c.nombre}</p>
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500">{c.tipo === "fijo" ? "Fijo" : "Variable"}</p>
+                </div>
               </div>
-              {editandoIconoCat === c.id ? (
+
+              {editandoDatosCat === c.id ? (
+                <div className="mt-2 space-y-2 border-t border-gray-50 pt-2 dark:border-white/10">
+                  <input
+                    value={nombreCatEdit}
+                    onChange={(e) => setNombreCatEdit(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  />
+                  <select
+                    value={tipoCatEdit}
+                    onChange={(e) => setTipoCatEdit(e.target.value as "fijo" | "variable")}
+                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  >
+                    <option value="variable">Variable</option>
+                    <option value="fijo">Fijo</option>
+                  </select>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => guardarDatosCategoria(c.id)}
+                      className="text-[11px] font-semibold text-brand-from dark:text-pink-400"
+                    >
+                      guardar
+                    </button>
+                    <button
+                      onClick={() => setEditandoDatosCat(null)}
+                      className="text-[11px] text-gray-400 dark:text-gray-500"
+                    >
+                      cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 flex items-center gap-3">
+                  <button
+                    onClick={() => iniciarEdicionCategoria(c)}
+                    className="text-[11px] text-brand-from dark:text-pink-400"
+                  >
+                    editar
+                  </button>
+                  <button
+                    onClick={() => setEditandoIconoCat(editandoIconoCat === c.id ? null : c.id)}
+                    className="text-[11px] text-brand-from dark:text-pink-400"
+                  >
+                    cambiar ícono
+                  </button>
+                  <button
+                    onClick={() => eliminarCategoria(c)}
+                    className="text-[11px] text-gray-300 hover:text-red-400 dark:text-gray-600"
+                  >
+                    eliminar
+                  </button>
+                </div>
+              )}
+
+              {editandoIconoCat === c.id && (
                 <div className="mt-2">
                   <IconoPicker
                     value={c.icono ?? ""}
@@ -398,13 +604,6 @@ export default function AdminPage() {
                     listo
                   </button>
                 </div>
-              ) : (
-                <button
-                  onClick={() => setEditandoIconoCat(c.id)}
-                  className="mt-2 text-[11px] text-brand-from dark:text-pink-400"
-                >
-                  cambiar ícono
-                </button>
               )}
               <div className="mt-2">
                 <label className="text-[11px] text-gray-400 dark:text-gray-500">Marcas sugeridas</label>
@@ -423,6 +622,9 @@ export default function AdminPage() {
               </div>
             </Card>
           ))}
+          {categorias.length === 0 && (
+            <p className="col-span-2 text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay categorías.</p>
+          )}
         </div>
       </div>
     </div>
