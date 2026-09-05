@@ -19,6 +19,11 @@ const TIPOS_MARCA: { value: TipoMarca; label: string }[] = [
   { value: "compras_online", label: "Compras online" },
   { value: "delivery", label: "Delivery (comida, encargos)" },
   { value: "suscripcion", label: "Suscripción (streaming, apps...)" },
+  { value: "bencina", label: "Bencina" },
+  { value: "mecanico", label: "Mecánico" },
+  { value: "repuestos", label: "Repuestos" },
+  { value: "centro_medico", label: "Centro médico" },
+  { value: "farmacia", label: "Farmacia (medicamentos)" },
   { value: "otro", label: "Otro" },
 ];
 

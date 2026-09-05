@@ -54,6 +54,16 @@ export type TipoMarca =
   | "compras_online"
   | "delivery"
   | "suscripcion"
+  // Auto y Salud (ver migration_25_marcas_auto_salud.sql) — a diferencia de
+  // los demás tipos, estos dos se agrupan de a varios por categoría (Auto:
+  // bencina+mecanico+repuestos; Salud: centro_medico+farmacia), por eso el
+  // selector de /auto y /salud usa MarcaAgrupadaPicker en vez de
+  // MarcaSugeridaPicker (pensado para UN tipo por categoría).
+  | "bencina"
+  | "mecanico"
+  | "repuestos"
+  | "centro_medico"
+  | "farmacia"
   | "otro";
 
 export interface Marca {
@@ -242,16 +252,19 @@ export interface MetaAhorroProgreso {
   monto_actual: number;
 }
 
-// Compra chica/improvisada del día a día (pan, queso, algo que faltaba...),
-// sin medio de pago ni reparto entre personas — carga rápida: solo monto,
-// descripción y fecha. Siempre caen bajo la categoría "Hogar" (categoria_id
-// se completa solo al guardar, no lo elige el usuario). Pestaña "Diarios"
-// de /gastos.
+// Gasto suelto de carga rápida: solo monto, descripción y fecha, sin medio
+// de pago ni reparto entre personas. Lo usan 3 pantallas, cada una atada a
+// su propia categoría fija (categoria_id se completa solo al guardar, no lo
+// elige el usuario): "Diarios" de /gastos (Hogar), /auto (Auto) y /salud
+// (Salud) — ver components/gastos/DiariosLista.tsx. `marca_id` es opcional y
+// solo lo completan /auto y /salud (bencinera, centro médico, farmacia...),
+// ver migration_25_marcas_auto_salud.sql; "Diarios" de /gastos no lo usa.
 export interface GastoDiario {
   id: string;
   descripcion: string;
   monto: number;
   categoria_id: string | null;
+  marca_id: string | null;
   fecha: string;
 }
 

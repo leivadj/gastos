@@ -19,6 +19,10 @@ export default function SaludPage() {
         textoAyuda='Gastos sueltos de salud (remedios, visita al doctor…). Caen bajo la categoría "Salud".'
         tituloTotal="Total salud este mes"
         textoVacio="Aún no cargaste gastos de salud este mes."
+        gruposMarca={[
+          { tipo: "centro_medico", label: "Centro médico" },
+          { tipo: "farmacia", label: "Medicamentos" },
+        ]}
       />
     </div>
   );

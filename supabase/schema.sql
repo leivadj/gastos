@@ -50,7 +50,8 @@ create table categorias (
   -- null = no se sugiere ninguna marca para esta categoría.
   tipo_marca_sugerido text check (tipo_marca_sugerido in (
     'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico',
-    'supermercado', 'transporte', 'compras_online', 'delivery', 'suscripcion', 'otro'
+    'supermercado', 'transporte', 'compras_online', 'delivery', 'suscripcion',
+    'bencina', 'mecanico', 'repuestos', 'centro_medico', 'farmacia', 'otro'
   )),
   created_at timestamptz not null default now()
 );
@@ -68,7 +69,8 @@ create table marcas (
   nombre text not null unique,
   tipo text not null check (tipo in (
     'banco', 'casa_comercial', 'caja_compensacion', 'autopista', 'telecom', 'servicio_basico',
-    'supermercado', 'transporte', 'compras_online', 'delivery', 'suscripcion', 'otro'
+    'supermercado', 'transporte', 'compras_online', 'delivery', 'suscripcion',
+    'bencina', 'mecanico', 'repuestos', 'centro_medico', 'farmacia', 'otro'
   )),
   logo_url text,
   icono text, -- emoji corto, alternativa al logo cuando no hay imagen
@@ -300,6 +302,10 @@ create table gastos_diarios (
   descripcion text not null,
   monto numeric(12, 2) not null check (monto > 0),
   categoria_id uuid references categorias(id),
+  -- marca/servicio específico del gasto (ej: "Copec" en uno de Auto, "Cruz
+  -- Verde" en uno de Salud) — opcional, solo lo usan las pantallas que pasan
+  -- `gruposMarca` a DiariosLista (ver migration_25_marcas_auto_salud.sql).
+  marca_id uuid references marcas(id),
   fecha date not null default current_date,
   created_at timestamptz not null default now()
 );

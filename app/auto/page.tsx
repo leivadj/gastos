@@ -25,6 +25,11 @@ export default function AutoPage() {
           textoAyuda='Gastos sueltos del auto (bencina, mecánico, mantención…). Caen bajo la categoría "Auto".'
           tituloTotal="Total auto este mes"
           textoVacio="Aún no cargaste gastos del auto este mes."
+          gruposMarca={[
+            { tipo: "bencina", label: "Bencina" },
+            { tipo: "mecanico", label: "Mecánico" },
+            { tipo: "repuestos", label: "Repuestos" },
+          ]}
         />
       </div>
     </div>

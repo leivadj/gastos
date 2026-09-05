@@ -3,9 +3,11 @@
 import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { GrupoMarca, MarcaAgrupadaPicker } from "@/components/MarcaAgrupadaPicker";
 import { formatCLP, mesActualISO, primerDiaMesSiguiente } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, GastoDiario } from "@/lib/types";
+import { Categoria, GastoDiario, Marca } from "@/lib/types";
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
@@ -34,28 +36,41 @@ export function DiariosLista({
   textoAyuda = 'Compras chicas o improvisadas (pan, queso, algo que faltaba…). Caen bajo la categoría "Hogar".',
   tituloTotal = "Total diarios este mes",
   textoVacio = "Aún no cargaste gastos diarios este mes.",
+  gruposMarca,
 }: {
   categoriaNombre?: string;
   placeholderDescripcion?: string;
   textoAyuda?: string;
   tituloTotal?: string;
   textoVacio?: string;
+  // Cuando se pasa, agrega un selector de marca agrupado (MarcaAgrupadaPicker)
+  // al formulario — hoy lo usan /auto (Bencina/Mecánico/Repuestos) y /salud
+  // (Centro médico/Medicamentos). Sin esta prop el formulario queda igual
+  // que siempre (solo monto + descripción + fecha), como en "Diarios" de
+  // /gastos. Ver migration_25_marcas_auto_salud.sql.
+  gruposMarca?: GrupoMarca[];
 }) {
   const [gastos, setGastos] = useState<GastoDiario[]>([]);
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(hoyISO());
+  const [marcaId, setMarcaId] = useState("");
   const [guardando, setGuardando] = useState(false);
 
   async function cargarTodo() {
     setCargando(true);
-    const { data: cat } = await supabase.from("categorias").select("*").eq("nombre", categoriaNombre);
+    const [{ data: cat }, { data: m }] = await Promise.all([
+      supabase.from("categorias").select("*").eq("nombre", categoriaNombre),
+      gruposMarca ? supabase.from("marcas").select("*").order("nombre") : Promise.resolve({ data: [] as Marca[] }),
+    ]);
     const catId = ((cat as Categoria[]) ?? [])[0]?.id ?? null;
     setCategoriaId(catId);
+    setMarcas((m as Marca[]) ?? []);
     if (catId) {
       const { data: gastosCat } = await supabase
         .from("gastos_diarios")
@@ -88,11 +103,13 @@ export function DiariosLista({
         monto: Number(monto),
         fecha,
         categoria_id: categoriaId,
+        marca_id: gruposMarca ? marcaId || null : null,
       });
       if (insError) throw insError;
       setDescripcion("");
       setMonto("");
       setFecha(hoyISO());
+      setMarcaId("");
       await cargarTodo();
     } catch (err) {
       setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
@@ -155,6 +172,18 @@ export function DiariosLista({
               {guardando ? "Guardando…" : "+ Agregar"}
             </button>
           </div>
+          {gruposMarca && (
+            <div className="pt-1">
+              <p className="mb-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">¿Dónde? (opcional)</p>
+              <MarcaAgrupadaPicker
+                grupos={gruposMarca}
+                marcas={marcas}
+                value={marcaId}
+                onChange={setMarcaId}
+                onCatalogoActualizado={cargarTodo}
+              />
+            </div>
+          )}
           {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
         </form>
       </Card>
@@ -169,22 +198,31 @@ export function DiariosLista({
       )}
 
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-        {gastos.map((g) => (
-          <Card key={g.id} className="!p-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{g.descripcion}</p>
-                <p className="text-[11px] text-gray-400 dark:text-gray-500">{fechaCorta(g.fecha)}</p>
+        {gastos.map((g) => {
+          const marca = g.marca_id ? marcas.find((m) => m.id === g.marca_id) ?? null : null;
+          return (
+            <Card key={g.id} className="!p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  {gruposMarca && <EntidadAvatar marca={marca} nombreFallback={marca?.nombre ?? g.descripcion} className="h-8 w-8" />}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{g.descripcion}</p>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                      {fechaCorta(g.fecha)}
+                      {marca ? ` · ${marca.nombre}` : ""}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2.5">
+                  <span className="text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(g.monto)}</span>
+                  <button onClick={() => borrar(g.id)} className="text-gray-300 dark:text-gray-600 hover:text-red-400">
+                    ✕
+                  </button>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2.5">
-                <span className="text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(g.monto)}</span>
-                <button onClick={() => borrar(g.id)} className="text-gray-300 dark:text-gray-600 hover:text-red-400">
-                  ✕
-                </button>
-              </div>
-            </div>
-          </Card>
-        ))}
+            </Card>
+          );
+        })}
         {gastos.length === 0 && <p className="text-center text-sm text-gray-400 dark:text-gray-500">{textoVacio}</p>}
       </div>
     </div>
