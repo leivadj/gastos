@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { PersonaAvatar } from "@/components/PersonaAvatar";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
 import { subirImagenPropia } from "@/lib/subirImagen";
@@ -232,6 +233,11 @@ export function PerfilPropioCard() {
         >
           Ver mis tarjetas
         </Link>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+        <span className="text-xs font-semibold text-gray-500">Tema</span>
+        <ThemeToggle />
       </div>
 
       <button

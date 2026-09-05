@@ -7,6 +7,7 @@ import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { MovimientoFab } from "@/components/MovimientoRapido";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 // Sidebar fijo de escritorio — reemplaza al antiguo header horizontal
 // (DesktopNav.tsx, eliminado). El celular no se toca: sigue usando
@@ -153,7 +154,7 @@ export function DesktopSidebar() {
   }
 
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-100 bg-white px-4 py-5">
+    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-100 bg-white px-4 py-5 dark:border-white/10 dark:bg-black">
       <div className="mb-5 flex items-center gap-2.5 px-1">
         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-white">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
@@ -161,7 +162,7 @@ export function DesktopSidebar() {
             <path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </span>
-        <p className="text-sm font-bold leading-tight text-gray-800">Gastos del Hogar</p>
+        <p className="text-sm font-bold leading-tight text-gray-800 dark:text-white">Gastos del Hogar</p>
       </div>
 
       <div className="mb-4">
@@ -177,10 +178,12 @@ export function DesktopSidebar() {
               key={item.href}
               href={item.href}
               className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
-                active ? "bg-purple-50 font-semibold text-brand-from" : "text-gray-500 hover:bg-gray-50"
+                active
+                  ? "bg-purple-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+                  : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
               }`}
             >
-              <span className={active ? "text-brand-from" : "text-gray-400"}>{item.icon(active)}</span>
+              <span className={active ? "text-brand-from dark:text-white" : "text-gray-400 dark:text-gray-500"}>{item.icon(active)}</span>
               {item.label}
             </Link>
           );
@@ -189,10 +192,12 @@ export function DesktopSidebar() {
           <Link
             href="/admin"
             className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
-              pathname === "/admin" ? "bg-purple-50 font-semibold text-brand-from" : "text-gray-500 hover:bg-gray-50"
+              pathname === "/admin"
+                ? "bg-purple-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+                : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
             }`}
           >
-            <span className={pathname === "/admin" ? "text-brand-from" : "text-gray-400"}>
+            <span className={pathname === "/admin" ? "text-brand-from dark:text-white" : "text-gray-400 dark:text-gray-500"}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={pathname === "/admin" ? 2.4 : 2}>
                 <path d="M12 3.5 5 6.5v5c0 4.5 3 7.5 7 8.5 4-1 7-4 7-8.5v-5L12 3.5Z" strokeLinecap="round" strokeLinejoin="round" />
                 <path d="M9.5 12 11 13.5 14.5 10" strokeLinecap="round" strokeLinejoin="round" />
@@ -207,11 +212,15 @@ export function DesktopSidebar() {
           pero acá vive siempre visible al fondo del Sidebar en vez de en su
           propia pantalla, ya que en escritorio no hace falta un destino "Más"
           separado para llegar al perfil. */}
-      <div className="mt-3 rounded-2xl border border-gray-100 p-3">
-        <p className="truncate text-xs font-semibold text-gray-700">{session?.user?.email ?? "Cuenta"}</p>
+      <div className="mt-3 rounded-2xl border border-gray-100 p-3 dark:border-white/10">
+        <p className="truncate text-xs font-semibold text-gray-700 dark:text-gray-200">{session?.user?.email ?? "Cuenta"}</p>
+        <div className="mt-2 flex items-center justify-between gap-2">
+          <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Tema</span>
+          <ThemeToggle />
+        </div>
         <button
           onClick={cerrarSesion}
-          className="mt-2 w-full rounded-lg border border-gray-200 py-1.5 text-[11px] font-medium text-gray-500 hover:border-red-200 hover:text-red-400"
+          className="mt-2 w-full rounded-lg border border-gray-200 py-1.5 text-[11px] font-medium text-gray-500 hover:border-red-200 hover:text-red-400 dark:border-white/10 dark:text-gray-400 dark:hover:border-red-400/40 dark:hover:text-red-400"
         >
           Cerrar sesión
         </button>

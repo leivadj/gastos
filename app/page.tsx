@@ -43,6 +43,12 @@ import { useDeviceType } from "@/lib/useDeviceType";
 const COLORES = ["#7C3AED", "#EC4899", "#F97316", "#10B981", "#3B82F6", "#F43F5E", "#8B5CF6", "#14B8A6"];
 const AVATAR_COLORES = ["#F59E0B", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6"];
 
+// Se agrega a cada <Card> de este dashboard (nunca al Card.tsx compartido,
+// ver la nota en lib/theme.tsx) — el resto de las pantallas todavía no
+// migran a oscuro, así que sus <Card> sin esta clase siguen viéndose
+// claros a propósito.
+const CARD_OSCURA = "dark:bg-gray-900 dark:shadow-none";
+
 function formatCompacto(valor: number): string {
   return new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 1 }).format(valor);
 }
@@ -297,16 +303,16 @@ export default function DashboardPage() {
     .slice(0, 5);
 
   if (cargando) {
-    return <p className="py-10 text-center text-gray-400">Cargando…</p>;
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
   // ---- Piezas reutilizadas entre el layout mobile y el de escritorio ----
 
   const tarjetaCategoria = (
-    <Card>
-      <p className="mb-3 text-sm font-semibold text-gray-600">Gastos por categoría</p>
+    <Card className={CARD_OSCURA}>
+      <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Gastos por categoría</p>
       {dataCategoria.length === 0 ? (
-        <p className="text-sm text-gray-400">Sin datos este mes todavía.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">Sin datos este mes todavía.</p>
       ) : (
         <div className="flex items-center gap-4">
           <div className="relative h-36 w-36 shrink-0">
@@ -321,27 +327,27 @@ export default function DashboardPage() {
               </PieChart>
             </ResponsiveContainer>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-base font-bold text-gray-800">${formatCompacto(totalGastos)}</span>
-              <span className="text-[10px] text-gray-400">este mes</span>
+              <span className="text-base font-bold text-gray-800 dark:text-white">${formatCompacto(totalGastos)}</span>
+              <span className="text-[10px] text-gray-400 dark:text-gray-500">este mes</span>
             </div>
           </div>
           <div className="min-w-0 flex-1 space-y-2 text-sm">
             {legendPrincipal.map((d, i) => (
               <div key={d.name} className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5 text-gray-600">
+                <span className="flex min-w-0 items-center gap-1.5 text-gray-600 dark:text-gray-400">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COLORES[i % COLORES.length] }} />
                   <span className="truncate">{d.name}</span>
                 </span>
-                <span className="shrink-0 whitespace-nowrap font-medium text-gray-800">${formatCompacto(d.value)}</span>
+                <span className="shrink-0 whitespace-nowrap font-medium text-gray-800 dark:text-gray-100">${formatCompacto(d.value)}</span>
               </div>
             ))}
             {restoCategorias.length > 0 && (
               <div className="flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1.5 text-gray-400">
-                  <span className="h-2 w-2 shrink-0 rounded-full bg-gray-300" />
+                <span className="flex min-w-0 items-center gap-1.5 text-gray-400 dark:text-gray-500">
+                  <span className="h-2 w-2 shrink-0 rounded-full bg-gray-300 dark:bg-gray-600" />
                   <span className="truncate">+{restoCategorias.length} más</span>
                 </span>
-                <span className="shrink-0 whitespace-nowrap font-medium text-gray-400">${formatCompacto(restoTotal)}</span>
+                <span className="shrink-0 whitespace-nowrap font-medium text-gray-400 dark:text-gray-500">${formatCompacto(restoTotal)}</span>
               </div>
             )}
           </div>
@@ -351,18 +357,18 @@ export default function DashboardPage() {
   );
 
   const tarjetaFijoVariable = totalGastos > 0 && (
-    <Card>
-      <p className="mb-2 text-sm font-semibold text-gray-600">Fijo vs. variable</p>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-pink-100">
+    <Card className={CARD_OSCURA}>
+      <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Fijo vs. variable</p>
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-pink-100 dark:bg-pink-950/50">
         <div className="h-full bg-brand-gradient" style={{ width: `${pctFijo}%` }} />
       </div>
-      <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+      <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1.5">
           <span className="h-2 w-2 rounded-full bg-brand-gradient" />
           Fijo · {formatCLP(totalTipoFijo)}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-pink-200" />
+          <span className="h-2 w-2 rounded-full bg-pink-200 dark:bg-pink-800" />
           Variable · {formatCLP(totalTipoVariable)}
         </span>
       </div>
@@ -370,10 +376,10 @@ export default function DashboardPage() {
   );
 
   const tarjetaPersonas = (
-    <Card>
-      <p className="mb-2 text-sm font-semibold text-gray-600">Cuánto le toca a cada persona</p>
+    <Card className={CARD_OSCURA}>
+      <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Cuánto le toca a cada persona</p>
       {dataPersonas.length === 0 ? (
-        <p className="text-sm text-gray-400">Sin datos este mes todavía.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">Sin datos este mes todavía.</p>
       ) : (
         <>
           <div className="h-48">
@@ -392,28 +398,28 @@ export default function DashboardPage() {
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="mt-1 text-center text-[11px] text-gray-400">Toca una barra para ver el detalle</p>
+          <p className="mt-1 text-center text-[11px] text-gray-400 dark:text-gray-500">Toca una barra para ver el detalle</p>
         </>
       )}
     </Card>
   );
 
   const tarjetaCuotas = (
-    <Card>
-      <p className="mb-3 text-sm font-semibold text-gray-600">Cuotas activas este mes</p>
+    <Card className={CARD_OSCURA}>
+      <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Cuotas activas este mes</p>
       {cuotas.length === 0 ? (
-        <p className="text-sm text-gray-400">No hay compras en cuotas vigentes.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">No hay compras en cuotas vigentes.</p>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-gray-100 dark:divide-white/10">
           {cuotas.map((c) => (
             <li key={c.compra_id} className="flex items-center justify-between py-2.5 text-sm">
               <div>
-                <p className="font-medium text-gray-700">{c.descripcion}</p>
-                <p className="text-xs text-gray-400">
+                <p className="font-medium text-gray-700 dark:text-gray-200">{c.descripcion}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">
                   Cuota {c.cuota_actual} de {c.n_cuotas} · {categoriaNombre(c.categoria_id)}
                 </p>
               </div>
-              <p className="font-semibold text-gray-800">{formatCLP(c.monto_cuota)}</p>
+              <p className="font-semibold text-gray-800 dark:text-gray-100">{formatCLP(c.monto_cuota)}</p>
             </li>
           ))}
         </ul>
@@ -422,31 +428,31 @@ export default function DashboardPage() {
   );
 
   const tarjetaPromedioDiario = (
-    <Card>
-      <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
-        <IconoPromedio className="text-gray-400" />
+    <Card className={CARD_OSCURA}>
+      <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
+        <IconoPromedio className="text-gray-400 dark:text-gray-500" />
         Gasto promedio diario
       </p>
-      <p className="mt-1 text-2xl font-bold text-gray-800">{formatCLP(gastoPromedioDiario)}</p>
-      <p className="text-[11px] capitalize text-gray-400">en lo que va de {nombreMes()}</p>
+      <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">{formatCLP(gastoPromedioDiario)}</p>
+      <p className="text-[11px] capitalize text-gray-400 dark:text-gray-500">en lo que va de {nombreMes()}</p>
     </Card>
   );
 
   const tarjetaProximosPagos = (
-    <Card>
+    <Card className={CARD_OSCURA}>
       <div className="mb-1 flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
-          <IconoProximosPagos className="text-gray-400" />
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300">
+          <IconoProximosPagos className="text-gray-400 dark:text-gray-500" />
           Próximos pagos
         </p>
-        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from">
+        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from dark:text-pink-400">
           Ver todos
         </Link>
       </div>
       {proximosPagos.length === 0 ? (
-        <p className="text-sm text-gray-400">No hay pagos pendientes este mes.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">No hay pagos pendientes este mes.</p>
       ) : (
-        <ul className="divide-y divide-gray-100">
+        <ul className="divide-y divide-gray-100 dark:divide-white/10">
           {proximosPagos.map((ev) => {
             const entidad = entidades.find((e) => e.id === ev.entidadId) ?? null;
             const marca = marcas.find((m) => m.id === ev.marcaId) ?? resolverMarca(entidad, marcas);
@@ -454,13 +460,13 @@ export default function DashboardPage() {
               <li key={`${ev.origen}:${ev.origenId}`} className="flex items-center gap-3 py-2.5 text-sm">
                 <EntidadAvatar entidad={entidad} marca={marca} icono={ev.icono} className="h-8 w-8 shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-gray-700">{ev.descripcion}</p>
-                  <p className="text-xs text-gray-400">
+                  <p className="truncate font-medium text-gray-700 dark:text-gray-200">{ev.descripcion}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">
                     {ev.dia != null ? `Vence el ${ev.dia}` : "Sin día definido"}
                     {ev.detalle ? ` · ${ev.detalle}` : ""}
                   </p>
                 </div>
-                <p className="shrink-0 font-semibold text-gray-800">{formatCLP(ev.monto)}</p>
+                <p className="shrink-0 font-semibold text-gray-800 dark:text-gray-100">{formatCLP(ev.monto)}</p>
               </li>
             );
           })}
@@ -470,18 +476,18 @@ export default function DashboardPage() {
   );
 
   const tarjetaMetas = (
-    <Card>
+    <Card className={CARD_OSCURA}>
       <div className="mb-2 flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">
-          <IconoMetas className="text-gray-400" />
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300">
+          <IconoMetas className="text-gray-400 dark:text-gray-500" />
           Metas de ahorro
         </p>
-        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from">
+        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from dark:text-pink-400">
           Ver todas
         </Link>
       </div>
       {metas.length === 0 ? (
-        <p className="text-sm text-gray-400">Todavía no tienes metas de ahorro activas.</p>
+        <p className="text-sm text-gray-400 dark:text-gray-500">Todavía no tienes metas de ahorro activas.</p>
       ) : (
         <ul className="space-y-3">
           {metas.slice(0, 3).map((m) => {
@@ -489,13 +495,13 @@ export default function DashboardPage() {
             return (
               <li key={m.meta_id}>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-gray-700">
+                  <span className="font-medium text-gray-700 dark:text-gray-200">
                     {m.icono ? `${m.icono} ` : ""}
                     {m.nombre}
                   </span>
-                  <span className="text-gray-400">{pct}%</span>
+                  <span className="text-gray-400 dark:text-gray-500">{pct}%</span>
                 </div>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
                   <div className="h-full bg-brand-gradient" style={{ width: `${pct}%` }} />
                 </div>
               </li>
@@ -579,8 +585,8 @@ export default function DashboardPage() {
     <div className="space-y-6 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-800">Resumen general</h1>
-          <p className="text-sm text-gray-400">
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Resumen general</h1>
+          <p className="text-sm text-gray-400 dark:text-gray-500">
             Así van tus finanzas en <span className="capitalize">{nombreMes()}</span> 👋
           </p>
         </div>
@@ -642,36 +648,36 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <Card>
-          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
-            <IconoCuentas className="text-gray-400" />
+        <Card className={CARD_OSCURA}>
+          <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
+            <IconoCuentas className="text-gray-400 dark:text-gray-500" />
             Total en cuentas
           </p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">
+          <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">
             <ContadorOdometro texto={formatCLP(totalEnCuentas)} />
           </p>
-          <p className="text-[11px] text-gray-400">saldo de tus cuentas</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">saldo de tus cuentas</p>
         </Card>
 
-        <Card>
-          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
-            <IconoGastos className="text-gray-400" />
+        <Card className={CARD_OSCURA}>
+          <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
+            <IconoGastos className="text-gray-400 dark:text-gray-500" />
             Gastos este mes
           </p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">
+          <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">
             <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
           </p>
         </Card>
 
-        <Card>
-          <p className="flex items-center gap-1 text-xs font-medium text-gray-400">
-            <IconoComprometido className="text-gray-400" />
+        <Card className={CARD_OSCURA}>
+          <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
+            <IconoComprometido className="text-gray-400 dark:text-gray-500" />
             Comprometido
           </p>
-          <p className="mt-1 text-2xl font-bold text-gray-800">
+          <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">
             <ContadorOdometro texto={formatCLP(comprometido)} />
           </p>
-          <p className="text-[11px] text-gray-400">vence más adelante este mes</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500">vence más adelante este mes</p>
         </Card>
       </div>
 

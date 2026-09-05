@@ -7,6 +7,18 @@ body {
   background-color: #f6f5fa;
 }
 
+/* Modo oscuro: fondo negro real (no solo el morado más oscuro), inspirado
+   en el estilo de referencia que mandó el usuario — ver lib/theme.tsx para
+   cómo y cuándo se agrega la clase .dark al <html>. Solo cambia el fondo
+   base acá; el resto de las pantallas todavía no están migradas a oscuro
+   (quedan como "tarjetas claras" flotando sobre este fondo por ahora), así
+   que este selector es a propósito lo único global — cada pantalla se migra
+   en su propia pasada, agregando clases dark: donde haga falta. */
+html.dark,
+html.dark body {
+  background-color: #000;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

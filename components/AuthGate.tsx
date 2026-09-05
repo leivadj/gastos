@@ -109,7 +109,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F5F3FB]">
+    <div className="flex min-h-screen bg-[#F5F3FB] dark:bg-black">
       <DesktopSidebar />
       <div className="min-w-0 flex-1 overflow-y-auto">
         <main className={`mx-auto ${anchoDesktop} px-8 py-8`}>

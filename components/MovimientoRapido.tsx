@@ -145,7 +145,7 @@ export function MovimientoFab({
           <Link
             href="/gastos?tab=cuotas"
             onClick={() => setAbierto(false)}
-            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
+            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-100 text-brand-from">
               <IconoCuotas />
@@ -155,7 +155,7 @@ export function MovimientoFab({
           <Link
             href="/gastos?tab=fijos"
             onClick={() => setAbierto(false)}
-            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50"
+            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
               <IconoPagoFijo />
@@ -166,7 +166,7 @@ export function MovimientoFab({
       )}
       <button
         onClick={() => abrir("transferencia")}
-        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
+        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
         style={{ animationDelay: "120ms" }}
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
@@ -176,7 +176,7 @@ export function MovimientoFab({
       </button>
       <button
         onClick={() => abrir("ingreso")}
-        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
+        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
         style={{ animationDelay: "60ms" }}
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
@@ -186,7 +186,7 @@ export function MovimientoFab({
       </button>
       <button
         onClick={() => abrir("gasto")}
-        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
+        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
       >
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pink-100 text-pink-600">
           <IconoGasto />
