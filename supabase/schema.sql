@@ -321,6 +321,25 @@ create table documentos_auto (
   created_at timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- PREFERENCIAS DE MENÚ — personalización del menú lateral de escritorio
+-- (DesktopSidebar.tsx): orden elegido a mano y qué ítems ocultar. Una fila
+-- por cuenta (owner_id único). `orden` y `ocultos` son arrays de las claves
+-- estables de cada ítem (ver DesktopSidebar.tsx: "inicio", "cuentas", etc,
+-- NO el href, que puede traer query string), así el orden de renderizado no
+-- se rompe si algún día cambia el texto del label o el destino exacto. Sin
+-- fila (cuenta que nunca personalizó) = usar el orden por defecto del código,
+-- nada oculto. Ligado a la cuenta (no al navegador), a propósito, para que
+-- se vea igual en cualquier dispositivo donde inicie sesión.
+-- ---------------------------------------------------------------------------
+create table preferencias_menu (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id) unique,
+  orden text[] not null default '{}',
+  ocultos text[] not null default '{}',
+  updated_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- VISTAS — aquí vive la automatización de las cuotas y del reparto
 -- ============================================================================
@@ -509,6 +528,7 @@ alter table metas_ahorro enable row level security;
 alter table metas_ahorro_aportes enable row level security;
 alter table gastos_diarios enable row level security;
 alter table documentos_auto enable row level security;
+alter table preferencias_menu enable row level security;
 
 create policy "solo_dueno" on personas for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
@@ -553,6 +573,8 @@ create policy "solo_dueno" on metas_ahorro_aportes for all
 create policy "solo_dueno" on gastos_diarios for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on documentos_auto for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on preferencias_menu for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ============================================================================

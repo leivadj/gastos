@@ -255,6 +255,16 @@ export interface GastoDiario {
   fecha: string;
 }
 
+// Personalización del menú lateral de escritorio (DesktopSidebar.tsx): una
+// fila por cuenta. `orden`/`ocultos` guardan claves estables de ítem (ej.
+// "inicio", "fijos"), no el href — ver migration_24_preferencias_menu.sql.
+// Ausente (cuenta que nunca personalizó) = usar el orden por defecto del
+// código, nada oculto.
+export interface PreferenciasMenu {
+  orden: string[];
+  ocultos: string[];
+}
+
 export type TipoDocumentoAuto = "permiso_circulacion" | "revision_tecnica" | "seguro" | "otro";
 
 // Documento del auto con vencimiento anual (permiso de circulación, revisión

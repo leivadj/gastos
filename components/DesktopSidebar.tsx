@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { MovimientoFab } from "@/components/MovimientoRapido";
+import { PersonalizarMenu } from "@/components/PersonalizarMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { PreferenciasMenu } from "@/lib/types";
 
 // Sidebar fijo de escritorio — reemplaza al antiguo header horizontal
 // (DesktopNav.tsx, eliminado). El celular no se toca: sigue usando
@@ -24,8 +26,29 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 //    alcanzables desde "Más" (al final de esta lista), igual que en el
 //    celular, para no saturar la barra. Quedará para otra pasada decidir
 //    si conviene subir alguno acá.
-const ITEMS = [
+// `key` es la identidad ESTABLE de cada ítem para personalizar el menú (ver
+// PersonalizarMenu.tsx y migration_24_preferencias_menu.sql) — no se usa el
+// href porque dos ítems ("fijos"/"cuotas") comparten el mismo href base
+// (/gastos) con distinto query string. "mas" es el único ítem NO
+// personalizable (ni se oculta ni se reordena): es la puerta de salida a
+// todo lo demás, tiene que quedar siempre en el mismo lugar.
+//
+// Tipado explícito (en vez de dejar que TS infiera el tipo del array
+// literal): así ITEMS e ITEM_MAS comparten exactamente el mismo tipo con
+// `activo` opcional, y se pueden combinar con spread (`[...itemsFiltrados,
+// ITEM_MAS]`) sin que TypeScript se queje de que "activo" no existe en
+// alguno de los dos — cosa que si pasaba dejando que se infiriera solo.
+type ItemMenu = {
+  key: string;
+  href: string;
+  label: string;
+  icon: (activo: boolean) => ReactNode;
+  activo?: (pathname: string) => boolean;
+};
+
+const ITEMS: ItemMenu[] = [
   {
+    key: "inicio",
     href: "/",
     label: "Inicio",
     icon: (a: boolean) => (
@@ -36,6 +59,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "cuentas",
     href: "/tarjetas",
     label: "Cuentas",
     icon: (a: boolean) => (
@@ -47,6 +71,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "presupuestos",
     href: "/presupuesto",
     label: "Presupuestos",
     icon: (a: boolean) => (
@@ -57,6 +82,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "fijos",
     href: "/gastos?tab=fijos",
     label: "Fijos",
     activo: (p: string) => p === "/gastos",
@@ -68,6 +94,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "metas",
     href: "/metas-ahorro",
     label: "Metas",
     icon: (a: boolean) => (
@@ -78,6 +105,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "cuotas",
     href: "/gastos?tab=cuotas",
     label: "Compras en cuotas",
     activo: () => false, // "Fijos" ya marca /gastos como activo; evita que ambos se iluminen a la vez
@@ -90,6 +118,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "reportes",
     href: "/reportes",
     label: "Reportes",
     icon: (a: boolean) => (
@@ -101,6 +130,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "personas",
     href: "/personas",
     label: "Personas",
     icon: (a: boolean) => (
@@ -113,6 +143,7 @@ const ITEMS = [
     ),
   },
   {
+    key: "grupos",
     href: "/grupos",
     label: "Grupos",
     icon: (a: boolean) => (
@@ -123,23 +154,41 @@ const ITEMS = [
       </svg>
     ),
   },
-  {
-    href: "/mas",
-    label: "Más",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <rect x="4" y="4" width="7" height="7" rx="1.8" />
-        <rect x="13" y="4" width="7" height="7" rx="1.8" />
-        <rect x="4" y="13" width="7" height="7" rx="1.8" />
-        <rect x="13" y="13" width="7" height="7" rx="1.8" />
-      </svg>
-    ),
-  },
 ];
+
+const ITEM_MAS: ItemMenu = {
+  key: "mas",
+  href: "/mas",
+  label: "Más",
+  icon: (a: boolean) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+      <rect x="4" y="4" width="7" height="7" rx="1.8" />
+      <rect x="13" y="4" width="7" height="7" rx="1.8" />
+      <rect x="4" y="13" width="7" height="7" rx="1.8" />
+      <rect x="13" y="13" width="7" height="7" rx="1.8" />
+    </svg>
+  ),
+};
+
+// Aplica la personalización guardada (orden + ocultos) sobre la lista base:
+// primero los ítems que están en `orden` (en ese orden), después cualquier
+// ítem nuevo que no estuviera guardado todavía (agregado al código después
+// de que la cuenta personalizó por última vez), y al final se sacan los
+// ocultos. "Más" no pasa por acá: se agrega siempre al final, aparte.
+function aplicarPreferencias(base: ItemMenu[], prefs: PreferenciasMenu | null): ItemMenu[] {
+  if (!prefs || prefs.orden.length === 0) return base;
+  const porKey = new Map(base.map((item) => [item.key, item]));
+  const ordenados = prefs.orden.map((k) => porKey.get(k)).filter((i): i is ItemMenu => !!i);
+  const yaIncluidos = new Set(prefs.orden);
+  const nuevos = base.filter((item) => !yaIncluidos.has(item.key));
+  return [...ordenados, ...nuevos].filter((item) => !prefs.ocultos.includes(item.key));
+}
 
 export function DesktopSidebar() {
   const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
+  const [prefs, setPrefs] = useState<PreferenciasMenu | null>(null);
+  const [mostrarPersonalizar, setMostrarPersonalizar] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -147,7 +196,17 @@ export function DesktopSidebar() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
+  async function cargarPreferencias() {
+    const { data } = await supabase.from("preferencias_menu").select("orden, ocultos").maybeSingle();
+    setPrefs(data ? { orden: data.orden ?? [], ocultos: data.ocultos ?? [] } : { orden: [], ocultos: [] });
+  }
+
+  useEffect(() => {
+    if (session) cargarPreferencias();
+  }, [session]);
+
   const esAdmin = checkEsAdmin(session?.user?.email);
+  const itemsOrdenados = [...aplicarPreferencias(ITEMS, prefs), ITEM_MAS];
 
   async function cerrarSesion() {
     await supabase.auth.signOut();
@@ -170,7 +229,7 @@ export function DesktopSidebar() {
       </div>
 
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-        {ITEMS.map((item) => {
+        {itemsOrdenados.map((item) => {
           const [hrefBase] = item.href.split("?");
           const active = item.activo ? item.activo(pathname) : pathname === hrefBase;
           return (
@@ -208,6 +267,18 @@ export function DesktopSidebar() {
         )}
       </nav>
 
+      <button
+        onClick={() => setMostrarPersonalizar(true)}
+        className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
+          <circle cx="16" cy="7" r="2.3" />
+          <circle cx="7" cy="17" r="2.3" />
+        </svg>
+        Personalizar menú
+      </button>
+
       {/* Cuadro de perfil: mismo lugar que en /mas del celular (PerfilPropioCard),
           pero acá vive siempre visible al fondo del Sidebar en vez de en su
           propia pantalla, ya que en escritorio no hace falta un destino "Más"
@@ -225,6 +296,18 @@ export function DesktopSidebar() {
           Cerrar sesión
         </button>
       </div>
+
+      {mostrarPersonalizar && (
+        <PersonalizarMenu
+          items={ITEMS}
+          prefs={prefs}
+          onClose={() => setMostrarPersonalizar(false)}
+          onGuardado={(nuevo) => {
+            setPrefs(nuevo);
+            setMostrarPersonalizar(false);
+          }}
+        />
+      )}
     </aside>
   );
 }
