@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { CuotasLista } from "@/components/gastos/CuotasLista";
 import { DiariosLista } from "@/components/gastos/DiariosLista";
 import { GastosFijosLista } from "@/components/gastos/GastosFijosLista";
@@ -23,17 +24,37 @@ const TABS_VALIDOS = new Set(TABS.map((t) => t.id));
 // GastosFijosLista), Cuotas es el ex-/compras (CuotasLista) y Diarios es
 // nuevo: compras chicas/improvisadas sin medio de pago ni reparto
 // (DiariosLista). Acepta ?tab=... para entrar directo a una pestaña (ver
-// /presupuesto y /servicios-basicos) — se lee de window.location en vez de
-// useSearchParams para no forzar un límite de Suspense en la página (mismo
-// patrón que /tarjetas?nueva=1).
+// /presupuesto, /servicios-basicos, /compras, /gastos-fijos y el sidebar,
+// que tiene "Fijos" y "Compras en cuotas" como dos ítems separados que
+// apuntan acá con distinto query string).
+//
+// Antes esto se leía una sola vez de window.location en un efecto sin
+// dependencias, para no forzar un límite de Suspense en la página (bug #17,
+// ver el resumen del proyecto). El problema: si ya estabas en /gastos (ej.
+// pestaña Fijos) y navegabas con un <Link> a /gastos?tab=cuotas — como el
+// del ítem "Compras en cuotas" del sidebar —, Next.js reutiliza la misma
+// instancia del componente (misma ruta) en vez de remontarla, así que ese
+// efecto de una sola vez nunca se volvía a ejecutar: la URL cambiaba pero
+// la pestaña se quedaba pegada en la que estaba. Ahora se usa
+// useSearchParams(), que sí es reactivo a la navegación — el efecto
+// depende de él y se vuelve a ejecutar en cada cambio de query string, sea
+// cual sea la pestaña en la que estabas antes.
 export default function GastosPage() {
+  return (
+    <Suspense fallback={null}>
+      <GastosContenido />
+    </Suspense>
+  );
+}
+
+function GastosContenido() {
+  const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("fijos");
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const deLaUrl = new URLSearchParams(window.location.search).get("tab");
+    const deLaUrl = searchParams.get("tab");
     if (deLaUrl && TABS_VALIDOS.has(deLaUrl as Tab)) setTab(deLaUrl as Tab);
-  }, []);
+  }, [searchParams]);
 
   return (
     <div className="space-y-4 pb-10">
