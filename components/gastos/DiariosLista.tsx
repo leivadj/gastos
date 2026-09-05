@@ -7,7 +7,7 @@ import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { GrupoMarca, MarcaAgrupadaPicker } from "@/components/MarcaAgrupadaPicker";
 import { formatCLP, mesActualISO, primerDiaMesSiguiente } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, GastoDiario, Marca } from "@/lib/types";
+import { Categoria, CategoriaGrupoPreferido, GastoDiario, Grupo, Marca } from "@/lib/types";
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
@@ -37,6 +37,7 @@ export function DiariosLista({
   tituloTotal = "Total diarios este mes",
   textoVacio = "Aún no cargaste gastos diarios este mes.",
   gruposMarca,
+  categoriasElegibles,
 }: {
   categoriaNombre?: string;
   placeholderDescripcion?: string;
@@ -49,10 +50,22 @@ export function DiariosLista({
   // que siempre (solo monto + descripción + fecha), como en "Diarios" de
   // /gastos. Ver migration_25_marcas_auto_salud.sql.
   gruposMarca?: GrupoMarca[];
+  // Cuando se pasa, reemplaza `categoriaNombre` fijo por un selector (chips)
+  // entre varias categorías del catálogo compartido — hoy lo usa "Diarios"
+  // de /gastos (Hogar/Feria/Panadería/Educación), para poder anotar un
+  // gasto suelto del día a día en cualquiera de esas categorías sin abrir
+  // otra pantalla. Sin esta prop, se comporta como siempre (una sola
+  // categoría fija, ver categoriaNombre) — así /auto y /salud no cambian.
+  categoriasElegibles?: string[];
 }) {
   const [gastos, setGastos] = useState<GastoDiario[]>([]);
+  const [categoriasDisponibles, setCategoriasDisponibles] = useState<Categoria[]>([]);
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // "Esta categoría usa este grupo por defecto" (ver Grupos y
+  // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
+  const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
@@ -60,22 +73,49 @@ export function DiariosLista({
   const [monto, setMonto] = useState("");
   const [fecha, setFecha] = useState(hoyISO());
   const [marcaId, setMarcaId] = useState("");
+  // Reparto (opcional) de este gasto diario — null = sin repartir, como
+  // siempre. Ver migration_27_reparto_gastos_diarios.sql: a propósito no
+  // hay reparto "por personas sueltas" acá, solo por grupo, para que cargar
+  // un diario siga siendo rápido.
+  const [grupoId, setGrupoId] = useState("");
+  // true mientras el grupo elegido venga del auto-aplicado por categoría
+  // (no de una elección manual) — ver el mismo patrón en CuotasLista.tsx /
+  // GastosFijosLista.tsx.
+  const [grupoEsAutomatico, setGrupoEsAutomatico] = useState(false);
   const [guardando, setGuardando] = useState(false);
+
+  const nombresBuscados = categoriasElegibles ?? [categoriaNombre];
 
   async function cargarTodo() {
     setCargando(true);
-    const [{ data: cat }, { data: m }] = await Promise.all([
-      supabase.from("categorias").select("*").eq("nombre", categoriaNombre),
+    const [{ data: cat }, { data: m }, { data: gr }, { data: cgp }] = await Promise.all([
+      supabase.from("categorias").select("*").in("nombre", nombresBuscados),
       gruposMarca ? supabase.from("marcas").select("*").order("nombre") : Promise.resolve({ data: [] as Marca[] }),
+      supabase.from("grupos").select("*").order("nombre"),
+      supabase.from("categoria_grupo_preferido").select("*"),
     ]);
-    const catId = ((cat as Categoria[]) ?? [])[0]?.id ?? null;
-    setCategoriaId(catId);
+    // Mantiene el orden pedido en nombresBuscados (no el que devuelva la
+    // consulta), así los chips salen siempre en el mismo orden.
+    const disponibles = nombresBuscados
+      .map((nombre) => ((cat as Categoria[]) ?? []).find((c) => c.nombre === nombre))
+      .filter((c): c is Categoria => !!c);
+    setCategoriasDisponibles(disponibles);
     setMarcas((m as Marca[]) ?? []);
-    if (catId) {
+    setGrupos((gr as Grupo[]) ?? []);
+    const mapaPreferido: Record<string, string> = {};
+    ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
+      mapaPreferido[row.categoria_id] = row.grupo_id;
+    });
+    setPreferidoPorCategoria(mapaPreferido);
+    // Si la categoría seleccionada ya no existe entre las disponibles (o
+    // todavía no hay ninguna elegida), vuelve a la primera.
+    setCategoriaId((actual) => (actual && disponibles.some((c) => c.id === actual) ? actual : (disponibles[0]?.id ?? null)));
+    const idsDisponibles = disponibles.map((c) => c.id);
+    if (idsDisponibles.length > 0) {
       const { data: gastosCat } = await supabase
         .from("gastos_diarios")
         .select("*")
-        .eq("categoria_id", catId)
+        .in("categoria_id", idsDisponibles)
         .gte("fecha", mesActualISO())
         .lt("fecha", primerDiaMesSiguiente())
         .order("fecha", { ascending: false })
@@ -90,7 +130,24 @@ export function DiariosLista({
   useEffect(() => {
     cargarTodo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoriaNombre]);
+  }, [categoriaNombre, ...(categoriasElegibles ?? [])]);
+
+  // Precarga el grupo por defecto de la categoría elegida — apenas se
+  // resuelve al cargar, y de nuevo si el usuario cambia de categoría a
+  // mano. No pisa una elección manual del grupo (ver grupoEsAutomatico).
+  useEffect(() => {
+    if (!categoriaId) return;
+    if (!grupoId || grupoEsAutomatico) {
+      const sugerido = preferidoPorCategoria[categoriaId] ?? "";
+      setGrupoId(sugerido);
+      setGrupoEsAutomatico(!!sugerido);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoriaId, preferidoPorCategoria]);
+
+  function elegirCategoria(id: string) {
+    setCategoriaId(id);
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -104,12 +161,18 @@ export function DiariosLista({
         fecha,
         categoria_id: categoriaId,
         marca_id: gruposMarca ? marcaId || null : null,
+        grupo_id: grupoId || null,
       });
       if (insError) throw insError;
       setDescripcion("");
       setMonto("");
       setFecha(hoyISO());
       setMarcaId("");
+      // Vuelve a aplicar el grupo por defecto de la misma categoría (queda
+      // elegida para el próximo ítem, es común cargar varios seguidos).
+      const sugerido = categoriaId ? (preferidoPorCategoria[categoriaId] ?? "") : "";
+      setGrupoId(sugerido);
+      setGrupoEsAutomatico(!!sugerido);
       await cargarTodo();
     } catch (err) {
       setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
@@ -139,6 +202,25 @@ export function DiariosLista({
 
       <Card>
         <form onSubmit={handleSubmit} className="space-y-2">
+          {categoriasDisponibles.length > 1 && (
+            <div className="flex flex-wrap gap-1.5 pb-1">
+              {categoriasDisponibles.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => elegirCategoria(c.id)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                    categoriaId === c.id
+                      ? "bg-brand-gradient text-white"
+                      : "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300"
+                  }`}
+                >
+                  {c.icono ? `${c.icono} ` : ""}
+                  {c.nombre}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <input
               required
@@ -184,6 +266,31 @@ export function DiariosLista({
               />
             </div>
           )}
+          {grupos.length > 0 && (
+            <div className="pt-1">
+              <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Grupo (opcional)</label>
+              <select
+                value={grupoId}
+                onChange={(e) => {
+                  setGrupoId(e.target.value);
+                  setGrupoEsAutomatico(false);
+                }}
+                className="mt-1 w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
+              >
+                <option value="">— Sin grupo (no se reparte) —</option>
+                {grupos.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.nombre}
+                  </option>
+                ))}
+              </select>
+              {grupoEsAutomatico && (
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Aplicado automáticamente porque es el reparto por defecto de esta categoría. Podés cambiarlo.
+                </p>
+              )}
+            </div>
+          )}
           {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
         </form>
       </Card>
@@ -200,6 +307,8 @@ export function DiariosLista({
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {gastos.map((g) => {
           const marca = g.marca_id ? marcas.find((m) => m.id === g.marca_id) ?? null : null;
+          const categoria = categoriasDisponibles.length > 1 ? categoriasDisponibles.find((c) => c.id === g.categoria_id) : null;
+          const grupo = g.grupo_id ? grupos.find((gr) => gr.id === g.grupo_id) : null;
           return (
             <Card key={g.id} className="!p-3.5">
               <div className="flex items-center justify-between gap-3">
@@ -210,6 +319,8 @@ export function DiariosLista({
                     <p className="text-[11px] text-gray-400 dark:text-gray-500">
                       {fechaCorta(g.fecha)}
                       {marca ? ` · ${marca.nombre}` : ""}
+                      {categoria ? ` · ${categoria.nombre}` : ""}
+                      {grupo ? ` · Grupo: ${grupo.nombre}` : ""}
                     </p>
                   </div>
                 </div>

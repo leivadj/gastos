@@ -94,7 +94,12 @@ function GastosContenido() {
       {tab === "fijos" && <GastosFijosLista tipoMonto="fijo" />}
       {tab === "variables" && <GastosFijosLista tipoMonto="variable" />}
       {tab === "cuotas" && <CuotasLista />}
-      {tab === "diarios" && <DiariosLista />}
+      {tab === "diarios" && (
+        <DiariosLista
+          textoAyuda='Compras chicas o improvisadas del día a día (pan, feria, colegio…). Elige la categoría y, si corresponde, el grupo con el que se reparte.'
+          categoriasElegibles={["Hogar", "Feria", "Panadería", "Educación (colegio, cursos)"]}
+        />
+      )}
     </div>
   );
 }

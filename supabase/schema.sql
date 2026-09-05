@@ -303,14 +303,22 @@ create table metas_ahorro_aportes (
 
 -- ---------------------------------------------------------------------------
 -- GASTOS DIARIOS — gastos sueltos de carga rápida: solo monto, descripción
--- y fecha, sin medio de pago ni reparto entre personas. Se usa en 3
--- pantallas, cada una atada a una categoría distinta del catálogo
--- compartido (ver seed.sql) que el usuario no elige a mano — el formulario
--- la busca por nombre:
---   - Pestaña "Diarios" de /gastos -> categoría "Hogar": compras chicas o
---     improvisadas del día a día (pan, queso, algo que faltaba...).
+-- y fecha, sin medio de pago. Se usa en 3 pantallas, cada una atada a una
+-- categoría distinta del catálogo compartido (ver seed.sql) que el usuario
+-- no elige a mano — el formulario la busca por nombre:
+--   - Pestaña "Diarios" de /gastos -> categoría "Hogar" (y ahora también
+--     Feria, Panadería, etc.): compras chicas o improvisadas del día a día
+--     (pan, queso, algo que faltaba...).
 --   - /auto -> categoría "Auto": bencina, mecánico, mantención.
 --   - /salud -> categoría "Salud": remedios, visita al doctor.
+--
+-- `grupo_id` (migration_27_reparto_gastos_diarios.sql) es OPCIONAL y por
+-- defecto null = sin reparto, igual que siempre. Cuando se elige un grupo,
+-- `vista_reparto_gastos_diarios` reparte el monto entre sus personas con la
+-- misma lógica que ya usan compras y gastos fijos — a propósito NO hay
+-- reparto "por personas sueltas" acá (sin grupo), para que cargar un
+-- diario siga siendo rápido: o no se reparte, o se elige un grupo ya
+-- armado, nada más.
 -- ---------------------------------------------------------------------------
 create table gastos_diarios (
   id uuid primary key default gen_random_uuid(),
@@ -322,6 +330,7 @@ create table gastos_diarios (
   -- Verde" en uno de Salud) — opcional, solo lo usan las pantallas que pasan
   -- `gruposMarca` a DiariosLista (ver migration_25_marcas_auto_salud.sql).
   marca_id uuid references marcas(id),
+  grupo_id uuid references grupos(id),
   fecha date not null default current_date,
   created_at timestamptz not null default now()
 );
@@ -488,6 +497,28 @@ join lateral (
 ) r on true
 where g.activo = true;
 
+-- Reparto por persona de los gastos diarios del mes actual QUE tengan un
+-- grupo elegido (los que no, siguen sin repartirse — ver comentario en la
+-- tabla gastos_diarios). A diferencia de cuotas/gastos fijos, no hay reparto
+-- "por personas sueltas" acá: si no hay grupo, no hay reparto.
+create or replace view vista_reparto_gastos_diarios
+with (security_invoker = true) as
+select
+  d.id as gasto_diario_id,
+  d.descripcion,
+  d.categoria_id,
+  d.grupo_id,
+  d.marca_id,
+  d.fecha,
+  d.monto,
+  r.persona_id,
+  r.persona_nombre,
+  round(d.monto * r.porcentaje_efectivo / 100, 0) as monto_persona
+from gastos_diarios d
+join vista_grupo_reparto r on r.grupo_id = d.grupo_id
+where d.grupo_id is not null
+  and date_trunc('month', d.fecha) = date_trunc('month', current_date);
+
 -- Resumen del mes por categoría (para el gráfico de torta del dashboard)
 create or replace view vista_resumen_categorias_mes
 with (security_invoker = true) as
@@ -508,6 +539,8 @@ from (
   select persona_id, persona_nombre, monto_persona from vista_reparto_cuotas_mes
   union all
   select persona_id, persona_nombre, monto_persona from vista_reparto_gastos_fijos
+  union all
+  select persona_id, persona_nombre, monto_persona from vista_reparto_gastos_diarios
 ) t
 group by persona_id, persona_nombre;
 

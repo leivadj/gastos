@@ -35,6 +35,7 @@ import {
   Pago,
   Persona,
   RepartoCuota,
+  RepartoGastoDiario,
   RepartoGastoFijo,
   ResumenPersonaMes,
 } from "@/lib/types";
@@ -137,6 +138,7 @@ export default function DashboardPage() {
   const [resumenPersonas, setResumenPersonas] = useState<ResumenPersonaMes[]>([]);
   const [repartoCuotas, setRepartoCuotas] = useState<RepartoCuota[]>([]);
   const [repartoGastos, setRepartoGastos] = useState<RepartoGastoFijo[]>([]);
+  const [repartoDiarios, setRepartoDiarios] = useState<RepartoGastoDiario[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [metas, setMetas] = useState<MetaAhorroProgreso[]>([]);
   const [ingresosMes, setIngresosMes] = useState(0);
@@ -156,6 +158,7 @@ export default function DashboardPage() {
         { data: rp },
         { data: rc },
         { data: rg },
+        { data: rd },
         { data: ing },
         { data: pg },
         { data: mt },
@@ -170,6 +173,7 @@ export default function DashboardPage() {
         supabase.from("vista_resumen_personas_mes").select("*"),
         supabase.from("vista_reparto_cuotas_mes").select("*"),
         supabase.from("vista_reparto_gastos_fijos").select("*"),
+        supabase.from("vista_reparto_gastos_diarios").select("*"),
         supabase.from("ingresos").select("monto").eq("mes", mesActualISO()),
         supabase.from("pagos").select("*"),
         supabase.from("vista_metas_ahorro_progreso").select("*").eq("activa", true).order("nombre"),
@@ -184,6 +188,7 @@ export default function DashboardPage() {
       setResumenPersonas((rp as ResumenPersonaMes[]) ?? []);
       setRepartoCuotas((rc as RepartoCuota[]) ?? []);
       setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
+      setRepartoDiarios((rd as RepartoGastoDiario[]) ?? []);
       setIngresosMes((ing ?? []).reduce((acc, r: any) => acc + Number(r.monto), 0));
       setPagos((pg as Pago[]) ?? []);
       setMetas((mt as MetaAhorroProgreso[]) ?? []);
@@ -703,6 +708,7 @@ export default function DashboardPage() {
           total={dataPersonas.find((d) => d.persona_id === persona.id)?.total ?? 0}
           cuotasPersona={repartoCuotas.filter((r) => r.persona_id === persona.id)}
           gastosPersona={repartoGastos.filter((r) => r.persona_id === persona.id)}
+          diariosPersona={repartoDiarios.filter((r) => r.persona_id === persona.id)}
           categorias={categorias}
           entidades={entidades}
           marcas={marcas}

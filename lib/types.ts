@@ -171,6 +171,22 @@ export interface RepartoGastoFijo {
   monto_persona: number;
 }
 
+// Reparto por persona de un gasto diario QUE tenga un grupo elegido (ver
+// migration_27_reparto_gastos_diarios.sql) — los diarios sin grupo (Auto,
+// Salud hoy) simplemente no aparecen acá, como siempre.
+export interface RepartoGastoDiario {
+  gasto_diario_id: string;
+  descripcion: string;
+  categoria_id: string | null;
+  grupo_id: string | null;
+  marca_id: string | null;
+  fecha: string;
+  monto: number;
+  persona_id: string;
+  persona_nombre: string;
+  monto_persona: number;
+}
+
 export interface GastoFijo {
   id: string;
   descripcion: string;
@@ -263,18 +279,21 @@ export interface MetaAhorroProgreso {
 }
 
 // Gasto suelto de carga rápida: solo monto, descripción y fecha, sin medio
-// de pago ni reparto entre personas. Lo usan 3 pantallas, cada una atada a
-// su propia categoría fija (categoria_id se completa solo al guardar, no lo
-// elige el usuario): "Diarios" de /gastos (Hogar), /auto (Auto) y /salud
-// (Salud) — ver components/gastos/DiariosLista.tsx. `marca_id` es opcional y
-// solo lo completan /auto y /salud (bencinera, centro médico, farmacia...),
-// ver migration_25_marcas_auto_salud.sql; "Diarios" de /gastos no lo usa.
+// de pago. Lo usan 3 pantallas, cada una atada a su propia categoría fija
+// (categoria_id se completa solo al guardar, no lo elige el usuario):
+// "Diarios" de /gastos (Hogar y otras categorías del día a día), /auto
+// (Auto) y /salud (Salud) — ver components/gastos/DiariosLista.tsx.
+// `marca_id` es opcional y solo lo completan /auto y /salud (bencinera,
+// centro médico, farmacia...), ver migration_25_marcas_auto_salud.sql;
+// "Diarios" de /gastos no lo usa. `grupo_id` es opcional (null = sin
+// reparto, como siempre) — ver migration_27_reparto_gastos_diarios.sql.
 export interface GastoDiario {
   id: string;
   descripcion: string;
   monto: number;
   categoria_id: string | null;
   marca_id: string | null;
+  grupo_id: string | null;
   fecha: string;
 }
 

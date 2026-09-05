@@ -9,7 +9,7 @@ import { traducirErrorPersona } from "@/components/PerfilPropioCard";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
-import { Categoria, Entidad, Ingreso, Marca, Persona, RepartoCuota, RepartoGastoFijo, ResumenPersonaMes } from "@/lib/types";
+import { Categoria, Entidad, Ingreso, Marca, Persona, RepartoCuota, RepartoGastoDiario, RepartoGastoFijo, ResumenPersonaMes } from "@/lib/types";
 
 export default function PersonasPage() {
   const [personas, setPersonas] = useState<Persona[]>([]);
@@ -20,6 +20,7 @@ export default function PersonasPage() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [repartoCuotas, setRepartoCuotas] = useState<RepartoCuota[]>([]);
   const [repartoGastos, setRepartoGastos] = useState<RepartoGastoFijo[]>([]);
+  const [repartoDiarios, setRepartoDiarios] = useState<RepartoGastoDiario[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [nombre, setNombre] = useState("");
@@ -31,7 +32,7 @@ export default function PersonasPage() {
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
 
   async function cargar() {
-    const [{ data: p }, { data: r }, { data: i }, { data: cat }, { data: ent }, { data: mar }, { data: rc }, { data: rg }] =
+    const [{ data: p }, { data: r }, { data: i }, { data: cat }, { data: ent }, { data: mar }, { data: rc }, { data: rg }, { data: rd }] =
       await Promise.all([
         supabase.from("personas").select("*").order("nombre"),
         supabase.from("vista_resumen_personas_mes").select("*"),
@@ -41,6 +42,7 @@ export default function PersonasPage() {
         supabase.from("marcas").select("*"),
         supabase.from("vista_reparto_cuotas_mes").select("*"),
         supabase.from("vista_reparto_gastos_fijos").select("*"),
+        supabase.from("vista_reparto_gastos_diarios").select("*"),
       ]);
     setPersonas((p as Persona[]) ?? []);
     setResumen((r as ResumenPersonaMes[]) ?? []);
@@ -50,6 +52,7 @@ export default function PersonasPage() {
     setMarcas((mar as Marca[]) ?? []);
     setRepartoCuotas((rc as RepartoCuota[]) ?? []);
     setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
+    setRepartoDiarios((rd as RepartoGastoDiario[]) ?? []);
   }
 
   useEffect(() => {
@@ -196,6 +199,7 @@ export default function PersonasPage() {
               total={debeEstaPersona(persona.id)}
               cuotasPersona={repartoCuotas.filter((r) => r.persona_id === persona.id)}
               gastosPersona={repartoGastos.filter((r) => r.persona_id === persona.id)}
+              diariosPersona={repartoDiarios.filter((r) => r.persona_id === persona.id)}
               categorias={categorias}
               entidades={entidades}
               marcas={marcas}

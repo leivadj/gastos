@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
-import { Categoria, Entidad, Ingreso, Marca, RepartoCuota, RepartoGastoFijo } from "@/lib/types";
+import { Categoria, Entidad, Ingreso, Marca, RepartoCuota, RepartoGastoDiario, RepartoGastoFijo } from "@/lib/types";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { formatCLP, mesActualISO } from "@/lib/format";
@@ -17,6 +17,7 @@ export function PersonaBreakdown({
   total,
   cuotasPersona,
   gastosPersona,
+  diariosPersona,
   categorias,
   entidades,
   marcas,
@@ -31,6 +32,11 @@ export function PersonaBreakdown({
   total: number;
   cuotasPersona: RepartoCuota[];
   gastosPersona: RepartoGastoFijo[];
+  // Gastos diarios (Hogar, Feria, Panadería...) que tenían un grupo elegido
+  // — ver migration_27_reparto_gastos_diarios.sql. Opcional: quien todavía
+  // no pasa esta prop (no debería quedar ninguno tras esta fase, pero por
+  // las dudas) simplemente no ve esta parte del desglose, sin romper nada.
+  diariosPersona?: RepartoGastoDiario[];
   categorias: Categoria[];
   entidades: Entidad[];
   marcas: Marca[];
@@ -100,6 +106,16 @@ export function PersonaBreakdown({
       icono: g.icono,
       detalle: "Gasto fijo",
       monto: g.monto_persona,
+    })),
+    ...(diariosPersona ?? []).map((d) => ({
+      key: `d-${d.gasto_diario_id}`,
+      descripcion: d.descripcion,
+      categoria: nombreCategoria(d.categoria_id),
+      entidad_id: null,
+      marca_id: d.marca_id,
+      icono: null,
+      detalle: "Diario",
+      monto: d.monto_persona,
     })),
   ].sort((a, b) => b.monto - a.monto);
 
