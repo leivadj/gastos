@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { Categoria, Entidad, Ingreso, Marca, RepartoCuota, RepartoGastoFijo } from "@/lib/types";
+import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { formatCLP, mesActualISO } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
@@ -23,6 +24,7 @@ export function PersonaBreakdown({
   personaId,
   ingresosPersona,
   onIngresosActualizados,
+  variant = "modal",
 }: {
   personaNombre: string;
   mesLabel: string;
@@ -40,6 +42,12 @@ export function PersonaBreakdown({
   personaId?: string;
   ingresosPersona?: Ingreso[];
   onIngresosActualizados?: () => void | Promise<void>;
+  // "modal" (por defecto): el panel flotante de siempre — lo sigue usando
+  // Inicio al hacer clic en la barra del gráfico de personas. "inline": se
+  // dibuja como una sección más de la página (misma tarjeta que el resto),
+  // sin overlay ni límite de alto — lo usa /personas, para que el detalle no
+  // salga "cortado" en ventanas más chicas. Mismo contenido en ambos casos.
+  variant?: "modal" | "inline";
 }) {
   // Efecto "panel-reveal" (transitions.dev): el panel entra deslizándose
   // desde abajo con un leve cross-blur en vez de aparecer de golpe, y sale
@@ -55,6 +63,12 @@ export function PersonaBreakdown({
   }, []);
 
   function cerrar() {
+    // La sección inline (/personas) no tiene animación de salida propia — se
+    // desmonta directo, como cualquier otra tarjeta de la página.
+    if (variant === "inline") {
+      onClose();
+      return;
+    }
     setAbierto(false);
     const prefiereMenosMovimiento =
       typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -177,31 +191,24 @@ export function PersonaBreakdown({
     });
   }
 
-  return (
-    <div
-      data-open={abierto}
-      className="panel-reveal-backdrop fixed inset-0 z-30 flex items-end justify-center bg-black/40 px-0 sm:items-center sm:px-4"
-      onClick={cerrar}
-    >
-      <div
-        data-open={abierto}
-        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-gray-900 dark:shadow-none sm:max-w-lg sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-lg font-bold text-gray-800 dark:text-white">{personaNombre}</p>
-            <p className="text-xs capitalize text-gray-400 dark:text-gray-500">{mesLabel}</p>
-          </div>
-          <button onClick={cerrar} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-white/10">
-            ✕
-          </button>
+  // Mismo contenido para las dos presentaciones (modal e inline) — solo
+  // cambia lo que lo envuelve, más abajo.
+  const contenido = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="text-lg font-bold text-gray-800 dark:text-white">{personaNombre}</p>
+          <p className="text-xs capitalize text-gray-400 dark:text-gray-500">{mesLabel}</p>
         </div>
+        <button onClick={cerrar} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-white/10">
+          {variant === "inline" ? "✕ cerrar" : "✕"}
+        </button>
+      </div>
 
-        <p className="mt-3 text-2xl font-bold text-brand-from dark:text-pink-400">{formatCLP(total)}</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500">Total que le corresponde este mes</p>
+      <p className="mt-3 text-2xl font-bold text-brand-from dark:text-pink-400">{formatCLP(total)}</p>
+      <p className="text-xs text-gray-400 dark:text-gray-500">Total que le corresponde este mes</p>
 
-        {personaId && ingresosPersona && (
+      {personaId && ingresosPersona && (
           <div className="mt-4 rounded-xl border border-gray-100 p-3 dark:border-white/10">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Ingresos este mes</p>
@@ -320,34 +327,62 @@ export function PersonaBreakdown({
           </div>
         )}
 
-        <div className="mt-4 divide-y divide-gray-100 dark:divide-white/10">
-          {items.length === 0 && <p className="py-4 text-sm text-gray-400 dark:text-gray-500">Sin ítems este mes.</p>}
-          {items.map((it) => (
-            <div key={it.key} className="flex items-center gap-3 py-2.5">
-              <EntidadAvatar
-                entidad={entidadDe(it.entidad_id) ?? undefined}
-                marca={marcaDe(it.marca_id) ?? marcaDeEntidad(it.entidad_id)}
-                icono={it.icono}
-                className="h-8 w-8"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{it.descripcion}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  {it.categoria} · {it.detalle}
-                </p>
-              </div>
-              <p className="shrink-0 text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(it.monto)}</p>
+      {variant === "inline" && (
+        <>
+          <p className="mb-1 mt-4 text-sm font-semibold text-gray-600 dark:text-gray-300">Movimientos</p>
+          <p className="mb-1 text-xs capitalize text-gray-400 dark:text-gray-500">{mesLabel}</p>
+        </>
+      )}
+      <div className={variant === "inline" ? "divide-y divide-gray-100 dark:divide-white/10" : "mt-4 divide-y divide-gray-100 dark:divide-white/10"}>
+        {items.length === 0 && <p className="py-4 text-sm text-gray-400 dark:text-gray-500">Sin ítems este mes.</p>}
+        {items.map((it) => (
+          <div key={it.key} className="flex items-center gap-3 py-2.5">
+            <EntidadAvatar
+              entidad={entidadDe(it.entidad_id) ?? undefined}
+              marca={marcaDe(it.marca_id) ?? marcaDeEntidad(it.entidad_id)}
+              icono={it.icono}
+              className="h-8 w-8"
+            />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{it.descripcion}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                {it.categoria} · {it.detalle}
+              </p>
             </div>
-          ))}
-        </div>
+            <p className="shrink-0 text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(it.monto)}</p>
+          </div>
+        ))}
+      </div>
 
-        <button
-          onClick={exportarPdf}
-          disabled={items.length === 0}
-          className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-40"
-        >
-          Exportar PDF
-        </button>
+      <button
+        onClick={exportarPdf}
+        disabled={items.length === 0}
+        className="mt-5 w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-40"
+      >
+        Exportar PDF
+      </button>
+    </>
+  );
+
+  // Inline (/personas): una tarjeta más de la página, con el scroll natural
+  // de la página — nada de overlay ni de alto máximo, así no puede salir
+  // "cortada" como pasaba con el modal en ventanas más chicas.
+  if (variant === "inline") {
+    return <Card>{contenido}</Card>;
+  }
+
+  return (
+    <div
+      data-open={abierto}
+      className="panel-reveal-backdrop fixed inset-0 z-30 flex items-end justify-center bg-black/40 px-0 sm:items-center sm:px-4"
+      onClick={cerrar}
+    >
+      <div
+        data-open={abierto}
+        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-gray-900 dark:shadow-none sm:max-w-lg sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {contenido}
       </div>
     </div>
   );

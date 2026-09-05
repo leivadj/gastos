@@ -185,6 +185,11 @@ export default function PersonasPage() {
           const persona = otrasPersonas.find((p) => p.id === personaSeleccionada);
           if (!persona) return null;
           return (
+            // Antes este detalle se abría como un panel flotante encima de
+            // todo (modal) y en ventanas más chicas su propio encabezado
+            // quedaba tapado/cortado arriba. Ahora se dibuja como una
+            // sección más de la página — igual que "Movimientos" en
+            // /tarjetas — así usa el scroll normal de la página.
             <PersonaBreakdown
               personaNombre={persona.nombre}
               mesLabel={nombreMes()}
@@ -198,6 +203,7 @@ export default function PersonasPage() {
               ingresosPersona={ingresos.filter((i) => i.persona_id === persona.id && i.mes.slice(0, 7) === mesActualPrefix)}
               onIngresosActualizados={cargar}
               onClose={() => setPersonaSeleccionada(null)}
+              variant="inline"
             />
           );
         })()}
