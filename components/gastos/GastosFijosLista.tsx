@@ -14,7 +14,7 @@ import { formatCLP, mesActualISO } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
+import { Categoria, CategoriaGrupoPreferido, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
 
 // Pestañas "Fijos" y "Variables" de /gastos: misma tabla (gastos_fijos),
 // filtradas por tipo_monto — antes eran dos secciones de una sola pantalla
@@ -29,6 +29,9 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // "Esta categoría usa este grupo por defecto" (ver Grupos y
+  // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
+  const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -46,6 +49,10 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   const [marcaId, setMarcaId] = useState("");
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
+  // true mientras el grupo elegido venga del auto-aplicado por categoría
+  // (no de una elección manual) — así, si el usuario cambia la categoría de
+  // nuevo, se puede reemplazar sin pisar una elección manual previa.
+  const [grupoEsAutomatico, setGrupoEsAutomatico] = useState(false);
 
   // Si en la cuenta solo hay una persona activa (el caso normal de una sola
   // persona usando la app), no tiene sentido preguntar "¿quiénes
@@ -54,7 +61,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargarTodo() {
-    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: ip }, { data: pg }] =
+    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: cgp }, { data: ip }, { data: pg }] =
       await Promise.all([
         supabase.from("gastos_fijos").select("*").eq("activo", true).order("descripcion"),
         supabase.from("entidades").select("*").order("nombre"),
@@ -62,6 +69,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
         supabase.from("categorias").select("*").order("nombre"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
+        supabase.from("categoria_grupo_preferido").select("*"),
         supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
         supabase.from("pagos").select("*").eq("origen", "gasto_fijo"),
       ]);
@@ -71,6 +79,11 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
+    const mapaPreferido: Record<string, string> = {};
+    ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
+      mapaPreferido[row.categoria_id] = row.grupo_id;
+    });
+    setPreferidoPorCategoria(mapaPreferido);
     setPagos((pg as Pago[]) ?? []);
     const agrupado: Record<string, ItemParticipante[]> = {};
     ((ip as ItemParticipante[]) ?? []).forEach((row) => {
@@ -100,6 +113,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setMarcaId("");
     setIcono("");
     setParticipantes([]);
+    setGrupoEsAutomatico(false);
     setError("");
   }
 
@@ -118,6 +132,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setEntidadId(g.entidad_id ?? "");
     setCategoriaId(g.categoria_id ?? "");
     setGrupoId(g.grupo_id ?? "");
+    setGrupoEsAutomatico(false);
     setMarcaId(g.marca_id ?? "");
     setIcono(g.icono ?? "");
     const participantesExistentes = (participantesPorItem[g.id] ?? []).map((row) => ({
@@ -334,6 +349,14 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                     setMarcaId("");
                   }
                   setCategoriaId(e.target.value);
+                  // Si todavía no eligieron un grupo a mano (o el que hay
+                  // vino de este mismo auto-aplicado), precarga el grupo
+                  // que esta categoría tiene por defecto (ver Grupos).
+                  if (!grupoId || grupoEsAutomatico) {
+                    const sugerido = preferidoPorCategoria[e.target.value] ?? "";
+                    setGrupoId(sugerido);
+                    setGrupoEsAutomatico(!!sugerido);
+                  }
                 }}
                 className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
@@ -365,7 +388,10 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
               <label className="text-xs text-gray-500 dark:text-gray-400">Grupo (opcional)</label>
               <select
                 value={grupoId}
-                onChange={(e) => setGrupoId(e.target.value)}
+                onChange={(e) => {
+                  setGrupoId(e.target.value);
+                  setGrupoEsAutomatico(false);
+                }}
                 className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
                 <option value="">— Sin grupo —</option>
@@ -375,6 +401,11 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                   </option>
                 ))}
               </select>
+              {grupoEsAutomatico && (
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Aplicado automáticamente porque es el reparto por defecto de esta categoría. Podés cambiarlo.
+                </p>
+              )}
             </div>
             {grupoId ? (
               <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">

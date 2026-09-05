@@ -49,6 +49,11 @@ insert into categorias (nombre, tipo, tipo_marca_sugerido) values
   ('Auto', 'variable', null),
   ('Salud', 'variable', null);
 
+insert into categorias (nombre, tipo, icono, tipo_marca_sugerido) values
+  ('Feria', 'variable', '🧺', null),
+  ('Panadería', 'variable', '🍞', null),
+  ('Educación (colegio, cursos)', 'fijo', '🎒', null);
+
 -- ---------------------------------------------------------------------------
 -- ENTIDADES (medios de pago / tarjetas / créditos)
 -- ---------------------------------------------------------------------------

@@ -94,6 +94,16 @@ export interface GrupoParticipante extends Participante {
   grupo_id: string;
 }
 
+// "Esta categoría usa este grupo mío por defecto" (ver
+// migration_26_reparto_por_categoria.sql) — una fila por cuenta y por
+// categoría; el formulario de gastos la usa para precargar el grupo apenas
+// se elige la categoría, sin tener que elegirlo a mano cada vez.
+export interface CategoriaGrupoPreferido {
+  id: string;
+  categoria_id: string;
+  grupo_id: string;
+}
+
 export type OrigenItem = "compra" | "gasto_fijo";
 
 export interface ItemParticipante extends Participante {

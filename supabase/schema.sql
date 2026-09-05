@@ -133,6 +133,22 @@ create table grupo_participantes (
   unique (grupo_id, persona_id)
 );
 
+-- Preferencia por cuenta: "esta categoría (del catálogo compartido) usa
+-- este grupo mío por defecto" — para que el formulario de gastos precargue
+-- el grupo solo apenas se elige la categoría, en vez de tener que elegirlo
+-- a mano cada vez (ver migration_26_reparto_por_categoria.sql). Tabla
+-- aparte de `categorias` porque `categorias` es compartida entre cuentas y
+-- `grupos` es privado de cada una — cada cuenta arma su propia preferencia,
+-- apuntando a su propio grupo.
+create table categoria_grupo_preferido (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id),
+  categoria_id uuid not null references categorias(id) on delete cascade,
+  grupo_id uuid not null references grupos(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  unique (owner_id, categoria_id)
+);
+
 -- ---------------------------------------------------------------------------
 -- COMPRAS — EL MOTOR DE CUOTAS AUTOMÁTICO
 -- En vez de guardar "en qué cuota voy" (texto que se edita a mano cada mes),
@@ -524,6 +540,7 @@ alter table marcas enable row level security;
 alter table entidades enable row level security;
 alter table grupos enable row level security;
 alter table grupo_participantes enable row level security;
+alter table categoria_grupo_preferido enable row level security;
 alter table compras enable row level security;
 alter table gastos_fijos enable row level security;
 alter table item_participantes enable row level security;
@@ -557,6 +574,8 @@ create policy "borrado_solo_admin" on marcas for delete
 create policy "solo_dueno" on entidades for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on grupos for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on categoria_grupo_preferido for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on grupo_participantes for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());

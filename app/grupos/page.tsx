@@ -7,7 +7,7 @@ import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { IconoPicker } from "@/components/IconoPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { mensajeError } from "@/lib/supabaseError";
-import { Grupo, GrupoParticipante, Participante, Persona } from "@/lib/types";
+import { Categoria, CategoriaGrupoPreferido, Grupo, GrupoParticipante, Participante, Persona } from "@/lib/types";
 
 // "grupos_nombre_key" es una restricción vieja (de antes de separar los
 // datos por cuenta) que exige nombre único en TODAS las cuentas — ver
@@ -27,6 +27,11 @@ export default function GruposPage() {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [participantesPorGrupo, setParticipantesPorGrupo] = useState<Record<string, GrupoParticipante[]>>({});
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  // categoria_id -> grupo_id, para TODOS los grupos de la cuenta — sirve
+  // para saber qué categorías ya están asignadas a otro grupo (y avisar que
+  // se van a reasignar) y para armar el resumen de cada tarjeta.
+  const [preferenciaPorCategoria, setPreferenciaPorCategoria] = useState<Record<string, string>>({});
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -35,21 +40,33 @@ export default function GruposPage() {
   const [nombre, setNombre] = useState("");
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
+  // Categorías que usan el reparto de ESTE grupo por defecto (ver
+  // migration_26_reparto_por_categoria.sql) — el formulario de gastos
+  // precarga este grupo apenas se elige una de estas categorías.
+  const [categoriasElegidas, setCategoriasElegidas] = useState<string[]>([]);
 
   async function cargarTodo() {
-    const [{ data: g }, { data: gp }, { data: p }] = await Promise.all([
+    const [{ data: g }, { data: gp }, { data: p }, { data: cat }, { data: cgp }] = await Promise.all([
       supabase.from("grupos").select("*").order("nombre"),
       supabase.from("grupo_participantes").select("*"),
       supabase.from("personas").select("*").eq("activo", true).order("nombre"),
+      supabase.from("categorias").select("*").order("nombre"),
+      supabase.from("categoria_grupo_preferido").select("*"),
     ]);
     setGrupos((g as Grupo[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
+    setCategorias((cat as Categoria[]) ?? []);
     const agrupado: Record<string, GrupoParticipante[]> = {};
     ((gp as GrupoParticipante[]) ?? []).forEach((row) => {
       if (!agrupado[row.grupo_id]) agrupado[row.grupo_id] = [];
       agrupado[row.grupo_id].push(row);
     });
     setParticipantesPorGrupo(agrupado);
+    const mapaPreferencia: Record<string, string> = {};
+    ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
+      mapaPreferencia[row.categoria_id] = row.grupo_id;
+    });
+    setPreferenciaPorCategoria(mapaPreferencia);
   }
 
   useEffect(() => {
@@ -62,6 +79,7 @@ export default function GruposPage() {
     setNombre("");
     setIcono("");
     setParticipantes([]);
+    setCategoriasElegidas([]);
     setError("");
   }
 
@@ -72,7 +90,41 @@ export default function GruposPage() {
     setParticipantes(
       (participantesPorGrupo[g.id] ?? []).map((row) => ({ persona_id: row.persona_id, porcentaje: row.porcentaje }))
     );
+    setCategoriasElegidas(
+      Object.entries(preferenciaPorCategoria)
+        .filter(([, grupoId]) => grupoId === g.id)
+        .map(([categoriaId]) => categoriaId)
+    );
     setMostrarForm(true);
+  }
+
+  function alternarCategoria(categoriaId: string) {
+    setCategoriasElegidas((actual) =>
+      actual.includes(categoriaId) ? actual.filter((id) => id !== categoriaId) : [...actual, categoriaId]
+    );
+  }
+
+  // Guarda qué categorías usan el reparto de este grupo por defecto.
+  // Primero borra la preferencia de las categorías tocadas (las que se
+  // acaban de sacar de este grupo, y las que se acaban de elegir — estas
+  // últimas pueden venir apuntando a OTRO grupo, ya que cada categoría solo
+  // puede tener un grupo por defecto a la vez) y después inserta las
+  // elegidas apuntando a este grupo.
+  async function guardarCategoriasPreferidas(grupoId: string) {
+    const previamenteEnEsteGrupo = Object.entries(preferenciaPorCategoria)
+      .filter(([, gid]) => gid === grupoId)
+      .map(([categoriaId]) => categoriaId);
+    const aTocar = Array.from(new Set([...previamenteEnEsteGrupo, ...categoriasElegidas]));
+    if (aTocar.length > 0) {
+      const { error: delError } = await supabase.from("categoria_grupo_preferido").delete().in("categoria_id", aTocar);
+      if (delError) throw delError;
+    }
+    if (categoriasElegidas.length > 0) {
+      const { error: insError } = await supabase
+        .from("categoria_grupo_preferido")
+        .insert(categoriasElegidas.map((categoriaId) => ({ categoria_id: categoriaId, grupo_id: grupoId })));
+      if (insError) throw insError;
+    }
   }
 
   async function guardarParticipantes(grupoId: string) {
@@ -101,7 +153,10 @@ export default function GruposPage() {
         if (insError) throw insError;
         grupoId = data.id;
       }
-      if (grupoId) await guardarParticipantes(grupoId);
+      if (grupoId) {
+        await guardarParticipantes(grupoId);
+        await guardarCategoriasPreferidas(grupoId);
+      }
       cancelarForm();
       cargarTodo();
     } catch (err) {
@@ -132,6 +187,12 @@ export default function GruposPage() {
         return `${nombrePersona} ${Math.round(pct)}%`;
       })
       .join(" · ");
+  }
+
+  function categoriasDeGrupo(g: Grupo) {
+    return Object.entries(preferenciaPorCategoria)
+      .filter(([, grupoId]) => grupoId === g.id)
+      .map(([categoriaId]) => categorias.find((c) => c.id === categoriaId)?.nombre ?? "?");
   }
 
   return (
@@ -177,6 +238,36 @@ export default function GruposPage() {
               </p>
               <ParticipantesPicker personas={personas} value={participantes} onChange={setParticipantes} />
             </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Categorías con este reparto por defecto (opcional)</label>
+              <p className="mb-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+                Al crear un gasto en una de estas categorías, este grupo se precarga solo — igual se puede cambiar en
+                ese momento. Cada categoría solo puede tener un grupo por defecto a la vez.
+              </p>
+              <div className="flex flex-wrap gap-1.5">
+                {categorias.map((c) => {
+                  const elegida = categoriasElegidas.includes(c.id);
+                  const otroGrupoId = preferenciaPorCategoria[c.id];
+                  const otroGrupo = otroGrupoId && otroGrupoId !== editandoId ? grupos.find((g) => g.id === otroGrupoId) : null;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => alternarCategoria(c.id)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                        elegida
+                          ? "bg-brand-gradient text-white"
+                          : "bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300"
+                      }`}
+                    >
+                      {c.icono ? `${c.icono} ` : ""}
+                      {c.nombre}
+                      {!elegida && otroGrupo && <span className="opacity-70"> · hoy: {otroGrupo.nombre}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
             {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
             <button
               type="submit"
@@ -198,6 +289,11 @@ export default function GruposPage() {
                 <div className="min-w-0">
                   <p className="truncate font-semibold text-gray-800 dark:text-white">{g.nombre}</p>
                   <p className="truncate text-xs text-gray-400 dark:text-gray-500">{resumenReparto(g)}</p>
+                  {categoriasDeGrupo(g).length > 0 && (
+                    <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">
+                      Por defecto en: {categoriasDeGrupo(g).join(", ")}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">

@@ -15,7 +15,7 @@ import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { diaDelMes, formatCLP } from "@/lib/format";
 import { fechaPrimeraCuotaDesde } from "@/lib/cuotas";
 import { resolverMarca } from "@/lib/resolverMarca";
-import { Categoria, CompraVigente, Entidad, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
+import { Categoria, CategoriaGrupoPreferido, CompraVigente, Entidad, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
 
 // Pestaña "Cuotas" de /gastos — antes /compras, pantalla propia. La cuota
 // vigente se calcula sola cada mes, con la fecha de hoy (ver
@@ -27,6 +27,9 @@ export function CuotasLista() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // "Esta categoría usa este grupo por defecto" (ver Grupos y
+  // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
+  const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
   const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -49,6 +52,10 @@ export function CuotasLista() {
   const [marcaId, setMarcaId] = useState("");
   const [icono, setIcono] = useState("");
   const [participantes, setParticipantes] = useState<Participante[]>([]);
+  // true mientras el grupo elegido venga del auto-aplicado por categoría
+  // (no de una elección manual) — así, si el usuario cambia la categoría de
+  // nuevo, se puede reemplazar sin pisar una elección manual previa.
+  const [grupoEsAutomatico, setGrupoEsAutomatico] = useState(false);
 
   // Si en la cuenta solo hay una persona activa (el caso normal de una sola
   // persona usando la app), no tiene sentido preguntar "¿quiénes
@@ -57,7 +64,7 @@ export function CuotasLista() {
   const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargarTodo() {
-    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: ip }] =
+    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: cgp }, { data: ip }] =
       await Promise.all([
         supabase.from("vista_cuotas_vigentes").select("*").order("cuota_actual", { ascending: true }),
         supabase.from("entidades").select("*").order("nombre"),
@@ -65,6 +72,7 @@ export function CuotasLista() {
         supabase.from("categorias").select("*").order("nombre"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
+        supabase.from("categoria_grupo_preferido").select("*"),
         supabase.from("item_participantes").select("*").eq("origen", "compra"),
       ]);
     setCompras((c as CompraVigente[]) ?? []);
@@ -73,6 +81,11 @@ export function CuotasLista() {
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
+    const mapaPreferido: Record<string, string> = {};
+    ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
+      mapaPreferido[row.categoria_id] = row.grupo_id;
+    });
+    setPreferidoPorCategoria(mapaPreferido);
     const agrupado: Record<string, ItemParticipante[]> = {};
     ((ip as ItemParticipante[]) ?? []).forEach((row) => {
       if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
@@ -101,6 +114,7 @@ export function CuotasLista() {
     setMarcaId("");
     setIcono("");
     setParticipantes([]);
+    setGrupoEsAutomatico(false);
     setError("");
   }
 
@@ -119,6 +133,7 @@ export function CuotasLista() {
     setEntidadId(c.entidad_id ?? "");
     setCategoriaId(c.categoria_id ?? "");
     setGrupoId(c.grupo_id ?? "");
+    setGrupoEsAutomatico(false);
     setMarcaId(c.marca_id ?? "");
     setIcono(c.icono ?? "");
     const participantesExistentes = (participantesPorItem[c.compra_id] ?? []).map((row) => ({
@@ -324,6 +339,14 @@ export function CuotasLista() {
                     setMarcaId("");
                   }
                   setCategoriaId(e.target.value);
+                  // Si todavía no eligieron un grupo a mano (o el que hay
+                  // vino de este mismo auto-aplicado), precarga el grupo
+                  // que esta categoría tiene por defecto (ver Grupos).
+                  if (!grupoId || grupoEsAutomatico) {
+                    const sugerido = preferidoPorCategoria[e.target.value] ?? "";
+                    setGrupoId(sugerido);
+                    setGrupoEsAutomatico(!!sugerido);
+                  }
                 }}
                 className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
@@ -355,7 +378,10 @@ export function CuotasLista() {
               <label className="text-xs text-gray-500 dark:text-gray-400">Grupo (opcional)</label>
               <select
                 value={grupoId}
-                onChange={(e) => setGrupoId(e.target.value)}
+                onChange={(e) => {
+                  setGrupoId(e.target.value);
+                  setGrupoEsAutomatico(false);
+                }}
                 className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               >
                 <option value="">— Sin grupo —</option>
@@ -365,6 +391,11 @@ export function CuotasLista() {
                   </option>
                 ))}
               </select>
+              {grupoEsAutomatico && (
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Aplicado automáticamente porque es el reparto por defecto de esta categoría. Podés cambiarlo.
+                </p>
+              )}
             </div>
             {grupoId ? (
               <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
