@@ -11,7 +11,7 @@ import { MovimientoFab } from "@/components/MovimientoRapido";
 import { PersonalizarMenu } from "@/components/PersonalizarMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { resolverMarca } from "@/lib/resolverMarca";
-import { Entidad, Grupo, Marca, PreferenciasMenu } from "@/lib/types";
+import { Categoria, Entidad, Grupo, Marca, PreferenciasMenu } from "@/lib/types";
 
 // Sidebar fijo de escritorio — reemplaza al antiguo header horizontal
 // (DesktopNav.tsx, eliminado). El celular no se toca: sigue usando
@@ -299,6 +299,7 @@ export function DesktopSidebar() {
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -312,14 +313,16 @@ export function DesktopSidebar() {
   }
 
   async function cargarCatalogosDinamicos() {
-    const [{ data: e }, { data: g }, { data: m }] = await Promise.all([
+    const [{ data: e }, { data: g }, { data: m }, { data: c }] = await Promise.all([
       supabase.from("entidades").select("*").order("nombre"),
       supabase.from("grupos").select("*").order("nombre"),
       supabase.from("marcas").select("*"),
+      supabase.from("categorias").select("*").order("nombre"),
     ]);
     setEntidades((e as Entidad[]) ?? []);
     setGrupos((g as Grupo[]) ?? []);
     setMarcas((m as Marca[]) ?? []);
+    setCategorias((c as Categoria[]) ?? []);
   }
 
   useEffect(() => {
@@ -354,14 +357,15 @@ export function DesktopSidebar() {
       icon: () => <EntidadAvatar icono={g.icono} nombreFallback={g.nombre} className="h-5 w-5 rounded-md" />,
     }));
     // Además de las cuentas/tarjetas propias (entidades) de arriba, se puede
-    // anclar cualquier marca del catálogo compartido de tipo "casa comercial"
-    // o "banco" (ej. Ripley, Falabella, Santander) aunque la cuenta nunca la
-    // haya convertido en una entidad propia — apunta a /marca/[id], que lista
-    // los ítems cuyo marca_id (la marca del producto/servicio, no el medio de
-    // pago) coincide, sin importar con qué tarjeta se pagó cada uno. Ver
-    // distinción entidad_id vs. marca_id en schema.sql y Novedades 2026-09-05.
+    // anclar cualquier marca del catálogo compartido de tipo "casa comercial",
+    // "banco" o "caja de compensación" (ej. Ripley, Falabella, Santander, Los
+    // Andes) aunque la cuenta nunca la haya convertido en una entidad propia
+    // — apunta a /marca/[id], que lista los ítems cuyo marca_id (la marca del
+    // producto/servicio, no el medio de pago) coincide, sin importar con qué
+    // tarjeta se pagó cada uno. Ver distinción entidad_id vs. marca_id en
+    // schema.sql y Novedades 2026-09-05/2026-09-06.
     const deMarcas: ItemMenu[] = marcas
-      .filter((m) => m.tipo === "casa_comercial" || m.tipo === "banco")
+      .filter((m) => m.tipo === "casa_comercial" || m.tipo === "banco" || m.tipo === "caja_compensacion")
       .map((m) => ({
         key: `marca:${m.id}`,
         href: `/marca/${m.id}`,
@@ -369,8 +373,22 @@ export function DesktopSidebar() {
         ocultoPorDefecto: true,
         icon: () => <EntidadAvatar marca={m} className="h-5 w-5 rounded-md" />,
       }));
-    return [...deEntidades, ...deGrupos, ...deMarcas];
-  }, [entidades, grupos, marcas]);
+    // Y también se puede anclar cualquier categoría del catálogo (ej.
+    // "Educación", "Salud") — apunta a /categoria/[id], que junta TODO lo
+    // categorizado así sin importar quién lo paga, con qué tarjeta ni en qué
+    // grupo se reparte (a diferencia de /grupo/[id], acá entidad/marca/grupo
+    // siguen siendo libres por ítem). Sin filtrar por tipo: a diferencia de
+    // las marcas, cualquier categoría es un destino válido para anclar. Ver
+    // Novedades 2026-09-06.
+    const deCategorias: ItemMenu[] = categorias.map((c) => ({
+      key: `categoria:${c.id}`,
+      href: `/categoria/${c.id}`,
+      label: c.nombre,
+      ocultoPorDefecto: true,
+      icon: () => <EntidadAvatar icono={c.icono} nombreFallback={c.nombre} className="h-5 w-5 rounded-md" />,
+    }));
+    return [...deEntidades, ...deGrupos, ...deMarcas, ...deCategorias];
+  }, [entidades, grupos, marcas, categorias]);
 
   const todosLosItems = useMemo(() => [...ITEMS_TODOS, ...itemsDinamicos], [itemsDinamicos]);
 

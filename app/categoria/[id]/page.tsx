@@ -8,17 +8,22 @@ import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { IconoPicker } from "@/components/IconoPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
+import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { fechaPrimeraCuotaDesde } from "@/lib/cuotas";
 import { diaDelMes, formatCLP, mesActualISO, primerDiaMesSiguiente } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
 import {
   Categoria,
+  CategoriaGrupoPreferido,
   CompraVigente,
   Entidad,
   GastoDiario,
   GastoFijo,
   Grupo,
+  ItemParticipante,
   Marca,
+  Participante,
+  Persona,
   RepartoCuota,
   RepartoGastoDiario,
   RepartoGastoFijo,
@@ -31,7 +36,7 @@ type ItemFila = {
   tipo: TipoItem;
   id: string;
   descripcion: string;
-  categoria: string;
+  entidad: string;
   detalle: string;
   monto: number;
   marcaId: string | null;
@@ -41,47 +46,44 @@ type ItemFila = {
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
-// Pantalla de detalle de UN grupo de reparto (ej. "Hogar", con Marian 40% /
-// Felipe 60%) — se llega acá desde "Personalizar menú" del sidebar de
-// escritorio (ver DesktopSidebar.tsx). Junta TODO lo que se reparte con este
-// grupo, venga de donde venga (cuotas, gastos fijos o diarios — ver
-// migration_26_reparto_por_categoria.sql y migration_27_reparto_gastos_diarios.sql),
-// no solo lo que tenga la categoría "Hogar": si Feria o Panadería también
-// usan este mismo grupo, aparecen acá también. También se puede cargar,
-// editar o eliminar un ítem sin salir de la ficha (antes solo se podía ver
-// — ver Novedades 2026-09-06): a diferencia de /entidad/[id] y /marca/[id],
-// acá el `grupo_id` queda SIEMPRE fijo en este grupo (no hace falta elegir
-// personas ni grupo en el formulario, ya está resuelto por estar en esta
-// pantalla), y el tipo de ítem incluye "Diario" además de Cuota/Gasto fijo,
-// porque los gastos sueltos del día a día (feria, pan…) son el caso de uso
-// más común de un grupo como "Hogar".
+// Pantalla de detalle de UNA categoría del catálogo compartido (ej.
+// "Educación (colegio, cursos)", "Feria") — se llega acá desde "Personalizar
+// menú" del sidebar de escritorio (ver DesktopSidebar.tsx), a pedido del
+// usuario ("un ícono de educación"). Es la cuarta dimensión de anclaje del
+// menú lateral, junto a /entidad/[id] (medio de pago), /marca/[id] (marca
+// del producto) y /grupo/[id] (reparto): esta filtra por categoria_id, sin
+// importar quién lo paga, con qué marca, ni con quién se reparte.
 //
-// Cuotas y gastos fijos muestran "todo lo activo" (mismo criterio que
-// /entidad/[id]); los diarios sí quedan acotados al mes en curso porque son
-// gastos sueltos del día a día, no cuotas — mismo alcance que ya tiene
-// vista_reparto_gastos_diarios.
-export default function GrupoDetallePage({ params }: { params: { id: string } }) {
+// A diferencia de /entidad/[id] y /marca/[id] (que fijan entidad_id o
+// marca_id), acá el que queda fijo es categoria_id — el resto de los campos
+// (medio de pago, marca del producto, grupo o personas) quedan libres, igual
+// que en el resto de la app, incluido el auto-completado del grupo por
+// defecto de esta categoría (ver Grupos y migration_26_reparto_por_categoria.sql).
+// Incluye Diarios además de Cuotas/Gastos fijos (a diferencia de /entidad y
+// /marca) porque un gasto diario SIEMPRE tiene una categoría — es la
+// dimensión más natural para ese tipo de ítem.
+export default function CategoriaDetallePage({ params }: { params: { id: string } }) {
   const { id } = params;
   const router = useRouter();
-  const [grupo, setGrupo] = useState<Grupo | null>(null);
+  const [categoria, setCategoria] = useState<Categoria | null>(null);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
-  const [composicion, setComposicion] = useState<{ persona_nombre: string; porcentaje: number }[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [grupoPorDefecto, setGrupoPorDefecto] = useState("");
   const [cuotas, setCuotas] = useState<CompraVigente[]>([]);
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
   const [diarios, setDiarios] = useState<GastoDiario[]>([]);
   const [repartoCuotas, setRepartoCuotas] = useState<RepartoCuota[]>([]);
   const [repartoGastos, setRepartoGastos] = useState<RepartoGastoFijo[]>([]);
   const [repartoDiarios, setRepartoDiarios] = useState<RepartoGastoDiario[]>([]);
+  const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [cargando, setCargando] = useState(true);
-  const [noEncontrado, setNoEncontrado] = useState(false);
+  const [noEncontrada, setNoEncontrada] = useState(false);
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
-  // Distinto de null mientras se edita un ítem ya existente — misma idea
-  // que en /entidad/[id]/page.tsx y /marca/[id]/page.tsx.
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [editandoTipo, setEditandoTipo] = useState<TipoItem | null>(null);
 
@@ -96,67 +98,81 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
   const [montoDiario, setMontoDiario] = useState("");
   const [fecha, setFecha] = useState(hoyISO());
   const [entidadId, setEntidadId] = useState("");
-  const [categoriaId, setCategoriaId] = useState("");
+  const [grupoId, setGrupoId] = useState("");
   const [marcaId, setMarcaId] = useState("");
   const [icono, setIcono] = useState("");
+  const [participantes, setParticipantes] = useState<Participante[]>([]);
+  const [grupoEsAutomatico, setGrupoEsAutomatico] = useState(false);
 
-  const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId) ?? null;
+  const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargar() {
     setCargando(true);
-    setNoEncontrado(false);
+    setNoEncontrada(false);
     const [
-      { data: g },
+      { data: cat },
       { data: m },
       { data: ent },
-      { data: cat },
       { data: gr },
+      { data: p },
+      { data: cgp },
       { data: c },
       { data: gf },
       { data: d },
       { data: rc },
       { data: rg },
       { data: rd },
+      { data: ipCompra },
+      { data: ipFijo },
     ] = await Promise.all([
-      supabase.from("grupos").select("*").eq("id", id).maybeSingle(),
+      supabase.from("categorias").select("*").eq("id", id).maybeSingle(),
       supabase.from("marcas").select("*"),
       supabase.from("entidades").select("*").order("nombre"),
-      supabase.from("categorias").select("*").order("nombre"),
-      supabase.from("vista_grupo_reparto").select("*").eq("grupo_id", id),
-      supabase.from("vista_cuotas_mes_actual").select("*").eq("grupo_id", id),
-      supabase.from("gastos_fijos").select("*").eq("grupo_id", id).eq("activo", true),
+      supabase.from("grupos").select("*").order("nombre"),
+      supabase.from("personas").select("*").eq("activo", true).order("nombre"),
+      supabase.from("categoria_grupo_preferido").select("*").eq("categoria_id", id).maybeSingle(),
+      supabase.from("vista_cuotas_mes_actual").select("*").eq("categoria_id", id),
+      supabase.from("gastos_fijos").select("*").eq("categoria_id", id).eq("activo", true),
       supabase
         .from("gastos_diarios")
         .select("*")
-        .eq("grupo_id", id)
+        .eq("categoria_id", id)
         .gte("fecha", mesActualISO())
         .lt("fecha", primerDiaMesSiguiente()),
-      supabase.from("vista_reparto_cuotas_mes").select("*").eq("grupo_id", id),
-      supabase.from("vista_reparto_gastos_fijos").select("*").eq("grupo_id", id),
-      supabase.from("vista_reparto_gastos_diarios").select("*").eq("grupo_id", id),
+      supabase.from("vista_reparto_cuotas_mes").select("*").eq("categoria_id", id),
+      supabase.from("vista_reparto_gastos_fijos").select("*").eq("categoria_id", id),
+      supabase.from("vista_reparto_gastos_diarios").select("*").eq("categoria_id", id),
+      supabase.from("item_participantes").select("*").eq("origen", "compra"),
+      supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
     ]);
-    if (!g) {
-      setNoEncontrado(true);
-      setGrupo(null);
+    if (!cat) {
+      setNoEncontrada(true);
+      setCategoria(null);
       setCargando(false);
       return;
     }
-    setGrupo(g as Grupo);
+    setCategoria(cat as Categoria);
     setMarcas((m as Marca[]) ?? []);
     setEntidades((ent as Entidad[]) ?? []);
-    setCategorias((cat as Categoria[]) ?? []);
-    setComposicion(
-      ((gr as { persona_nombre: string; porcentaje_efectivo: number }[]) ?? []).map((r) => ({
-        persona_nombre: r.persona_nombre,
-        porcentaje: r.porcentaje_efectivo,
-      }))
-    );
+    setGrupos((gr as Grupo[]) ?? []);
+    setPersonas((p as Persona[]) ?? []);
+    setGrupoPorDefecto((cgp as CategoriaGrupoPreferido | null)?.grupo_id ?? "");
     setCuotas((c as CompraVigente[]) ?? []);
     setGastosFijos((gf as GastoFijo[]) ?? []);
     setDiarios((d as GastoDiario[]) ?? []);
     setRepartoCuotas((rc as RepartoCuota[]) ?? []);
     setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
     setRepartoDiarios((rd as RepartoGastoDiario[]) ?? []);
+    const agrupado: Record<string, ItemParticipante[]> = {};
+    ((ipCompra as ItemParticipante[]) ?? []).forEach((row) => {
+      if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
+      agrupado[row.origen_id].push(row);
+    });
+    ((ipFijo as ItemParticipante[]) ?? []).forEach((row) => {
+      if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
+      agrupado[row.origen_id].push(row);
+    });
+    setParticipantesPorItem(agrupado);
     setCargando(false);
   }
 
@@ -166,14 +182,14 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
   }, [id]);
 
   const items = useMemo<ItemFila[]>(() => {
-    const categoriaNombre = (catId: string | null) => categorias.find((x) => x.id === catId)?.nombre ?? "Sin categoría";
+    const entidadNombre = (entId: string | null) => entidades.find((x) => x.id === entId)?.nombre ?? "Sin cuenta";
     return [
       ...cuotas.map((x) => ({
         key: `c-${x.compra_id}`,
         tipo: "cuota" as TipoItem,
         id: x.compra_id,
         descripcion: x.descripcion,
-        categoria: categoriaNombre(x.categoria_id),
+        entidad: entidadNombre(x.entidad_id),
         detalle: `Cuota ${x.cuota_actual} de ${x.n_cuotas}`,
         monto: Number(x.monto_cuota),
         marcaId: x.marca_id,
@@ -187,7 +203,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
         tipo: "fijo" as TipoItem,
         id: x.id,
         descripcion: x.descripcion,
-        categoria: categoriaNombre(x.categoria_id),
+        entidad: entidadNombre(x.entidad_id),
         detalle: "Gasto fijo",
         monto: Number(x.monto_estimado),
         marcaId: x.marca_id,
@@ -201,7 +217,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
         tipo: "diario" as TipoItem,
         id: x.id,
         descripcion: x.descripcion,
-        categoria: categoriaNombre(x.categoria_id),
+        entidad: "Diario",
         detalle: "Diario",
         monto: Number(x.monto),
         marcaId: x.marca_id,
@@ -211,7 +227,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
           .map((r) => ({ persona_nombre: r.persona_nombre, monto_persona: r.monto_persona })),
       })),
     ].sort((a, b) => b.monto - a.monto);
-  }, [cuotas, gastosFijos, diarios, repartoCuotas, repartoGastos, repartoDiarios, categorias]);
+  }, [cuotas, gastosFijos, diarios, repartoCuotas, repartoGastos, repartoDiarios, entidades]);
 
   function cancelarForm() {
     setMostrarForm(false);
@@ -228,26 +244,34 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
     setMontoDiario("");
     setFecha(hoyISO());
     setEntidadId("");
-    setCategoriaId("");
+    setGrupoId("");
     setMarcaId("");
     setIcono("");
+    setParticipantes([]);
+    setGrupoEsAutomatico(false);
     setError("");
   }
 
   function abrirFormNuevo() {
+    if (grupoPorDefecto) {
+      setGrupoId(grupoPorDefecto);
+      setGrupoEsAutomatico(true);
+    } else if (unicaPersona) {
+      setParticipantes([{ persona_id: unicaPersona.id, porcentaje: null }]);
+    }
     setMostrarForm(true);
   }
 
-  // Ver la nota gemela en /entidad/[id]/page.tsx y /marca/[id]/page.tsx:
-  // precarga el formulario con un ítem ya cargado para editarlo. Acá no hay
-  // participantes que restaurar — todo lo que aparece en esta pantalla ya
-  // tiene `grupo_id` fijo en este grupo, así que el reparto lo resuelve
-  // siempre el grupo.
+  // Ver la nota gemela en /entidad/[id]/page.tsx, /marca/[id]/page.tsx y
+  // /grupo/[id]/page.tsx: precarga el formulario con un ítem ya cargado para
+  // editarlo. Acá la categoría queda fija (es la de esta pantalla); el resto
+  // de los campos se restauran tal cual estaban guardados.
   function iniciarEdicion(it: ItemFila) {
     setEditandoId(it.id);
     setEditandoTipo(it.tipo);
     setDescripcion(it.descripcion);
     setMarcaId(it.marcaId ?? "");
+    setGrupoEsAutomatico(false);
     if (it.tipo === "cuota") {
       const c = cuotas.find((x) => x.compra_id === it.id);
       if (!c) return;
@@ -257,7 +281,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
       setCuotaActual(String(c.cuota_actual));
       setDiaVencimiento(diaDelMes(c.fecha_primera_cuota));
       setEntidadId(c.entidad_id ?? "");
-      setCategoriaId(c.categoria_id ?? "");
+      setGrupoId(c.grupo_id ?? "");
       setIcono(c.icono ?? "");
     } else if (it.tipo === "fijo") {
       const g = gastosFijos.find((x) => x.id === it.id);
@@ -266,7 +290,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
       setMontoEstimado(String(g.monto_estimado));
       setDiaMesPago(g.dia_mes_pago ?? new Date().getDate());
       setEntidadId(g.entidad_id ?? "");
-      setCategoriaId(g.categoria_id ?? "");
+      setGrupoId(g.grupo_id ?? "");
       setIcono(g.icono ?? "");
     } else {
       const d = diarios.find((x) => x.id === it.id);
@@ -274,22 +298,42 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
       setTipoItem("diario");
       setMontoDiario(String(d.monto));
       setFecha(d.fecha.slice(0, 10));
-      setCategoriaId(d.categoria_id ?? "");
       setEntidadId("");
+      setGrupoId(d.grupo_id ?? "");
       setIcono("");
     }
+    const participantesExistentes = (participantesPorItem[it.id] ?? []).map((row) => ({
+      persona_id: row.persona_id,
+      porcentaje: row.porcentaje,
+    }));
+    setParticipantes(
+      participantesExistentes.length > 0
+        ? participantesExistentes
+        : unicaPersona
+          ? [{ persona_id: unicaPersona.id, porcentaje: null }]
+          : []
+    );
     setMostrarForm(true);
   }
 
-  function elegirCategoria(nuevaCategoriaId: string) {
-    const nuevaCategoria = categorias.find((c) => c.id === nuevaCategoriaId) ?? null;
-    if (nuevaCategoria?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
-    setCategoriaId(nuevaCategoriaId);
+  async function guardarParticipantes(origen: "compra" | "gasto_fijo", origenId: string) {
+    const { error: delError } = await supabase.from("item_participantes").delete().eq("origen", origen).eq("origen_id", origenId);
+    if (delError) throw delError;
+    if (!grupoId && participantes.length > 0) {
+      const { error: insError } = await supabase
+        .from("item_participantes")
+        .insert(participantes.map((p) => ({ origen, origen_id: origenId, persona_id: p.persona_id, porcentaje: p.porcentaje })));
+      if (insError) throw insError;
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (tipoItem !== "diario" && !grupoId && participantes.length === 0) {
+      setError("Elige al menos una persona, o asocia el ítem a un grupo.");
+      return;
+    }
     setGuardando(true);
     try {
       if (tipoItem === "cuota") {
@@ -302,8 +346,8 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
           n_cuotas: nCuotasNum,
           fecha_primera_cuota: fechaPrimeraCuotaDesde(cuotaActualNum, diaVencimiento),
           entidad_id: entidadId || null,
-          categoria_id: categoriaId || null,
-          grupo_id: id,
+          categoria_id: id,
+          grupo_id: grupoId || null,
           marca_id: marcaId || null,
           icono: icono || null,
         };
@@ -316,12 +360,13 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
           if (insError) throw insError;
           compraId = data.id;
         }
+        await guardarParticipantes("compra", compraId!);
       } else if (tipoItem === "fijo") {
         const payload = {
           descripcion,
-          categoria_id: categoriaId || null,
+          categoria_id: id,
           entidad_id: entidadId || null,
-          grupo_id: id,
+          grupo_id: grupoId || null,
           marca_id: marcaId || null,
           icono: icono || null,
           monto_estimado: Number(montoEstimado) || 0,
@@ -334,17 +379,19 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
           const { error: updError } = await supabase.from("gastos_fijos").update(payload).eq("id", gastoId);
           if (updError) throw updError;
         } else {
-          const { error: insError } = await supabase.from("gastos_fijos").insert(payload);
+          const { data, error: insError } = await supabase.from("gastos_fijos").insert(payload).select().single();
           if (insError) throw insError;
+          gastoId = data.id;
         }
+        await guardarParticipantes("gasto_fijo", gastoId!);
       } else {
         const payload = {
           descripcion,
           monto: Number(montoDiario) || 0,
           fecha,
-          categoria_id: categoriaId || null,
+          categoria_id: id,
           marca_id: marcaId || null,
-          grupo_id: id,
+          grupo_id: grupoId || null,
         };
         let diarioId = editandoTipo === "diario" ? editandoId : null;
         if (diarioId) {
@@ -373,9 +420,6 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
       }
       await supabase.from("item_participantes").delete().eq("origen", "compra").eq("origen_id", it.id);
     } else if (it.tipo === "fijo") {
-      // Los gastos fijos no se borran, se desactivan (mismo criterio que
-      // GastosFijosLista.tsx) — conserva el historial de pagos ya
-      // registrados en el Calendario de pagos.
       const { error: dbError } = await supabase.from("gastos_fijos").update({ activo: false }).eq("id", it.id);
       if (dbError) {
         setError(dbError.message || "No se pudo quitar.");
@@ -393,6 +437,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
   }
 
   const marcaDe = (marcaId: string | null) => marcas.find((m) => m.id === marcaId) ?? null;
+  const grupoDe = (grupoIdBuscado: string) => grupos.find((g) => g.id === grupoIdBuscado) ?? null;
   const totalMensual = useMemo(() => items.reduce((acc, it) => acc + it.monto, 0), [items]);
   const resumenPersonas = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -401,19 +446,18 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
       .map(([persona_nombre, total]) => ({ persona_nombre, total }))
       .sort((a, b) => b.total - a.total);
   }, [items]);
-  const textoComposicion = composicion.map((c) => `${c.persona_nombre} ${Math.round(c.porcentaje)}%`).join(" · ");
 
   if (cargando) {
     return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
 
-  if (noEncontrado || !grupo) {
+  if (noEncontrada || !categoria) {
     return (
       <div className="space-y-3 pb-10">
         <button onClick={() => router.back()} className="text-xs text-brand-from dark:text-pink-400">
           ‹ Volver
         </button>
-        <p className="text-center text-sm text-gray-400 dark:text-gray-500">No se encontró este grupo.</p>
+        <p className="text-center text-sm text-gray-400 dark:text-gray-500">No se encontró esta categoría.</p>
       </div>
     );
   }
@@ -426,12 +470,10 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
 
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <EntidadAvatar icono={grupo.icono} nombreFallback={grupo.nombre} className="h-11 w-11" />
+          <EntidadAvatar icono={categoria.icono} nombreFallback={categoria.nombre} className="h-11 w-11" />
           <div>
-            <h1 className="text-lg font-bold text-gray-800 dark:text-white">{grupo.nombre}</h1>
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              {textoComposicion || "Sin personas asignadas todavía"}
-            </p>
+            <h1 className="text-lg font-bold text-gray-800 dark:text-white">{categoria.nombre}</h1>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{categoria.tipo === "fijo" ? "Categoría fija" : "Categoría variable"}</p>
           </div>
         </div>
         <button
@@ -475,9 +517,6 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
                 Editando ítem — el tipo (Cuota/Fijo/Diario) no se puede cambiar acá.
               </p>
             )}
-            <p className="text-[11px] text-gray-400 dark:text-gray-500">
-              Este ítem queda repartido automáticamente con el grupo {grupo.nombre} — no hace falta elegir personas.
-            </p>
 
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400">Descripción</label>
@@ -485,7 +524,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
                 required
                 value={descripcion}
                 onChange={(e) => setDescripcion(e.target.value)}
-                placeholder="Ej: Mercadería del mes"
+                placeholder={`Ej: Gasto de ${categoria.nombre.toLowerCase()}`}
                 className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
               />
             </div>
@@ -602,31 +641,15 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
               </div>
             )}
 
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
-              <select
-                value={categoriaId}
-                onChange={(e) => elegirCategoria(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
-              >
-                <option value="">—</option>
-                {categorias.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {categoriaSeleccionada?.tipo_marca_sugerido && (
+            {categoria.tipo_marca_sugerido && (
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400">
-                  ¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)
+                  ¿Cuál {categoria.nombre.toLowerCase()}? (opcional)
                 </label>
                 <div className="mt-1">
                   <MarcaSugeridaPicker
                     marcas={marcas}
-                    tipo={categoriaSeleccionada.tipo_marca_sugerido}
+                    tipo={categoria.tipo_marca_sugerido}
                     value={marcaId}
                     onChange={setMarcaId}
                     onCatalogoActualizado={cargar}
@@ -634,6 +657,50 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
                 </div>
               </div>
             )}
+
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Grupo (opcional)</label>
+              <select
+                value={grupoId}
+                onChange={(e) => {
+                  setGrupoId(e.target.value);
+                  setGrupoEsAutomatico(false);
+                }}
+                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
+              >
+                <option value="">— Sin grupo —</option>
+                {grupos.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.nombre}
+                  </option>
+                ))}
+              </select>
+              {grupoEsAutomatico && (
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Aplicado automáticamente porque es el reparto por defecto de esta categoría. Podés cambiarlo.
+                </p>
+              )}
+            </div>
+
+            {tipoItem !== "diario" &&
+              (grupoId ? (
+                <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
+                  El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;.
+                </p>
+              ) : unicaPersona ? null : (
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400">¿Quiénes participan?</label>
+                  <p className="mb-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    Deja el % en blanco para repartir en partes iguales el resto.
+                  </p>
+                  <ParticipantesPicker
+                    personas={personas}
+                    value={participantes}
+                    onChange={setParticipantes}
+                    montoTotal={tipoItem === "cuota" ? (montoCuota ? Number(montoCuota) : undefined) : Number(montoEstimado) || undefined}
+                  />
+                </div>
+              ))}
 
             {tipoItem !== "diario" && (
               <div>
@@ -660,7 +727,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
         <p className="text-xs text-gray-400 dark:text-gray-500">Total vigente</p>
         <p className="text-2xl font-bold text-gray-800 dark:text-white">{formatCLP(totalMensual)}</p>
         <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
-          Cuotas activas, gastos fijos y diarios de este mes repartidos con el grupo {grupo.nombre}.
+          Cuotas activas, gastos fijos y diarios de este mes categorizados como {categoria.nombre}, sin importar quién los paga.
         </p>
       </Card>
 
@@ -681,10 +748,10 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
       <Card>
         <p className="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-300">Detalle</p>
         <p className="mb-3 text-xs text-gray-400 dark:text-gray-500">
-          Todo lo repartido con el grupo {grupo.nombre}, con las cuotas que quedan y cuánto le toca a cada uno.
+          Todo lo activo categorizado como {categoria.nombre}, con las cuotas que quedan y quién debe pagar cada ítem.
         </p>
         {items.length === 0 ? (
-          <p className="py-2 text-sm text-gray-400 dark:text-gray-500">Nada repartido con este grupo por ahora.</p>
+          <p className="py-2 text-sm text-gray-400 dark:text-gray-500">Nada cargado en esta categoría por ahora.</p>
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-white/10">
             {items.map((it) => (
@@ -693,7 +760,7 @@ export default function GrupoDetallePage({ params }: { params: { id: string } })
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{it.descripcion}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {it.categoria} · {it.detalle}
+                    {it.detalle} · {it.entidad}
                   </p>
                   <p className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500">
                     {it.reparto.length > 0
