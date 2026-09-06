@@ -241,6 +241,18 @@ const ITEMS_OPCIONALES: ItemMenu[] = [
       </svg>
     ),
   },
+  {
+    key: "sugerencias",
+    href: "/sugerencias",
+    label: "Sugerencias",
+    ocultoPorDefecto: true,
+    icon: (a: boolean) => (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+        <rect x="3" y="5" width="18" height="14" rx="2.2" />
+        <path d="m3.5 6 8.5 6.5L20.5 6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
 
 // Pool completo de ítems personalizables: los de fábrica + los opcionales.

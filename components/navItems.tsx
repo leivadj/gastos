@@ -151,6 +151,16 @@ export const navItems = [
     ),
   },
   {
+    href: "/sugerencias",
+    label: "Sugerencias",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <rect x="3" y="5" width="18" height="14" rx="2.2" />
+        <path d="m3.5 6 8.5 6.5L20.5 6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/personas",
     label: "Personas",
     icon: (active: boolean) => (

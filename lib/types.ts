@@ -242,6 +242,29 @@ export interface Transferencia {
   notas: string | null;
 }
 
+// Movimiento detectado leyendo el correo del banco (ver
+// migration_29_sugerencias_correo.sql y app/api/sugerencias-correo), pendiente
+// de revisión manual en /sugerencias. "gasto" y "transferencia_tercero" se
+// confirman igual (como gasto diario) — la diferencia es solo informativa
+// (si fue una compra a un comercio o plata que le mandaste a una persona).
+// "transferencia_propia" se confirma como "↔ Transferencia" entre tus
+// propias cuentas, no es gasto ni ingreso.
+export type TipoSugerenciaCorreo = "gasto" | "transferencia_propia" | "transferencia_tercero";
+export type EstadoSugerenciaCorreo = "pendiente" | "confirmada" | "descartada";
+
+export interface SugerenciaCorreo {
+  id: string;
+  tipo: TipoSugerenciaCorreo;
+  monto: number;
+  descripcion: string;
+  fecha: string;
+  estado: EstadoSugerenciaCorreo;
+  // Campos crudos sacados del correo (comercio, cuenta, comentario…), tal
+  // cual se guardaron — solo para poder revisar cómo se interpretó.
+  datos_originales: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface ResumenPersonaMes {
   persona_id: string;
   persona_nombre: string;

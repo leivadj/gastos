@@ -21,6 +21,7 @@ const RUTAS_MAS = [
   "/ingresos",
   "/grupos",
   "/personas",
+  "/sugerencias",
   "/admin",
 ];
 

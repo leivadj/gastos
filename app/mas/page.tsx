@@ -23,6 +23,7 @@ const HREFS_AGRUPADOS = [
   "/ingresos",
   "/grupos",
   "/personas",
+  "/sugerencias",
 ];
 
 export default function MasPage() {
@@ -44,8 +45,8 @@ export default function MasPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Más</h1>
         <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
-          Gastos, calendario de pagos, movimientos, reportes, metas de ahorro, auto, salud, ingresos, grupos, personas
-          {esAdminUsuario ? " y ajustes" : ""}.
+          Gastos, calendario de pagos, movimientos, reportes, metas de ahorro, auto, salud, ingresos, grupos, personas,
+          sugerencias{esAdminUsuario ? " y ajustes" : ""}.
         </p>
       </div>
 

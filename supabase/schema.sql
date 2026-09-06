@@ -377,6 +377,24 @@ create table preferencias_menu (
   updated_at timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------------------
+-- SUGERENCIAS_CORREO — movimientos detectados leyendo el correo del banco
+-- (ver migration_29), pendientes de revisión manual en /sugerencias. Nunca se
+-- confirman solos: siempre los guarda el usuario a mano desde esa pantalla,
+-- que los inserta en gastos_diarios o transferencias según corresponda.
+-- ---------------------------------------------------------------------------
+create table sugerencias_correo (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id),
+  tipo text not null check (tipo in ('gasto', 'transferencia_propia', 'transferencia_tercero')),
+  monto numeric(12, 2) not null check (monto > 0),
+  descripcion text not null,
+  fecha date not null,
+  estado text not null default 'pendiente' check (estado in ('pendiente', 'confirmada', 'descartada')),
+  datos_originales jsonb,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- VISTAS — aquí vive la automatización de las cuotas y del reparto
 -- ============================================================================
@@ -591,6 +609,7 @@ alter table metas_ahorro_aportes enable row level security;
 alter table gastos_diarios enable row level security;
 alter table documentos_auto enable row level security;
 alter table preferencias_menu enable row level security;
+alter table sugerencias_correo enable row level security;
 
 create policy "solo_dueno" on personas for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
@@ -639,6 +658,8 @@ create policy "solo_dueno" on gastos_diarios for all
 create policy "solo_dueno" on documentos_auto for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on preferencias_menu for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on sugerencias_correo for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ============================================================================
