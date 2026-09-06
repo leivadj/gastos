@@ -11,7 +11,7 @@ import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { TIPO_LABEL } from "@/components/TarjetaVisual";
 import { fechaPrimeraCuotaDesde } from "@/lib/cuotas";
 import { resolverMarca } from "@/lib/resolverMarca";
-import { formatCLP } from "@/lib/format";
+import { diaDelMes, formatCLP } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
 import {
   Categoria,
@@ -20,6 +20,7 @@ import {
   Entidad,
   GastoFijo,
   Grupo,
+  ItemParticipante,
   Marca,
   Participante,
   Persona,
@@ -29,6 +30,8 @@ import {
 
 type ItemFila = {
   key: string;
+  tipo: TipoItem;
+  id: string;
   descripcion: string;
   categoria: string;
   detalle: string;
@@ -48,7 +51,8 @@ type TipoItem = "cuota" | "fijo";
 // cuotas quedan y a quién le corresponde pagar cada ítem — y desde acá mismo
 // cargar un ítem nuevo (compra en cuotas o gasto fijo) SIN tener que ir a
 // /gastos y elegir la tarjeta a mano, ya que ya se sabe con cuál se está
-// mirando.
+// mirando. También se puede editar o eliminar un ítem ya cargado sin salir
+// de la ficha (antes solo se podía agregar — ver Novedades 2026-09-06).
 //
 // A propósito NO filtra por mes (a diferencia de "Movimientos" en
 // /tarjetas): reutiliza las mismas vistas de "vigente ahora" que ya usa esa
@@ -66,13 +70,22 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
-  const [items, setItems] = useState<ItemFila[]>([]);
+  const [cuotas, setCuotas] = useState<CompraVigente[]>([]);
+  const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
+  const [repartoCuotas, setRepartoCuotas] = useState<RepartoCuota[]>([]);
+  const [repartoGastos, setRepartoGastos] = useState<RepartoGastoFijo[]>([]);
+  const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [cargando, setCargando] = useState(true);
   const [noEncontrada, setNoEncontrada] = useState(false);
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
+  // Distinto de null mientras se edita un ítem ya existente (en vez de
+  // cargar uno nuevo) — guarda tanto el id como el tipo (compra/gasto fijo)
+  // para saber a qué tabla mandar el `update`. Ver iniciarEdicion más abajo.
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editandoTipo, setEditandoTipo] = useState<TipoItem | null>(null);
 
   const [tipoItem, setTipoItem] = useState<TipoItem>("cuota");
   const [descripcion, setDescripcion] = useState("");
@@ -95,19 +108,33 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
   async function cargar() {
     setCargando(true);
     setNoEncontrada(false);
-    const [{ data: e }, { data: m }, { data: cat }, { data: gr }, { data: p }, { data: cgp }, { data: c }, { data: gf }, { data: rc }, { data: rg }] =
-      await Promise.all([
-        supabase.from("entidades").select("*").eq("id", id).maybeSingle(),
-        supabase.from("marcas").select("*"),
-        supabase.from("categorias").select("*").order("nombre"),
-        supabase.from("grupos").select("*").order("nombre"),
-        supabase.from("personas").select("*").eq("activo", true).order("nombre"),
-        supabase.from("categoria_grupo_preferido").select("*"),
-        supabase.from("vista_cuotas_mes_actual").select("*").eq("entidad_id", id),
-        supabase.from("gastos_fijos").select("*").eq("entidad_id", id).eq("activo", true),
-        supabase.from("vista_reparto_cuotas_mes").select("*").eq("entidad_id", id),
-        supabase.from("vista_reparto_gastos_fijos").select("*").eq("entidad_id", id),
-      ]);
+    const [
+      { data: e },
+      { data: m },
+      { data: cat },
+      { data: gr },
+      { data: p },
+      { data: cgp },
+      { data: c },
+      { data: gf },
+      { data: rc },
+      { data: rg },
+      { data: ipCompra },
+      { data: ipFijo },
+    ] = await Promise.all([
+      supabase.from("entidades").select("*").eq("id", id).maybeSingle(),
+      supabase.from("marcas").select("*"),
+      supabase.from("categorias").select("*").order("nombre"),
+      supabase.from("grupos").select("*").order("nombre"),
+      supabase.from("personas").select("*").eq("activo", true).order("nombre"),
+      supabase.from("categoria_grupo_preferido").select("*"),
+      supabase.from("vista_cuotas_mes_actual").select("*").eq("entidad_id", id),
+      supabase.from("gastos_fijos").select("*").eq("entidad_id", id).eq("activo", true),
+      supabase.from("vista_reparto_cuotas_mes").select("*").eq("entidad_id", id),
+      supabase.from("vista_reparto_gastos_fijos").select("*").eq("entidad_id", id),
+      supabase.from("item_participantes").select("*").eq("origen", "compra"),
+      supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
+    ]);
     if (!e) {
       setNoEncontrada(true);
       setEntidad(null);
@@ -116,8 +143,7 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
     }
     setEntidad(e as Entidad);
     setMarcas((m as Marca[]) ?? []);
-    const categoriasData = (cat as Categoria[]) ?? [];
-    setCategorias(categoriasData);
+    setCategorias((cat as Categoria[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     const mapaPreferido: Record<string, string> = {};
@@ -125,14 +151,38 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
       mapaPreferido[row.categoria_id] = row.grupo_id;
     });
     setPreferidoPorCategoria(mapaPreferido);
+    setCuotas((c as CompraVigente[]) ?? []);
+    setGastosFijos((gf as GastoFijo[]) ?? []);
+    setRepartoCuotas((rc as RepartoCuota[]) ?? []);
+    setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
+    // Participantes de cuotas y de gastos fijos, agrupados por el id del
+    // ítem — mismo criterio que CuotasLista.tsx/GastosFijosLista.tsx, para
+    // poder precargar "¿quiénes participan?" al editar (ver iniciarEdicion).
+    const agrupado: Record<string, ItemParticipante[]> = {};
+    ((ipCompra as ItemParticipante[]) ?? []).forEach((row) => {
+      if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
+      agrupado[row.origen_id].push(row);
+    });
+    ((ipFijo as ItemParticipante[]) ?? []).forEach((row) => {
+      if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
+      agrupado[row.origen_id].push(row);
+    });
+    setParticipantesPorItem(agrupado);
+    setCargando(false);
+  }
 
-    const categoriaNombre = (catId: string | null) => categoriasData.find((x) => x.id === catId)?.nombre ?? "Sin categoría";
-    const repartoCuotas = (rc as RepartoCuota[]) ?? [];
-    const repartoGastos = (rg as RepartoGastoFijo[]) ?? [];
+  useEffect(() => {
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-    const filas: ItemFila[] = [
-      ...((c as CompraVigente[]) ?? []).map((x) => ({
+  const items = useMemo<ItemFila[]>(() => {
+    const categoriaNombre = (catId: string | null) => categorias.find((x) => x.id === catId)?.nombre ?? "Sin categoría";
+    return [
+      ...cuotas.map((x) => ({
         key: `c-${x.compra_id}`,
+        tipo: "cuota" as TipoItem,
+        id: x.compra_id,
         descripcion: x.descripcion,
         categoria: categoriaNombre(x.categoria_id),
         detalle: `Cuota ${x.cuota_actual} de ${x.n_cuotas}`,
@@ -143,8 +193,10 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
           .filter((r) => r.compra_id === x.compra_id)
           .map((r) => ({ persona_nombre: r.persona_nombre, monto_persona: r.monto_persona })),
       })),
-      ...((gf as GastoFijo[]) ?? []).map((x) => ({
+      ...gastosFijos.map((x) => ({
         key: `g-${x.id}`,
+        tipo: "fijo" as TipoItem,
+        id: x.id,
         descripcion: x.descripcion,
         categoria: categoriaNombre(x.categoria_id),
         detalle: "Gasto fijo",
@@ -156,18 +208,12 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
           .map((r) => ({ persona_nombre: r.persona_nombre, monto_persona: r.monto_persona })),
       })),
     ].sort((a, b) => b.monto - a.monto);
-
-    setItems(filas);
-    setCargando(false);
-  }
-
-  useEffect(() => {
-    cargar();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [cuotas, gastosFijos, repartoCuotas, repartoGastos, categorias]);
 
   function cancelarForm() {
     setMostrarForm(false);
+    setEditandoId(null);
+    setEditandoTipo(null);
     setTipoItem("cuota");
     setDescripcion("");
     setMontoCuota("");
@@ -190,6 +236,52 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
     setMostrarForm(true);
   }
 
+  // Precarga el formulario con los datos de un ítem ya cargado (cuota o
+  // gasto fijo) para editarlo en vez de crear uno nuevo — mismo criterio que
+  // iniciarEdicion en CuotasLista.tsx/GastosFijosLista.tsx. El tipo (cuota/
+  // gasto fijo) queda fijo mientras se edita: cambiarlo significaría mover
+  // el ítem entre dos tablas distintas, así que el formulario lo bloquea
+  // (ver los botones "Cuota"/"Gasto fijo" más abajo).
+  function iniciarEdicion(it: ItemFila) {
+    setEditandoId(it.id);
+    setEditandoTipo(it.tipo);
+    setDescripcion(it.descripcion);
+    setMarcaId(it.marcaId ?? "");
+    setIcono(it.icono ?? "");
+    setGrupoEsAutomatico(false);
+    if (it.tipo === "cuota") {
+      const c = cuotas.find((x) => x.compra_id === it.id);
+      if (!c) return;
+      setTipoItem("cuota");
+      setMontoCuota(String(c.monto_cuota));
+      setNCuotas(String(c.n_cuotas));
+      setCuotaActual(String(c.cuota_actual));
+      setDiaVencimiento(diaDelMes(c.fecha_primera_cuota));
+      setCategoriaId(c.categoria_id ?? "");
+      setGrupoId(c.grupo_id ?? "");
+    } else {
+      const g = gastosFijos.find((x) => x.id === it.id);
+      if (!g) return;
+      setTipoItem("fijo");
+      setMontoEstimado(String(g.monto_estimado));
+      setDiaMesPago(g.dia_mes_pago ?? new Date().getDate());
+      setCategoriaId(g.categoria_id ?? "");
+      setGrupoId(g.grupo_id ?? "");
+    }
+    const participantesExistentes = (participantesPorItem[it.id] ?? []).map((row) => ({
+      persona_id: row.persona_id,
+      porcentaje: row.porcentaje,
+    }));
+    setParticipantes(
+      participantesExistentes.length > 0
+        ? participantesExistentes
+        : unicaPersona
+          ? [{ persona_id: unicaPersona.id, porcentaje: null }]
+          : []
+    );
+    setMostrarForm(true);
+  }
+
   function elegirCategoria(nuevaCategoriaId: string) {
     const nuevaCategoria = categorias.find((c) => c.id === nuevaCategoriaId) ?? null;
     if (nuevaCategoria?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
@@ -202,11 +294,18 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
   }
 
   async function guardarParticipantes(origen: "compra" | "gasto_fijo", origenId: string) {
-    if (grupoId || participantes.length === 0) return;
-    const { error: insError } = await supabase
-      .from("item_participantes")
-      .insert(participantes.map((p) => ({ origen, origen_id: origenId, persona_id: p.persona_id, porcentaje: p.porcentaje })));
-    if (insError) throw insError;
+    // Borrar y volver a insertar (en vez de intentar un diff fino) es lo
+    // mismo que ya hacen CuotasLista.tsx/GastosFijosLista.tsx — funciona
+    // igual para un ítem nuevo (el delete no encuentra nada que borrar) que
+    // para uno editado.
+    const { error: delError } = await supabase.from("item_participantes").delete().eq("origen", origen).eq("origen_id", origenId);
+    if (delError) throw delError;
+    if (!grupoId && participantes.length > 0) {
+      const { error: insError } = await supabase
+        .from("item_participantes")
+        .insert(participantes.map((p) => ({ origen, origen_id: origenId, persona_id: p.persona_id, porcentaje: p.porcentaje })));
+      if (insError) throw insError;
+    }
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -222,42 +321,50 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
         const nCuotasNum = Math.max(1, Number(nCuotas) || 1);
         const montoCuotaNum = Number(montoCuota);
         const cuotaActualNum = Math.min(Math.max(1, Number(cuotaActual) || 1), nCuotasNum);
-        const { data, error: insError } = await supabase
-          .from("compras")
-          .insert({
-            descripcion,
-            monto_total: Math.round(montoCuotaNum * nCuotasNum),
-            n_cuotas: nCuotasNum,
-            fecha_primera_cuota: fechaPrimeraCuotaDesde(cuotaActualNum, diaVencimiento),
-            entidad_id: id,
-            categoria_id: categoriaId || null,
-            grupo_id: grupoId || null,
-            marca_id: marcaId || null,
-            icono: icono || null,
-          })
-          .select()
-          .single();
-        if (insError) throw insError;
-        await guardarParticipantes("compra", data.id);
+        const payload = {
+          descripcion,
+          monto_total: Math.round(montoCuotaNum * nCuotasNum),
+          n_cuotas: nCuotasNum,
+          fecha_primera_cuota: fechaPrimeraCuotaDesde(cuotaActualNum, diaVencimiento),
+          entidad_id: id,
+          categoria_id: categoriaId || null,
+          grupo_id: grupoId || null,
+          marca_id: marcaId || null,
+          icono: icono || null,
+        };
+        let compraId = editandoTipo === "cuota" ? editandoId : null;
+        if (compraId) {
+          const { error: updError } = await supabase.from("compras").update(payload).eq("id", compraId);
+          if (updError) throw updError;
+        } else {
+          const { data, error: insError } = await supabase.from("compras").insert(payload).select().single();
+          if (insError) throw insError;
+          compraId = data.id;
+        }
+        await guardarParticipantes("compra", compraId!);
       } else {
-        const { data, error: insError } = await supabase
-          .from("gastos_fijos")
-          .insert({
-            descripcion,
-            categoria_id: categoriaId || null,
-            entidad_id: id,
-            grupo_id: grupoId || null,
-            marca_id: marcaId || null,
-            icono: icono || null,
-            monto_estimado: Number(montoEstimado) || 0,
-            dia_mes_pago: diaMesPago,
-            tipo_monto: "fijo",
-            activo: true,
-          })
-          .select()
-          .single();
-        if (insError) throw insError;
-        await guardarParticipantes("gasto_fijo", data.id);
+        const payload = {
+          descripcion,
+          categoria_id: categoriaId || null,
+          entidad_id: id,
+          grupo_id: grupoId || null,
+          marca_id: marcaId || null,
+          icono: icono || null,
+          monto_estimado: Number(montoEstimado) || 0,
+          dia_mes_pago: diaMesPago,
+          tipo_monto: "fijo" as const,
+          activo: true,
+        };
+        let gastoId = editandoTipo === "fijo" ? editandoId : null;
+        if (gastoId) {
+          const { error: updError } = await supabase.from("gastos_fijos").update(payload).eq("id", gastoId);
+          if (updError) throw updError;
+        } else {
+          const { data, error: insError } = await supabase.from("gastos_fijos").insert(payload).select().single();
+          if (insError) throw insError;
+          gastoId = data.id;
+        }
+        await guardarParticipantes("gasto_fijo", gastoId!);
       }
       cancelarForm();
       await cargar();
@@ -266,6 +373,28 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
     } finally {
       setGuardando(false);
     }
+  }
+
+  async function eliminarItem(it: ItemFila) {
+    if (it.tipo === "cuota") {
+      const { error: dbError } = await supabase.from("compras").delete().eq("id", it.id);
+      if (dbError) {
+        setError(dbError.message || "No se pudo eliminar.");
+        return;
+      }
+      await supabase.from("item_participantes").delete().eq("origen", "compra").eq("origen_id", it.id);
+    } else {
+      // Los gastos fijos no se borran de la base, se desactivan (mismo
+      // criterio que GastosFijosLista.tsx) — así se conserva el historial de
+      // pagos ya registrados en el Calendario de pagos.
+      const { error: dbError } = await supabase.from("gastos_fijos").update({ activo: false }).eq("id", it.id);
+      if (dbError) {
+        setError(dbError.message || "No se pudo quitar.");
+        return;
+      }
+    }
+    if (editandoId === it.id) cancelarForm();
+    await cargar();
   }
 
   const marcaEntidad = resolverMarca(entidad, marcas);
@@ -330,17 +459,25 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
                 <button
                   key={t.v}
                   type="button"
-                  onClick={() => setTipoItem(t.v)}
+                  disabled={!!editandoId}
+                  onClick={() => {
+                    if (!editandoId) setTipoItem(t.v);
+                  }}
                   className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
                     tipoItem === t.v
                       ? "bg-white text-brand-from shadow-sm dark:bg-gray-800 dark:text-white dark:shadow-none"
                       : "text-gray-500 dark:text-gray-500"
-                  }`}
+                  } ${editandoId ? "opacity-60" : ""}`}
                 >
                   {t.label}
                 </button>
               ))}
             </div>
+            {editandoId && (
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                Editando ítem — el tipo (cuota/gasto fijo) no se puede cambiar acá.
+              </p>
+            )}
 
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400">Descripción</label>
@@ -517,7 +654,7 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
               disabled={guardando}
               className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
             >
-              {guardando ? "Guardando…" : "Guardar"}
+              {guardando ? "Guardando…" : editandoId ? "Guardar cambios" : "Guardar"}
             </button>
           </form>
         </Card>
@@ -568,7 +705,17 @@ export default function EntidadDetallePage({ params }: { params: { id: string } 
                       : "Sin repartir"}
                   </p>
                 </div>
-                <p className="shrink-0 text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(it.monto)}</p>
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  <p className="text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(it.monto)}</p>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => iniciarEdicion(it)} className="text-[11px] text-brand-from dark:text-pink-400">
+                      editar
+                    </button>
+                    <button onClick={() => eliminarItem(it)} className="text-[11px] text-gray-300 dark:text-gray-600 hover:text-red-400">
+                      {it.tipo === "cuota" ? "eliminar" : "quitar"}
+                    </button>
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
