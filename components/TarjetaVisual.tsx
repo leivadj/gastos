@@ -35,11 +35,15 @@ export function TarjetaVisual({
   entidad,
   marca,
   gastoMes,
+  disponible,
   className = "",
 }: {
   entidad: Entidad;
   marca: Marca | null;
   gastoMes: number;
+  // Cupo disponible ya calculado (cupo - usado, ver app/tarjetas/page.tsx) —
+  // undefined/null si esta tarjeta no tiene cupo puesto o no es de crédito.
+  disponible?: number | null;
   className?: string;
 }) {
   const colorBase = entidad.color_hex || colorFor(entidad.nombre);
@@ -75,8 +79,27 @@ export function TarjetaVisual({
       </div>
 
       <div className="relative">
-        <p className="text-[11px] opacity-85">Gastado este mes</p>
-        <p className="text-2xl font-bold tracking-tight drop-shadow-sm">{formatCLP(gastoMes)}</p>
+        {entidad.tipo === "tarjeta_credito" && entidad.cupo != null && disponible != null ? (
+          // Con cupo puesto, mostramos disponible en vez de "gastado este
+          // mes" — es el dato que de verdad importa en una tarjeta de
+          // crédito (cuánto margen queda), ver migration_28_cupo_tarjetas.sql.
+          <>
+            <p className="text-[11px] opacity-85">Cupo disponible</p>
+            <p className="text-2xl font-bold tracking-tight drop-shadow-sm">{formatCLP(disponible)}</p>
+            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+              <div
+                className="h-full rounded-full bg-white"
+                style={{ width: `${Math.min(100, Math.max(0, (disponible / entidad.cupo) * 100))}%` }}
+              />
+            </div>
+            <p className="mt-1 text-[10px] opacity-70">de {formatCLP(entidad.cupo)} de cupo</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[11px] opacity-85">Gastado este mes</p>
+            <p className="text-2xl font-bold tracking-tight drop-shadow-sm">{formatCLP(gastoMes)}</p>
+          </>
+        )}
       </div>
     </div>
   );

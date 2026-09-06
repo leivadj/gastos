@@ -552,6 +552,16 @@ function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClo
               </option>
             ))}
           </select>
+          {(() => {
+            const destino = entidades.find((e) => e.id === destinoId);
+            if (destino?.tipo !== "tarjeta_credito" || destino.cupo == null) return null;
+            return (
+              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                Esto se descuenta del cupo usado de &quot;{destino.nombre}&quot; — así pagás la tarjeta desde tu
+                banco y liberás cupo (ver /tarjetas).
+              </p>
+            );
+          })()}
         </div>
         <div>
           <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>

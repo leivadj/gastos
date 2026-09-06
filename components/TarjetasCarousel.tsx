@@ -12,12 +12,17 @@ export function TarjetasCarousel({
   entidades,
   marcas,
   gastoPorEntidad,
+  disponiblePorEntidad,
   activaId,
   onCambiarActiva,
 }: {
   entidades: Entidad[];
   marcas: Marca[];
   gastoPorEntidad: Record<string, number>;
+  // Cupo disponible ya calculado por tarjeta de crédito (ver
+  // app/tarjetas/page.tsx) — opcional, solo trae valor para las que tienen
+  // cupo puesto.
+  disponiblePorEntidad?: Record<string, number>;
   activaId: string | null;
   onCambiarActiva: (id: string) => void;
 }) {
@@ -64,7 +69,12 @@ export function TarjetasCarousel({
             onClick={() => irA(e.id, i)}
             className="w-[78%] shrink-0 snap-center text-left sm:w-[320px]"
           >
-            <TarjetaVisual entidad={e} marca={marcaDe(e.marca_id)} gastoMes={gastoPorEntidad[e.id] ?? 0} />
+            <TarjetaVisual
+              entidad={e}
+              marca={marcaDe(e.marca_id)}
+              gastoMes={gastoPorEntidad[e.id] ?? 0}
+              disponible={disponiblePorEntidad?.[e.id]}
+            />
           </button>
         ))}
       </div>

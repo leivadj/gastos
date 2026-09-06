@@ -99,6 +99,12 @@ create table entidades (
   -- calcula solo a partir de los movimientos — ver migration_18). null =
   -- todavía no le puso un saldo.
   saldo numeric(12, 2),
+  -- Límite de crédito de una tarjeta de crédito (ver migration_28) — opcional,
+  -- null = todavía no lo puso. Con esto puesto, /tarjetas calcula sola el
+  -- cupo disponible (cupo - deuda de cuotas/gastos fijos + abonos vía
+  -- "Transferencia"). Solo tiene sentido para tipo 'tarjeta_credito', pero no
+  -- se restringe a nivel de base de datos, mismo criterio que `saldo`.
+  cupo numeric(12, 2),
   created_at timestamptz not null default now(),
   -- nombre + tipo (no solo nombre): permite tener "Banco Estado" como
   -- tarjeta de débito Y como tarjeta de crédito a la vez, por ejemplo.

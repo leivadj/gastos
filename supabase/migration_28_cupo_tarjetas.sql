@@ -1,0 +1,39 @@
+-- ============================================================================
+-- Gastos del Hogar — Migración 28: Cupo de tarjetas de crédito
+-- ============================================================================
+-- Por qué: a pedido del usuario, que quiere poder pagar sus tarjetas de
+-- crédito desde su cuenta de banco y saber cuánto cupo le queda disponible
+-- en cada una.
+--
+-- Qué agrega:
+--   1) `entidades.cupo` — el límite de crédito de la tarjeta, opcional (null
+--      = todavía no lo puso). Solo tiene sentido para tipo 'tarjeta_credito'
+--      (así lo pidió el usuario — línea de crédito/hipotecario quedan sin
+--      cupo por ahora), pero no se restringe a nivel de base de datos, mismo
+--      criterio que ya usa `saldo`.
+--   2) NADA MÁS a nivel de base de datos: el "usado" y el "disponible" de
+--      cada tarjeta se calculan en el cliente (app/tarjetas/page.tsx), no acá
+--      — ya se leen ahí `vista_cuotas_mes_actual`, `gastos_fijos` y
+--      `transferencias`, los mismos datos que hacen falta para el cálculo,
+--      así que no hacía falta ninguna vista SQL nueva.
+--
+-- Cómo se calcula el disponible (para referencia — ver también el resumen
+-- del proyecto): usado = deuda pendiente de cuotas vigentes de esa tarjeta
+-- (lo que falta pagar de cada compra en cuotas, no solo la cuota de este
+-- mes) + gastos fijos activos ahí, menos lo que ya le hayas abonado con
+-- "↔ Transferencia" (banco -> tarjeta, tabla `transferencias`, ya existía
+-- desde antes). disponible = cupo - usado (nunca negativo). Por eso pagar
+-- una tarjeta sigue siendo el mismo botón "Transferencia" de siempre — no
+-- hizo falta un botón nuevo, solo sumar ese pago a la resta.
+--
+-- Segura de correr aunque ya hayas corrido las migraciones anteriores.
+-- ============================================================================
+
+alter table entidades add column if not exists cupo numeric(12, 2);
+
+-- ============================================================================
+-- Listo: en /tarjetas, al crear o editar una tarjeta de crédito aparece un
+-- campo "Cupo" opcional. Con eso puesto, la tarjeta muestra sola cuánto
+-- cupo te queda disponible, y se actualiza cada vez que cargas una cuota, un
+-- gasto fijo, o le haces un abono con "↔ Transferencia" desde tu banco.
+-- ============================================================================

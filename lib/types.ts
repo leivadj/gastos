@@ -40,6 +40,10 @@ export interface Entidad {
   imagen_fondo_url: string | null;
   // Saldo actual, editado a mano por el usuario (null = todavía no lo puso).
   saldo: number | null;
+  // Límite de crédito (solo tiene sentido para tipo "tarjeta_credito") — con
+  // esto puesto, /tarjetas calcula solo el cupo disponible. null = todavía
+  // no lo puso. Ver migration_28_cupo_tarjetas.sql.
+  cupo: number | null;
 }
 
 export type TipoMarca =

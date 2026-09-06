@@ -59,6 +59,7 @@ export default function TarjetasPage() {
   const [marcaId, setMarcaId] = useState("");
   const [marcaAutodetectada, setMarcaAutodetectada] = useState(false);
   const [saldo, setSaldo] = useState("");
+  const [cupo, setCupo] = useState("");
   const [colorHex, setColorHex] = useState<string | null>(null);
   const [imagenFondoUrl, setImagenFondoUrl] = useState<string | null>(null);
   const [archivoFondo, setArchivoFondo] = useState<File | null>(null);
@@ -167,6 +168,7 @@ export default function TarjetasPage() {
     setMarcaId("");
     setMarcaAutodetectada(false);
     setSaldo("");
+    setCupo("");
     setColorHex(null);
     setImagenFondoUrl(null);
     onElegirArchivo(null);
@@ -180,6 +182,7 @@ export default function TarjetasPage() {
     setMarcaId(e.marca_id ?? "");
     setMarcaAutodetectada(false);
     setSaldo(e.saldo != null ? String(e.saldo) : "");
+    setCupo(e.cupo != null ? String(e.cupo) : "");
     setColorHex(e.color_hex ?? null);
     setImagenFondoUrl(e.imagen_fondo_url ?? null);
     onElegirArchivo(null);
@@ -215,6 +218,7 @@ export default function TarjetasPage() {
         tipo,
         marca_id: marcaId || null,
         saldo: saldo.trim() === "" ? null : Number(saldo),
+        cupo: cupo.trim() === "" ? null : Number(cupo),
         color_hex: colorHex || null,
         imagen_fondo_url: fondoUrlFinal,
       };
@@ -256,6 +260,38 @@ export default function TarjetasPage() {
     });
     return acc;
   }, [cuotas, gastosFijos]);
+
+  // Cupo disponible por tarjeta de crédito (ver migration_28_cupo_tarjetas.sql):
+  // usado = deuda pendiente REAL de cuotas vigentes (todas las cuotas que
+  // faltan de cada compra, no solo la de este mes — a diferencia de
+  // gastoPorEntidad arriba) + gastos fijos activos ahí, menos lo que ya se
+  // haya abonado con "↔ Transferencia" hacia esa tarjeta. disponible = cupo
+  // - usado, nunca negativo. Solo trae valor para entidades con cupo puesto.
+  const disponiblePorEntidad = useMemo(() => {
+    const deudaCuotas: Record<string, number> = {};
+    cuotas.forEach((c) => {
+      if (!c.entidad_id) return;
+      const cuotasRestantes = c.n_cuotas - c.cuota_actual + 1;
+      deudaCuotas[c.entidad_id] = (deudaCuotas[c.entidad_id] ?? 0) + Number(c.monto_cuota) * cuotasRestantes;
+    });
+    const deudaFijos: Record<string, number> = {};
+    gastosFijos.forEach((g) => {
+      if (!g.entidad_id) return;
+      deudaFijos[g.entidad_id] = (deudaFijos[g.entidad_id] ?? 0) + Number(g.monto_estimado);
+    });
+    const abonos: Record<string, number> = {};
+    transferencias.forEach((t) => {
+      if (!t.cuenta_destino_id) return;
+      abonos[t.cuenta_destino_id] = (abonos[t.cuenta_destino_id] ?? 0) + Number(t.monto);
+    });
+    const acc: Record<string, number> = {};
+    entidades.forEach((e) => {
+      if (e.tipo !== "tarjeta_credito" || e.cupo == null) return;
+      const usado = Math.max(0, (deudaCuotas[e.id] ?? 0) + (deudaFijos[e.id] ?? 0) - (abonos[e.id] ?? 0));
+      acc[e.id] = Math.max(0, e.cupo - usado);
+    });
+    return acc;
+  }, [cuotas, gastosFijos, transferencias, entidades]);
 
   const entidadActiva = entidades.find((e) => e.id === activaId) ?? null;
   const marcaActiva = resolverMarca(entidadActiva, marcas);
@@ -411,6 +447,23 @@ export default function TarjetasPage() {
                 Lo actualizas tú a mano cuando quieras — no se calcula solo a partir de tus gastos.
               </p>
             </div>
+            {tipo === "tarjeta_credito" && (
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Cupo (límite de crédito, opcional)</label>
+                <input
+                  type="number"
+                  value={cupo}
+                  onChange={(e) => setCupo(e.target.value)}
+                  placeholder="Ej: 1500000"
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                />
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Con esto puesto, la tarjeta te muestra sola cuánto cupo te queda disponible: se calcula a partir de
+                  las cuotas y gastos fijos activos ahí, y se libera cuando le haces un abono con &quot;↔
+                  Transferencia&quot; desde tu banco.
+                </p>
+              </div>
+            )}
 
             <div className="rounded-xl border border-gray-100 bg-gray-50/60 p-3 dark:border-white/10 dark:bg-white/5">
               <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">Diseño de la tarjeta</p>
@@ -427,6 +480,7 @@ export default function TarjetasPage() {
                     tipo,
                     marca_id: marcaId || null,
                     saldo: saldo.trim() === "" ? null : Number(saldo),
+                    cupo: cupo.trim() === "" ? null : Number(cupo),
                     color_hex: colorHex,
                     imagen_fondo_url: previewFondo ?? imagenFondoUrl,
                   }}
@@ -499,23 +553,32 @@ export default function TarjetasPage() {
             entidades={entidades}
             marcas={marcas}
             gastoPorEntidad={gastoPorEntidad}
+            disponiblePorEntidad={disponiblePorEntidad}
             activaId={activaId}
             onCambiarActiva={setActivaId}
           />
 
           {entidadActiva && (
-            <div className="flex items-center justify-between px-1">
-              <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                {entidadActiva.nombre} <span className="font-normal text-gray-400 dark:text-gray-500">· {TIPO_LABEL[entidadActiva.tipo]}</span>
-              </p>
-              <div className="flex shrink-0 items-center gap-3">
-                <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from dark:text-pink-400">
-                  editar
-                </button>
-                <button onClick={() => eliminar(entidadActiva.id)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
-                  eliminar
-                </button>
+            <div className="px-1">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                  {entidadActiva.nombre} <span className="font-normal text-gray-400 dark:text-gray-500">· {TIPO_LABEL[entidadActiva.tipo]}</span>
+                </p>
+                <div className="flex shrink-0 items-center gap-3">
+                  <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from dark:text-pink-400">
+                    editar
+                  </button>
+                  <button onClick={() => eliminar(entidadActiva.id)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
+                    eliminar
+                  </button>
+                </div>
               </div>
+              {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null && (
+                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
+                  Cupo disponible: {formatCLP(disponiblePorEntidad[entidadActiva.id] ?? entidadActiva.cupo)} de{" "}
+                  {formatCLP(entidadActiva.cupo)}
+                </p>
+              )}
             </div>
           )}
 
@@ -562,10 +625,21 @@ export default function TarjetasPage() {
                           <p className="text-xs text-gray-400 dark:text-gray-500">{TIPO_LABEL[e.tipo]}</p>
                         </div>
                         <div className="shrink-0 text-right">
-                          <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                            {formatCLP(e.saldo ?? gastoPorEntidad[e.id] ?? 0)}
-                          </p>
-                          <p className="text-[10px] text-gray-400 dark:text-gray-500">{e.saldo != null ? "saldo" : "gastado este mes"}</p>
+                          {e.tipo === "tarjeta_credito" && e.cupo != null ? (
+                            <>
+                              <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                                {formatCLP(disponiblePorEntidad[e.id] ?? e.cupo)}
+                              </p>
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500">disponible de cupo</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
+                                {formatCLP(e.saldo ?? gastoPorEntidad[e.id] ?? 0)}
+                              </p>
+                              <p className="text-[10px] text-gray-400 dark:text-gray-500">{e.saldo != null ? "saldo" : "gastado este mes"}</p>
+                            </>
+                          )}
                         </div>
                       </button>
                     </Card>
