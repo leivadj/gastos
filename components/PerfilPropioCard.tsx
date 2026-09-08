@@ -5,6 +5,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { NotificacionesPush } from "@/components/NotificacionesPush";
 import { PersonaAvatar } from "@/components/PersonaAvatar";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
 import { subirImagenPropia } from "@/lib/subirImagen";
@@ -239,6 +240,8 @@ export function PerfilPropioCard() {
         <span className="text-xs font-semibold text-gray-500">Tema</span>
         <ThemeToggle />
       </div>
+
+      <NotificacionesPush />
 
       <button
         onClick={() => supabase.auth.signOut()}

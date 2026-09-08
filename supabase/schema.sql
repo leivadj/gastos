@@ -395,6 +395,19 @@ create table sugerencias_correo (
   created_at timestamptz not null default now()
 );
 
+-- Suscripciones a notificaciones push (Web Push) — ver migration_30. Una
+-- fila por dispositivo/navegador que aceptó notificaciones; se usa desde
+-- app/api/sugerencias-correo para avisar en el celular apenas se propone
+-- algo nuevo.
+create table push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+
 -- ============================================================================
 -- VISTAS — aquí vive la automatización de las cuotas y del reparto
 -- ============================================================================
@@ -610,6 +623,7 @@ alter table gastos_diarios enable row level security;
 alter table documentos_auto enable row level security;
 alter table preferencias_menu enable row level security;
 alter table sugerencias_correo enable row level security;
+alter table push_subscriptions enable row level security;
 
 create policy "solo_dueno" on personas for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
@@ -660,6 +674,8 @@ create policy "solo_dueno" on documentos_auto for all
 create policy "solo_dueno" on preferencias_menu for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 create policy "solo_dueno" on sugerencias_correo for all
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "solo_dueno" on push_subscriptions for all
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ============================================================================

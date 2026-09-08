@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import webpush from "web-push";
 
 // Endpoint privado para la automatización de "Sugerencias" (ver Novedades del
 // resumen del proyecto): una tarea programada, fuera de esta app, lee el
@@ -28,6 +29,48 @@ import { createClient } from "@supabase/supabase-js";
 //   - La SERVICE ROLE KEY (SUPABASE_SERVICE_ROLE_KEY) vive solo acá, como
 //     variable de entorno de servidor en Vercel — nunca con el prefijo
 //     NEXT_PUBLIC_, nunca llega al navegador.
+// Manda el push a todos los dispositivos suscriptos del dueño de la cuenta
+// (ver migration_30_push_subscriptions.sql y components/NotificacionesPush)
+// avisando que hay una sugerencia nueva. Nunca debe romper el POST: si falta
+// configurar las claves VAPID, o si el envío falla, el insert en
+// `sugerencias_correo` ya se hizo y la sugerencia igual queda disponible en
+// /sugerencias — el push es solo un aviso, no la fuente de verdad.
+async function avisarPorPush(admin: SupabaseClient, ownerId: string, descripcion: string, montoNum: number) {
+  const clavePublica = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const clavePrivada = process.env.VAPID_PRIVATE_KEY;
+  if (!clavePublica || !clavePrivada) return;
+
+  webpush.setVapidDetails("mailto:leivadj@gmail.com", clavePublica, clavePrivada);
+
+  const { data: subs } = await admin.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("owner_id", ownerId);
+  if (!subs || subs.length === 0) return;
+
+  const monto = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 }).format(montoNum);
+  const payload = JSON.stringify({
+    titulo: "Nueva sugerencia del correo",
+    cuerpo: `${descripcion} · ${monto}`,
+    url: "/sugerencias",
+  });
+
+  await Promise.all(
+    subs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        );
+      } catch (err) {
+        // 404/410 = el navegador invalidó esa suscripción (desinstaló la
+        // app, borró datos, etc.) — se borra para no seguir intentando.
+        const status = (err as { statusCode?: number })?.statusCode;
+        if (status === 404 || status === 410) {
+          await admin.from("push_subscriptions").delete().eq("id", sub.id);
+        }
+      }
+    })
+  );
+}
+
 export async function POST(req: NextRequest) {
   const secretEsperado = process.env.BOT_SHARED_SECRET;
   const secretRecibido = req.headers.get("x-bot-secret");
@@ -90,6 +133,13 @@ export async function POST(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  try {
+    await avisarPorPush(admin, ownerId, descripcion.trim(), montoNum);
+  } catch {
+    // El aviso push es "best effort" — nunca debe hacer fallar la
+    // sugerencia ya guardada.
   }
 
   return NextResponse.json({ id: data.id }, { status: 201 });

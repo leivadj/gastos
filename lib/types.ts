@@ -271,6 +271,19 @@ export interface ResumenPersonaMes {
   total: number;
 }
 
+// Una suscripción a notificaciones push (un dispositivo/navegador que
+// aceptó notificaciones) — ver migration_30_push_subscriptions.sql y
+// components/NotificacionesPush.tsx. El navegador la genera sola al
+// suscribirse; acá solo se guarda tal cual para poder mandarle un push
+// después desde el servidor.
+export interface PushSubscriptionRow {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  created_at: string;
+}
+
 // Meta de ahorro (ej. "Viaje a Cancún", "Fondo de emergencia") — distinta de
 // la categoría "Ahorro" (para gastos recurrentes): es un objetivo puntual
 // con progreso propio, no un gasto del mes.
