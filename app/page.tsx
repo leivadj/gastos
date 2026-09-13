@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { IngresosContenido } from "@/components/IngresosContenido";
 import { PresupuestoContenido } from "@/components/PresupuestoContenido";
 import {
@@ -19,6 +20,7 @@ import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { PersonaAvatar } from "@/components/PersonaAvatar";
 import { PersonaBreakdown } from "@/components/PersonaBreakdown";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
+import { NotificacionesBell } from "@/components/NotificacionesBell";
 import { AvatarGroupHover } from "@/components/AvatarGroupHover";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
 import {
@@ -26,16 +28,16 @@ import {
   fechaLargaHoy,
   formatCLP,
   mesAbreviadoMayus,
-  mesActualISO,
   nombreMes,
-  primerDiaMesSiguiente,
   saludoHora,
 } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { resumenGastosMes } from "@/lib/resumenGastos";
+import { cuotaActualEn, esMismoMes, isoDelMes, mesAnterior, mesRefActual, mesSiguiente, MesRef } from "@/lib/cuotasHistoricas";
 import {
   Categoria,
+  Compra,
   CompraVigente,
   Entidad,
   GastoDiario,
@@ -53,6 +55,54 @@ import {
   Transferencia,
 } from "@/lib/types";
 import { useDeviceType } from "@/lib/useDeviceType";
+
+// Reconstruye las cuotas vigentes de un mes de referencia arbitrario (pasado
+// o actual) a partir de las compras crudas — mismo criterio que ya usan
+// /movimientos y /calendario-pagos (ver lib/cuotasHistoricas.ts), en vez de
+// vista_cuotas_mes_actual, que la base solo calcula para el mes de hoy y por
+// eso no servía para navegar "los gastos de los meses anteriores" desde
+// Inicio.
+function cuotasDelMes(compras: Compra[], pagos: Pago[], ref: MesRef, refIso: string): CompraVigente[] {
+  return compras.flatMap((c) => {
+    const cuotaActual = cuotaActualEn(c.fecha_primera_cuota, ref);
+    if (cuotaActual < 1 || cuotaActual > c.n_cuotas) return [];
+    const pago = pagos.find((p) => p.origen === "compra" && p.origen_id === c.id && p.mes === refIso);
+    const monto_cuota = pago?.monto_real != null ? Number(pago.monto_real) : Math.round(c.monto_total / c.n_cuotas);
+    return [
+      {
+        descripcion: c.descripcion,
+        monto_total: c.monto_total,
+        n_cuotas: c.n_cuotas,
+        fecha_primera_cuota: c.fecha_primera_cuota,
+        entidad_id: c.entidad_id,
+        categoria_id: c.categoria_id,
+        grupo_id: c.grupo_id,
+        marca_id: c.marca_id,
+        icono: c.icono,
+        notas: c.notas,
+        compra_id: c.id,
+        monto_cuota,
+        cuota_actual: cuotaActual,
+      },
+    ];
+  });
+}
+
+function IconoChevronIzq({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m15 6-6 6 6 6" />
+    </svg>
+  );
+}
+
+function IconoChevronDer({ className = "" }: { className?: string }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}
 
 // Rediseño v2: mismos tonos grises + reservados que la dona de
 // "Gastos por categoría" de PresupuestoContenido.tsx (esta es la versión de
@@ -100,22 +150,18 @@ function IconoBuscar({ className = "" }: { className?: string }) {
   );
 }
 
-function IconoCampana({ className = "" }: { className?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M6 10a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 14.5 6 10Z" />
-      <path d="M10 20a2 2 0 0 0 4 0" />
-    </svg>
-  );
-}
-
 export default function DashboardPage() {
   const deviceType = useDeviceType();
   const esMobile = deviceType === "mobile";
 
-  const [cuotas, setCuotas] = useState<CompraVigente[]>([]);
+  // "cuotas"/"gastosDiarios"/"ingresosDelMes" ya no son estado: se cargan
+  // SIN filtrar por mes (comprasRaw/gastosDiariosRaw/ingresosLista, más
+  // abajo) y se recortan al mes elegido (variable "ref") en cada render —
+  // así se puede navegar a meses anteriores sin ir a buscar datos de nuevo
+  // cada vez que se cambia de mes (mismo criterio que /movimientos).
+  const [comprasRaw, setComprasRaw] = useState<Compra[]>([]);
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
-  const [gastosDiarios, setGastosDiarios] = useState<GastoDiario[]>([]);
+  const [gastosDiariosRaw, setGastosDiariosRaw] = useState<GastoDiario[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
@@ -129,9 +175,14 @@ export default function DashboardPage() {
   const [ingresosLista, setIngresosLista] = useState<Ingreso[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
-  const [ingresosMes, setIngresosMes] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
+  // Mes que se está viendo en Inicio — antes "Septiembre de 2026" era un
+  // rótulo fijo sin forma de navegar a meses anteriores; ahora es un
+  // MesRef con flechas ‹ › junto al nombre del mes (mobile y escritorio).
+  // No se deja ir a futuro (el botón "siguiente" se deshabilita en el mes
+  // actual), solo hacia atrás, como en /movimientos.
+  const [ref, setRef] = useState<MesRef>(mesRefActual());
   // Rediseño v2: en celular, Inicio/Ingresos/Presupuesto se fusionan en una
   // sola pantalla "Resumen" con pestañas (como en el mockup de Not Pato) en
   // vez de 3 pantallas sueltas — Felipe notó que "Presupuesto" ya
@@ -140,6 +191,12 @@ export default function DashboardPage() {
   // espacio de sobra ahí), así que esta pestaña solo aplica al layout
   // mobile de más abajo.
   const [tabResumen, setTabResumen] = useState<"resumen" | "ingresos" | "presupuesto">("resumen");
+  // Buscador de escritorio (mockup Inicio): antes era un <Link> decorativo
+  // sin <input> real, no se podía escribir nada — ahora navega a
+  // /movimientos?buscar=... al enviar, donde la búsqueda de verdad filtra
+  // la lista.
+  const [busquedaInicio, setBusquedaInicio] = useState("");
+  const router = useRouter();
 
   useEffect(() => {
     async function cargar() {
@@ -161,9 +218,9 @@ export default function DashboardPage() {
         { data: gr },
         { data: tr },
       ] = await Promise.all([
-        supabase.from("vista_cuotas_mes_actual").select("*"),
+        supabase.from("compras").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
-        supabase.from("gastos_diarios").select("*").gte("fecha", mesActualISO()).lt("fecha", primerDiaMesSiguiente()),
+        supabase.from("gastos_diarios").select("*"),
         supabase.from("categorias").select("*"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("entidades").select("*"),
@@ -172,15 +229,15 @@ export default function DashboardPage() {
         supabase.from("vista_reparto_cuotas_mes").select("*"),
         supabase.from("vista_reparto_gastos_fijos").select("*"),
         supabase.from("vista_reparto_gastos_diarios").select("*"),
-        supabase.from("ingresos").select("*").eq("mes", mesActualISO()),
+        supabase.from("ingresos").select("*"),
         supabase.from("pagos").select("*"),
         supabase.from("vista_metas_ahorro_progreso").select("*").eq("activa", true).order("nombre"),
         supabase.from("grupos").select("*"),
         supabase.from("transferencias").select("*"),
       ]);
-      setCuotas((c as CompraVigente[]) ?? []);
+      setComprasRaw((c as Compra[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
-      setGastosDiarios((gd as GastoDiario[]) ?? []);
+      setGastosDiariosRaw((gd as GastoDiario[]) ?? []);
       setCategorias((cat as Categoria[]) ?? []);
       setPersonas((per as Persona[]) ?? []);
       setEntidades((ent as Entidad[]) ?? []);
@@ -189,9 +246,7 @@ export default function DashboardPage() {
       setRepartoCuotas((rc as RepartoCuota[]) ?? []);
       setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
       setRepartoDiarios((rd as RepartoGastoDiario[]) ?? []);
-      const ingresosDelMes = (ing as Ingreso[]) ?? [];
-      setIngresosLista(ingresosDelMes);
-      setIngresosMes(ingresosDelMes.reduce((acc, r) => acc + Number(r.monto), 0));
+      setIngresosLista((ing as Ingreso[]) ?? []);
       setPagos((pg as Pago[]) ?? []);
       setMetas((mt as MetaAhorroProgreso[]) ?? []);
       setGrupos((gr as Grupo[]) ?? []);
@@ -208,6 +263,15 @@ export default function DashboardPage() {
   const categoriaNombre = (id: string | null) =>
     categorias.find((c) => c.id === id)?.nombre ?? "Sin categoría";
 
+  // Recorte al mes elegido (ver comentario junto a "ref" más arriba).
+  const refIso = isoDelMes(ref);
+  const refMesTexto = refIso.slice(0, 7);
+  const enMesActual = esMismoMes(ref, mesRefActual());
+  const cuotas = cuotasDelMes(comprasRaw, pagos, ref, refIso);
+  const gastosDiarios = gastosDiariosRaw.filter((d) => d.fecha.slice(0, 7) === refMesTexto);
+  const ingresosDelMes = ingresosLista.filter((i) => i.mes.slice(0, 7) === refMesTexto);
+  const ingresosMes = ingresosDelMes.reduce((acc, r) => acc + Number(r.monto), 0);
+
   const totalCuotas = cuotas.reduce((acc, c) => acc + Number(c.monto_cuota), 0);
   const totalFijosMonto = gastosFijos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
   const totalDiarios = gastosDiarios.reduce((acc, d) => acc + Number(d.monto), 0);
@@ -219,18 +283,20 @@ export default function DashboardPage() {
   // mes todavía no llega — sigue restando del disponible, pero por
   // separado, para no confundir "ya gastado" con "ya sé que se va a ir". Los
   // gastos diarios no tienen "vencimiento" — ya se hicieron, así que siempre
-  // suman a "ya pagados", nunca a "comprometido".
+  // suman a "ya pagados", nunca a "comprometido". Al navegar a un mes
+  // anterior ya completo no existe "comprometido" (todo ya pasó), así que
+  // todo cae en "ya pagados".
   const hoyDia = new Date().getDate();
   let gastosYaPagados = totalDiarios;
   let comprometido = 0;
   cuotas.forEach((c) => {
     const monto = Number(c.monto_cuota);
-    if (diaDelMes(c.fecha_primera_cuota) <= hoyDia) gastosYaPagados += monto;
+    if (!enMesActual || diaDelMes(c.fecha_primera_cuota) <= hoyDia) gastosYaPagados += monto;
     else comprometido += monto;
   });
   gastosFijos.forEach((g) => {
     const monto = Number(g.monto_estimado);
-    if (g.dia_mes_pago == null || g.dia_mes_pago <= hoyDia) gastosYaPagados += monto;
+    if (!enMesActual || g.dia_mes_pago == null || g.dia_mes_pago <= hoyDia) gastosYaPagados += monto;
     else comprometido += monto;
   });
 
@@ -252,12 +318,14 @@ export default function DashboardPage() {
   // fijo con su día de pago + promedio móvil si es de monto variable, cuota
   // vigente con el día de su primera cuota), filtrado a los que todavía no
   // se marcaron como pagados este mes, para una vista rápida en el dashboard.
-  const mesActualStr = mesActualISO();
+  // "Próximos" solo tiene sentido en el mes actual — un mes anterior ya
+  // completo no tiene pagos "por vencer" (ver guard de "proximosPagos" más
+  // abajo), así que esta lista ni se usa cuando !enMesActual.
   const eventosPagos = [
     ...gastosFijos.map((g) => {
       const esVariable = g.tipo_monto === "variable";
       const { promedio } = esVariable
-        ? promedioMovil(pagos, g.id, mesActualStr, Number(g.monto_estimado))
+        ? promedioMovil(pagos, g.id, refIso, Number(g.monto_estimado))
         : { promedio: Number(g.monto_estimado) };
       return {
         origen: "gasto_fijo" as const,
@@ -284,18 +352,20 @@ export default function DashboardPage() {
     })),
   ];
 
-  const proximosPagos = eventosPagos
-    .filter((ev) => {
-      const pago = pagos.find((p) => p.origen === ev.origen && p.origen_id === ev.origenId && p.mes === mesActualStr);
-      return !(pago?.pagado ?? false);
-    })
-    .sort((a, b) => {
-      if (a.dia == null && b.dia == null) return 0;
-      if (a.dia == null) return 1;
-      if (b.dia == null) return -1;
-      return a.dia - b.dia;
-    })
-    .slice(0, 5);
+  const proximosPagos = !enMesActual
+    ? []
+    : eventosPagos
+        .filter((ev) => {
+          const pago = pagos.find((p) => p.origen === ev.origen && p.origen_id === ev.origenId && p.mes === refIso);
+          return !(pago?.pagado ?? false);
+        })
+        .sort((a, b) => {
+          if (a.dia == null && b.dia == null) return 0;
+          if (a.dia == null) return 1;
+          if (b.dia == null) return -1;
+          return a.dia - b.dia;
+        })
+        .slice(0, 5);
 
   // Cuentas próximas a vencer "esta semana" (dentro de los próximos 7 días
   // desde hoy) — para el badge de la tarjeta "Cuentas próximas" del
@@ -305,8 +375,11 @@ export default function DashboardPage() {
   // Tendencia diaria del "Balance del mes" (mini gráfico del hero de
   // escritorio): mismo criterio que gastosYaPagados/comprometido de más
   // arriba, pero recalculado día a día para dibujar la curva — no es un
-  // dato nuevo, es el mismo cálculo cortado en cada día del mes.
-  const tendenciaBalance = Array.from({ length: hoyDia }, (_, i) => {
+  // dato nuevo, es el mismo cálculo cortado en cada día del mes. En el mes
+  // actual llega solo hasta hoy; en un mes anterior ya completo, se dibuja
+  // el mes entero.
+  const diasParaTendencia = enMesActual ? hoyDia : new Date(ref.year, ref.month + 1, 0).getDate();
+  const tendenciaBalance = Array.from({ length: diasParaTendencia }, (_, i) => {
     const dia = i + 1;
     let gastadoAlDia = gastosDiarios.filter((d) => diaDelMes(d.fecha) <= dia).reduce((acc, d) => acc + Number(d.monto), 0);
     cuotas.forEach((c) => {
@@ -324,7 +397,7 @@ export default function DashboardPage() {
   // exacto en la base — ver nota en calendario-pagos/page.tsx — así que se
   // muestran aparte, arriba, sin fecha inventada).
   const movimientosPagados = pagos
-    .filter((p) => p.mes === mesActualStr && p.pagado && p.fecha_pago)
+    .filter((p) => p.mes === refIso && p.pagado && p.fecha_pago)
     .flatMap((p) => {
       const ev = eventosPagos.find((e) => e.origen === p.origen && e.origenId === p.origen_id);
       if (!ev) return [];
@@ -359,7 +432,7 @@ export default function DashboardPage() {
     .sort((a, b) => b.fecha.localeCompare(a.fecha))
     .slice(0, 4);
 
-  const movimientosIngreso = ingresosLista.slice(0, 1).map((i) => ({
+  const movimientosIngreso = ingresosDelMes.slice(0, 1).map((i) => ({
     key: `ingreso-${i.id}`,
     descripcion: i.descripcion || "Ingreso",
     detalle: "Ingreso este mes",
@@ -401,21 +474,26 @@ export default function DashboardPage() {
   // mes" no se guarda como una foto fija en la base (el saldo de
   // entidades.saldo es el saldo ACTUAL, no el de hace 13 días) — se
   // aproxima restándole al saldo actual el movimiento neto de este mes,
-  // para no inventar un número sin relación con datos reales.
+  // para no inventar un número sin relación con datos reales. Esa
+  // aproximación solo es válida para el mes actual (el saldo de hoy menos
+  // lo que pasó ESTE mes) — para un mes anterior haría falta reconstruir
+  // el saldo de cada mes entre medio, así que esa fila se oculta cuando se
+  // navega a un mes que no es el actual (ver "enMesActual" más abajo).
   const totalEnCuentas = entidades
     .filter((e) => e.tipo !== "tarjeta_credito" && e.saldo != null)
     .reduce((acc, e) => acc + Number(e.saldo), 0);
   const pagoTarjetaMes = transferencias
-    .filter((t) => t.fecha.slice(0, 7) === mesActualStr.slice(0, 7))
+    .filter((t) => t.fecha.slice(0, 7) === refMesTexto)
     .filter((t) => entidades.find((e) => e.id === t.cuenta_destino_id)?.tipo === "tarjeta_credito")
     .reduce((acc, t) => acc + Number(t.monto), 0);
   const aperturaMes = totalEnCuentas - (ingresosMes - gastosYaPagados - pagoTarjetaMes);
 
   // Cuántas tarjetas entran en la fila "Cuentas próximas / Meta / Grupo
-  // Hogar" del dashboard de escritorio — "Cuentas próximas" siempre va,
-  // las otras dos son condicionales (sin metas activas, o una sola
-  // persona en la cuenta) y el grid se acomoda solo.
-  const numTarjetasSecundarias = 1 + (metas[0] ? 1 : 0) + (personas.length > 1 ? 1 : 0);
+  // Hogar" del dashboard de escritorio — "Cuentas próximas" solo aplica en
+  // el mes actual (no hay pagos "por vencer" en un mes anterior ya
+  // completo), las otras dos son condicionales (sin metas activas, o una
+  // sola persona en la cuenta) y el grid se acomoda solo.
+  const numTarjetasSecundarias = (enMesActual ? 1 : 0) + (metas[0] ? 1 : 0) + (enMesActual && personas.length > 1 ? 1 : 0);
 
   if (cargando) {
     return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
@@ -525,11 +603,13 @@ export default function DashboardPage() {
   const vistaResumenTab = (
     <div className="space-y-4">
       <Card>
-        <div className="flex items-center justify-between py-1 text-sm">
-          <span className="text-gray-400 dark:text-gray-500">Apertura del mes</span>
-          <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(aperturaMes)}</span>
-        </div>
-        <div className="flex items-center justify-between border-t border-gray-50 py-2 text-sm dark:border-white/10">
+        {enMesActual && (
+          <div className="flex items-center justify-between py-1 text-sm">
+            <span className="text-gray-400 dark:text-gray-500">Apertura del mes</span>
+            <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(aperturaMes)}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between border-t border-gray-50 py-2 text-sm first:border-t-0 dark:border-white/10">
           <span className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
             <IconoIngresos className="text-ingreso" />
             Ingresos
@@ -562,21 +642,34 @@ export default function DashboardPage() {
   const contenido = esMobile ? (
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          aria-label="Notificaciones"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300"
-        >
-          <IconoCampana />
-        </button>
-        <span className="rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium capitalize text-gray-700 dark:bg-white/10 dark:text-gray-200">
-          {nombreMes()} ▾
-        </span>
-        <PersonaAvatar
-          fotoUrl={personas.find((p) => p.es_self)?.foto_url}
-          nombre={personas.find((p) => p.es_self)?.nombre ?? "?"}
-          className="h-9 w-9 text-sm"
-        />
+        <NotificacionesBell buttonClassName="h-10 w-10 rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300" />
+        <div className="flex items-center gap-0.5 rounded-full bg-gray-100 pl-1 pr-1 dark:bg-white/10">
+          <button
+            type="button"
+            onClick={() => setRef(mesAnterior(ref))}
+            aria-label="Mes anterior"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 active:bg-gray-200 dark:text-gray-300 dark:active:bg-white/15"
+          >
+            <IconoChevronIzq />
+          </button>
+          <span className="px-0.5 text-sm font-medium capitalize text-gray-700 dark:text-gray-200">{nombreMes(refIso)}</span>
+          <button
+            type="button"
+            onClick={() => setRef(mesSiguiente(ref))}
+            disabled={enMesActual}
+            aria-label="Mes siguiente"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-gray-500 active:bg-gray-200 disabled:opacity-30 disabled:active:bg-transparent dark:text-gray-300 dark:active:bg-white/15"
+          >
+            <IconoChevronDer />
+          </button>
+        </div>
+        <Link href="/personas" aria-label="Ir a tu perfil">
+          <PersonaAvatar
+            fotoUrl={personas.find((p) => p.es_self)?.foto_url}
+            nombre={personas.find((p) => p.es_self)?.nombre ?? "?"}
+            className="h-9 w-9 text-sm"
+          />
+        </Link>
       </div>
       {barraTabsResumen}
       {tabResumen === "resumen" && vistaResumenTab}
@@ -599,20 +692,23 @@ export default function DashboardPage() {
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Inicio</h1>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/movimientos"
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const q = busquedaInicio.trim();
+              router.push(q ? `/movimientos?buscar=${encodeURIComponent(q)}` : "/movimientos");
+            }}
             className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500"
           >
             <IconoBuscar />
-            Buscar movimiento
-          </Link>
-          <button
-            type="button"
-            aria-label="Notificaciones"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500"
-          >
-            <IconoCampana />
-          </button>
+            <input
+              value={busquedaInicio}
+              onChange={(e) => setBusquedaInicio(e.target.value)}
+              placeholder="Buscar movimiento"
+              className="w-40 bg-transparent text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
+            />
+          </form>
+          <NotificacionesBell buttonClassName="h-10 w-10 shrink-0 rounded-full border border-gray-200 bg-white text-gray-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500" />
         </div>
       </div>
 
@@ -634,11 +730,30 @@ export default function DashboardPage() {
               </p>
               <p className="text-sm opacity-70">
                 Llevas gastado el {ingresosMes > 0 ? Math.min(999, Math.round((totalGastos / ingresosMes) * 100)) : 0}% de tus
-                ingresos de <span className="capitalize">{nombreMes()}</span>.
+                ingresos de <span className="capitalize">{nombreMes(refIso)}</span>.
               </p>
             </div>
           </div>
-          <span className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium capitalize">{nombreMes()}</span>
+          <div className="flex items-center gap-0.5 rounded-full bg-white/15 pl-1 pr-1">
+            <button
+              type="button"
+              onClick={() => setRef(mesAnterior(ref))}
+              aria-label="Mes anterior"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 hover:bg-white/10"
+            >
+              <IconoChevronIzq />
+            </button>
+            <span className="px-1 text-sm font-medium capitalize">{nombreMes(refIso)}</span>
+            <button
+              type="button"
+              onClick={() => setRef(mesSiguiente(ref))}
+              disabled={enMesActual}
+              aria-label="Mes siguiente"
+              className="flex h-7 w-7 items-center justify-center rounded-full text-white/80 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <IconoChevronDer />
+            </button>
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-white/10 pt-5">
@@ -654,14 +769,14 @@ export default function DashboardPage() {
                 <IconoIngresos className="text-white" />
                 Ingresos
               </p>
-              <p className="text-base font-semibold">+{formatCLP(ingresosMes)}</p>
+              <p className="text-base font-semibold text-ingreso">+{formatCLP(ingresosMes)}</p>
             </div>
             <div>
               <p className="flex items-center gap-1 text-xs opacity-70">
                 <IconoGastos className="text-white" />
                 Gastos
               </p>
-              <p className="text-base font-semibold">-{formatCLP(gastosYaPagados)}</p>
+              <p className="text-base font-semibold text-gasto">-{formatCLP(gastosYaPagados)}</p>
             </div>
             <div>
               <p className="flex items-center gap-1 text-xs opacity-70">
@@ -688,36 +803,40 @@ export default function DashboardPage() {
           numTarjetasSecundarias === 3 ? "md:grid-cols-3" : numTarjetasSecundarias === 2 ? "md:grid-cols-2" : ""
         }`}
       >
-        <Card>
-          <div className="mb-1 flex items-center justify-between">
-            <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Cuentas próximas</p>
-            {cuentasEstaSemana > 0 && (
-              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500 dark:bg-white/10 dark:text-gray-300">
-                {cuentasEstaSemana} esta semana
-              </span>
+        {/* "Cuentas próximas" solo tiene sentido mirando el mes actual — un
+            mes anterior ya completo no tiene pagos "por vencer". */}
+        {enMesActual && (
+          <Card>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Cuentas próximas</p>
+              {cuentasEstaSemana > 0 && (
+                <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500 dark:bg-white/10 dark:text-gray-300">
+                  {cuentasEstaSemana} esta semana
+                </span>
+              )}
+            </div>
+            {proximosPagos.length === 0 ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500">No hay pagos pendientes este mes.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100 dark:divide-white/10">
+                {proximosPagos.slice(0, 3).map((ev) => (
+                  <li key={`${ev.origen}:${ev.origenId}`} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-gray-700 dark:text-gray-200">{ev.descripcion}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">
+                        {ev.dia != null ? `Vence el ${ev.dia}` : "Sin día definido"}
+                      </p>
+                    </div>
+                    <p className="shrink-0 font-semibold text-gray-800 dark:text-gray-100">{formatCLP(ev.monto)}</p>
+                  </li>
+                ))}
+              </ul>
             )}
-          </div>
-          {proximosPagos.length === 0 ? (
-            <p className="text-sm text-gray-400 dark:text-gray-500">No hay pagos pendientes este mes.</p>
-          ) : (
-            <ul className="divide-y divide-gray-100 dark:divide-white/10">
-              {proximosPagos.slice(0, 3).map((ev) => (
-                <li key={`${ev.origen}:${ev.origenId}`} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-gray-700 dark:text-gray-200">{ev.descripcion}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {ev.dia != null ? `Vence el ${ev.dia}` : "Sin día definido"}
-                    </p>
-                  </div>
-                  <p className="shrink-0 font-semibold text-gray-800 dark:text-gray-100">{formatCLP(ev.monto)}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-          <Link href="/calendario-pagos" className="mt-2 inline-block text-xs font-semibold text-brand-from dark:text-white">
-            Ver todas →
-          </Link>
-        </Card>
+            <Link href="/calendario-pagos" className="mt-2 inline-block text-xs font-semibold text-brand-from dark:text-white">
+              Ver todas →
+            </Link>
+          </Card>
+        )}
 
         {metaDestacada && (
           <Card className="flex flex-col items-center text-center">
@@ -760,7 +879,11 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {personas.length > 1 && (
+        {/* El reparto por persona viene de vista_resumen_personas_mes, una
+            vista que la base solo calcula para el mes de hoy — se oculta al
+            navegar a un mes anterior en vez de mostrar (por error) el
+            reparto del mes actual con el rótulo de otro mes. */}
+        {enMesActual && personas.length > 1 && (
           <Card>
             <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">{nombreGrupoHogar}</p>
             <AvatarGroupHover className="flex -space-x-2">

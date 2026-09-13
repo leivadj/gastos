@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useEffect, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
@@ -173,8 +173,6 @@ export function DesktopSidebar() {
   const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
   const [personaSelf, setPersonaSelf] = useState<Persona | null>(null);
-  const [menuAbierto, setMenuAbierto] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
   const { preferencia, setPreferencia } = useTheme();
 
   useEffect(() => {
@@ -193,15 +191,6 @@ export function DesktopSidebar() {
       .then(({ data }) => setPersonaSelf((data as Persona) ?? null));
   }, [session]);
 
-  useEffect(() => {
-    if (!menuAbierto) return;
-    function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuAbierto(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [menuAbierto]);
-
   const esAdmin = checkEsAdmin(session?.user?.email);
   const itemUltimo = esAdmin ? ITEM_ADMIN : ITEM_PERSONAS;
   const todosLosItems = [...ITEMS, itemUltimo];
@@ -209,10 +198,6 @@ export function DesktopSidebar() {
   function ciclarTema() {
     const i = ORDEN_TEMA.indexOf(preferencia);
     setPreferencia(ORDEN_TEMA[(i + 1) % ORDEN_TEMA.length]);
-  }
-
-  async function cerrarSesion() {
-    await supabase.auth.signOut();
   }
 
   const iniciales = personaSelf?.nombre
@@ -276,27 +261,19 @@ export function DesktopSidebar() {
         {ICONO_TEMA[preferencia]}
       </button>
 
-      <div className="relative" ref={menuRef}>
-        <button
-          type="button"
-          onClick={() => setMenuAbierto((v) => !v)}
-          aria-label="Cuenta"
-          className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-gray-800 text-[12.5px] font-bold text-white dark:bg-white dark:text-black"
-        >
-          {iniciales}
-        </button>
-        {menuAbierto && (
-          <div className="absolute bottom-0 left-full z-30 ml-2 w-56 rounded-2xl border border-gray-100 bg-white p-3 shadow-xl dark:border-white/10 dark:bg-gray-900">
-            <p className="truncate px-1 text-xs font-semibold text-gray-700 dark:text-gray-200">{session?.user?.email ?? "Cuenta"}</p>
-            <button
-              onClick={cerrarSesion}
-              className="mt-3 w-full rounded-lg border border-gray-200 py-1.5 text-[11px] font-medium text-gray-500 hover:border-red-200 hover:text-red-400 dark:border-white/10 dark:text-gray-400 dark:hover:border-red-400/40 dark:hover:text-red-400"
-            >
-              Cerrar sesión
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Antes esto abría un popover con el email + "Cerrar sesión" — ahora
+          navega directo al Perfil (mismo destino que el avatar del mockup),
+          igual que en el header de Inicio en celular. "Cerrar sesión" ya
+          vive en el propio Perfil (ver PerfilPropioCard.tsx), así que no se
+          perdió esa función, solo dejó de estar duplicada acá. */}
+      <Link
+        href="/personas"
+        aria-label="Ir a tu perfil"
+        title="Tu perfil"
+        className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-gray-800 text-[12.5px] font-bold text-white transition hover:opacity-90 dark:bg-white dark:text-black"
+      >
+        {iniciales}
+      </Link>
     </aside>
   );
 }

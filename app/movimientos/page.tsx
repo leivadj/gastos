@@ -89,6 +89,11 @@ export default function MovimientosPage() {
 
   const [ref, setRef] = useState<MesRef>(mesRefActual());
   const [vista, setVista] = useState<Vista>("todo");
+  // Búsqueda por texto (mockup "Buscar movimiento" de Inicio, ver
+  // app/page.tsx): se lee el parámetro ?buscar= así (en vez de
+  // useSearchParams) para no forzar un límite de Suspense, mismo criterio
+  // que ya se usa en /tarjetas para ?nueva=1.
+  const [busqueda, setBusqueda] = useState("");
   // Movimiento en el que se abrió "Dividir gasto" (mockup PDF pág. 13) — ver
   // DividirGastoSheet.tsx. Solo cuotas/fijos/variables tienen esta opción.
   const [dividiendo, setDividiendo] = useState<Movimiento | null>(null);
@@ -141,6 +146,11 @@ export default function MovimientosPage() {
     cargarTodo();
     window.addEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargarTodo);
     return () => window.removeEventListener(EVENTO_MOVIMIENTO_GUARDADO, cargarTodo);
+  }, []);
+
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("buscar");
+    if (q) setBusqueda(q);
   }, []);
 
   if (cargando) {
@@ -265,9 +275,12 @@ export default function MovimientosPage() {
   const totalIngresos = movIngresos.reduce((acc, m) => acc + m.monto, 0);
   const balance = totalIngresos - totalGastos;
 
+  const busquedaNormalizada = busqueda.trim().toLowerCase();
   const visibles = (
     vista === "todo" ? todos : vista === "ingresos" ? movIngresos : [...movCuotas, ...movFijos, ...movDiarios]
-  ).sort((a, b) => {
+  )
+    .filter((m) => !busquedaNormalizada || m.descripcion.toLowerCase().includes(busquedaNormalizada) || m.detalle.toLowerCase().includes(busquedaNormalizada))
+    .sort((a, b) => {
     if (a.dia == null && b.dia == null) return 0;
     if (a.dia == null) return 1;
     if (b.dia == null) return -1;
@@ -312,6 +325,24 @@ export default function MovimientosPage() {
         <p className="text-xs text-gray-400 dark:text-gray-500">
           Fijos, variables, cuotas, diarios e ingresos, en un solo listado por mes.
         </p>
+      </div>
+
+      <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 dark:border-white/10 dark:bg-gray-900">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400 dark:text-gray-500">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+        <input
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          placeholder="Buscar movimiento (ej: supermercado, estacionamiento…)"
+          className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
+        />
+        {busqueda && (
+          <button type="button" onClick={() => setBusqueda("")} aria-label="Limpiar búsqueda" className="shrink-0 text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400">
+            ✕
+          </button>
+        )}
       </div>
 
       <Card>

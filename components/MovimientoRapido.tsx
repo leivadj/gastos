@@ -189,72 +189,87 @@ export function FormMovimiento({
     );
   }
 
+  // Antes era un menú "absolute" anidado dentro del formulario con scroll
+  // (overflow-y-auto): al desplegarse cerca del fondo de la hoja quedaba
+  // cortado (no cabía) y, al no tener su propio fondo, se confundía
+  // visualmente con la hoja "Nuevo movimiento" que queda detrás. Ahora es un
+  // overlay "fixed" de pantalla completa (mismo patrón que el resto de las
+  // hojas de la app) con su propio fondo oscuro + difuminado, así siempre
+  // cabe entero y se nota claramente que es una ventana aparte, por encima.
   function DropdownCuentas({ valor, onElegir, onTransferencia }: { valor: string; onElegir: (id: string) => void; onTransferencia?: () => void }) {
     return (
-      <div className="absolute left-0 right-0 top-full z-30 mt-2 max-h-72 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-1.5 shadow-2xl dark:border-white/10 dark:bg-gray-900">
-        <p className="px-3 pb-1.5 pt-1 text-[10.5px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Pagar con</p>
-        <button
-          type="button"
-          onClick={() => onElegir("")}
-          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm ${
-            valor === "" ? "bg-gray-50 font-semibold dark:bg-white/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
-          }`}
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4"
+        onClick={() => setSelectorAbierto(null)}
+      >
+        <div
+          className="max-h-[70vh] w-full overflow-y-auto rounded-t-3xl border border-gray-100 bg-white p-1.5 pb-[max(env(safe-area-inset-bottom),0.375rem)] shadow-2xl dark:border-white/10 dark:bg-gray-900 sm:max-w-sm sm:rounded-3xl"
+          onClick={(e) => e.stopPropagation()}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="8.5" />
-              <path d="M12 7.5v9M9 9.8h4.2a1.9 1.9 0 1 1 0 3.8H10a1.9 1.9 0 1 0 0 3.8H15" />
-            </svg>
-          </span>
-          <span className="min-w-0 flex-1 truncate">
-            Efectivo <span className="text-gray-400 dark:text-gray-500">· sin tarjeta</span>
-          </span>
-          {valor === "" && (
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
-              <path d="m4 12 5 5L20 6" />
-            </svg>
-          )}
-        </button>
-        {entidades.map((e) => (
+          <p className="px-3 pb-1.5 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Pagar con</p>
           <button
             type="button"
-            key={e.id}
-            onClick={() => onElegir(e.id)}
+            onClick={() => onElegir("")}
             className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm ${
-              valor === e.id ? "bg-gray-50 font-semibold dark:bg-white/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
+              valor === "" ? "bg-gray-50 font-semibold dark:bg-white/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
             }`}
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
-              {iconoCuenta()}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 7.5v9M9 9.8h4.2a1.9 1.9 0 1 1 0 3.8H10a1.9 1.9 0 1 0 0 3.8H15" />
+              </svg>
             </span>
-            <span className="min-w-0 flex-1 truncate">{e.nombre}</span>
-            {valor === e.id && (
+            <span className="min-w-0 flex-1 truncate">
+              Efectivo <span className="text-gray-400 dark:text-gray-500">· sin tarjeta</span>
+            </span>
+            {valor === "" && (
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                 <path d="m4 12 5 5L20 6" />
               </svg>
             )}
           </button>
-        ))}
-        {onTransferencia && (
-          <>
-            <div className="my-1 h-px bg-gray-100 dark:bg-white/10" />
+          {entidades.map((e) => (
             <button
               type="button"
-              onClick={onTransferencia}
-              className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+              key={e.id}
+              onClick={() => onElegir(e.id)}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm ${
+                valor === e.id ? "bg-gray-50 font-semibold dark:bg-white/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
+              }`}
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 3 21 7l-4 4" />
-                  <path d="M21 7H9a4 4 0 0 0-4 4v1" />
-                  <path d="M7 21 3 17l4-4" />
-                  <path d="M3 17h12a4 4 0 0 0 4-4v-1" />
-                </svg>
+                {iconoCuenta()}
               </span>
-              Transferencia entre mis cuentas
+              <span className="min-w-0 flex-1 truncate">{e.nombre}</span>
+              {valor === e.id && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m4 12 5 5L20 6" />
+                </svg>
+              )}
             </button>
-          </>
-        )}
+          ))}
+          {onTransferencia && (
+            <>
+              <div className="my-1 h-px bg-gray-100 dark:bg-white/10" />
+              <button
+                type="button"
+                onClick={onTransferencia}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3 21 7l-4 4" />
+                    <path d="M21 7H9a4 4 0 0 0-4 4v1" />
+                    <path d="M7 21 3 17l4-4" />
+                    <path d="M3 17h12a4 4 0 0 0 4-4v-1" />
+                  </svg>
+                </span>
+                Transferencia entre mis cuentas
+              </button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -347,7 +362,7 @@ export function FormMovimiento({
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 px-0 sm:items-center sm:px-4" onClick={onClose}>
       <form
         onSubmit={handleSubmit}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 shadow-xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-10 shadow-xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl sm:pb-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -603,9 +618,18 @@ export function FormMovimiento({
 
         {error && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>}
 
+        {/* Al enfocar el input de monto/descripción en iPhone, Safari muestra
+            su propia barra de accesorios del teclado (flechas ◀▶ + "Listo")
+            justo encima del teclado — no es parte de esta app y no se puede
+            ocultar desde CSS/JS, pero si tapaba este botón era porque no
+            había espacio para hacerle scroll por encima (el formulario
+            terminaba justo en el borde). El scroll-mb reserva ese margen al
+            hacer scroll-into-view y el pb-10/pb-28 del form de arriba deja
+            aire real debajo para poder subirlo del todo. */}
         <button
           type="submit"
           disabled={guardando}
+          style={{ scrollMarginBottom: "140px" }}
           className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-gray-900 py-3.5 text-sm font-bold text-white disabled:opacity-50 dark:bg-white dark:text-black"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">

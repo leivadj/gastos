@@ -9,25 +9,21 @@ import { PerfilPropioCard } from "@/components/PerfilPropioCard";
 // Los destinos que antes estaban sueltos en la barra inferior y ahora se
 // agrupan acá, para no amontonar la barra (ver BottomNav — Inicio, Cuentas
 // y Presupuesto quedaron como destinos principales ahí, junto con el botón
-// "+"). "Gastos" reemplaza a las antiguas /compras y /gastos-fijos, ahora
-// fusionadas en una sola pantalla con pestañas. "Auto" y "Salud" son
-// pantallas nuevas de gastos sueltos (ver navItems.tsx).
-const HREFS_AGRUPADOS = [
-  "/gastos",
-  "/calendario-pagos",
-  "/movimientos",
-  "/reportes",
-  "/metas-ahorro",
-  "/auto",
-  "/salud",
-  "/ingresos",
-  "/grupos",
-  "/personas",
-  "/sugerencias",
-];
+// "+"). "Auto" y "Salud" son pantallas nuevas de gastos sueltos (ver
+// navItems.tsx).
+const HREFS_PRINCIPALES = ["/metas-ahorro", "/auto", "/salud", "/ingresos", "/grupos", "/personas", "/sugerencias"];
+
+// Pantallas de la app anterior a este rediseño (Gastos, Calendario,
+// Movimientos, Reportes) — Felipe pidió que dejen de aparecer sueltas acá y
+// queden agrupadas bajo un menú aparte, tipo "admin", en vez de mezcladas
+// con las secciones nuevas. Siguen existiendo (en celular no tienen otra
+// forma de llegar a ellas, a diferencia de escritorio que tiene el rail),
+// solo que ahora hay que abrir esta sección para verlas.
+const HREFS_HERRAMIENTAS_ANTERIORES = ["/gastos", "/calendario-pagos", "/movimientos", "/reportes"];
 
 export default function MasPage() {
   const [esAdminUsuario, setEsAdminUsuario] = useState(false);
+  const [herramientasAbiertas, setHerramientasAbiertas] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setEsAdminUsuario(checkEsAdmin(data.session?.user?.email)));
@@ -35,30 +31,30 @@ export default function MasPage() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  const items = [
-    ...navItems.filter((item) => HREFS_AGRUPADOS.includes(item.href)),
+  const itemsPrincipales = [
+    ...navItems.filter((item) => HREFS_PRINCIPALES.includes(item.href)),
     ...(esAdminUsuario ? [adminNavItem] : []),
   ];
+  const itemsAnteriores = navItems.filter((item) => HREFS_HERRAMIENTAS_ANTERIORES.includes(item.href));
 
   return (
     <div className="space-y-6 pb-10 pt-2">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Más</h1>
         <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
-          Gastos, calendario de pagos, movimientos, reportes, metas de ahorro, auto, salud, ingresos, grupos, personas,
-          sugerencias{esAdminUsuario ? " y ajustes" : ""}.
+          Metas de ahorro, auto, salud, ingresos, grupos, personas, sugerencias{esAdminUsuario ? " y ajustes" : ""}.
         </p>
       </div>
 
       <PerfilPropioCard />
 
       <div className="overflow-hidden rounded-3xl border border-gray-100 dark:border-white/10 bg-white dark:bg-gray-900">
-        {items.map((item, i) => (
+        {itemsPrincipales.map((item, i) => (
           <Link
             key={item.href}
             href={item.href}
             className={`flex items-center gap-4 px-5 py-4 transition-colors active:bg-gray-50 dark:active:bg-white/5 ${
-              i !== items.length - 1 ? "border-b border-gray-50 dark:border-white/10" : ""
+              i !== itemsPrincipales.length - 1 ? "border-b border-gray-50 dark:border-white/10" : ""
             }`}
           >
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gray-50 text-brand-from dark:bg-white/10 dark:text-white">
@@ -70,6 +66,60 @@ export default function MasPage() {
             </svg>
           </Link>
         ))}
+      </div>
+
+      <div className="overflow-hidden rounded-3xl border border-dashed border-gray-200 bg-white dark:border-white/15 dark:bg-gray-900">
+        <button
+          type="button"
+          onClick={() => setHerramientasAbiertas((v) => !v)}
+          className="flex w-full items-center gap-3 px-5 py-4"
+        >
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gray-50 text-gray-400 dark:bg-white/10 dark:text-gray-400">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3.5 5 6.5v5c0 4.5 3 7.5 7 8.5 4-1 7-4 7-8.5v-5L12 3.5Z" />
+            </svg>
+          </span>
+          <span className="flex-1 text-left text-[15px] font-medium text-gray-500 dark:text-gray-400">
+            Herramientas de la versión anterior
+          </span>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`shrink-0 text-gray-300 transition-transform dark:text-gray-600 ${herramientasAbiertas ? "rotate-180" : ""}`}
+          >
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        {herramientasAbiertas && (
+          <div className="border-t border-gray-50 dark:border-white/10">
+            <p className="px-5 pt-3 text-[11px] text-gray-400 dark:text-gray-500">
+              Gastos, calendario de pagos, movimientos y reportes — de la app anterior a este rediseño.
+            </p>
+            {itemsAnteriores.map((item, i) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-4 px-5 py-4 transition-colors active:bg-gray-50 dark:active:bg-white/5 ${
+                  i !== itemsAnteriores.length - 1 ? "border-b border-gray-50 dark:border-white/10" : ""
+                }`}
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gray-50 text-gray-400 dark:bg-white/10 dark:text-gray-400">
+                  {item.icon(true)}
+                </span>
+                <span className="flex-1 text-[15px] font-medium text-gray-700 dark:text-gray-200">{item.label}</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="shrink-0 text-gray-300 dark:text-gray-600">
+                  <path d="m9 6 6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

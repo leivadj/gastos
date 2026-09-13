@@ -652,7 +652,7 @@ export default function TarjetasPage() {
       )}
 
       {mostrarDetalle && entidadActiva && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => setMostrarDetalle(false)}>
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={() => setMostrarDetalle(false)}>
           <div
             className="max-h-[90vh] w-full space-y-4 overflow-y-auto rounded-t-3xl bg-[#111113] p-5 text-white sm:max-w-md sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
