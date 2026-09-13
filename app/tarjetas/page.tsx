@@ -28,6 +28,9 @@ function traducirError(err: unknown): string {
   if (msg.includes("Could not find") && msg.includes("column")) {
     return `Todavía falta correr una migración de Supabase (revisa que hayas corrido migration_12 y migration_13, en orden) — falta una columna en la base de datos. Detalle: ${msg}`;
   }
+  if (msg.includes("entidades_ultimos_digitos_formato")) {
+    return "Los últimos dígitos deben ser exactamente 4 números (ej. 5344).";
+  }
   return msg || "No se pudo guardar. Intenta de nuevo.";
 }
 
@@ -67,6 +70,7 @@ export default function TarjetasPage() {
   const [marcaAutodetectada, setMarcaAutodetectada] = useState(false);
   const [saldo, setSaldo] = useState("");
   const [cupo, setCupo] = useState("");
+  const [ultimosDigitos, setUltimosDigitos] = useState("");
   const [colorHex, setColorHex] = useState<string | null>(null);
   const [imagenFondoUrl, setImagenFondoUrl] = useState<string | null>(null);
   const [archivoFondo, setArchivoFondo] = useState<File | null>(null);
@@ -185,6 +189,7 @@ export default function TarjetasPage() {
     setMarcaAutodetectada(false);
     setSaldo("");
     setCupo("");
+    setUltimosDigitos("");
     setColorHex(null);
     setImagenFondoUrl(null);
     onElegirArchivo(null);
@@ -199,6 +204,7 @@ export default function TarjetasPage() {
     setMarcaAutodetectada(false);
     setSaldo(e.saldo != null ? String(e.saldo) : "");
     setCupo(e.cupo != null ? String(e.cupo) : "");
+    setUltimosDigitos(e.ultimos_digitos ?? "");
     setColorHex(e.color_hex ?? null);
     setImagenFondoUrl(e.imagen_fondo_url ?? null);
     onElegirArchivo(null);
@@ -235,6 +241,7 @@ export default function TarjetasPage() {
         marca_id: marcaId || null,
         saldo: saldo.trim() === "" ? null : Number(saldo),
         cupo: cupo.trim() === "" ? null : Number(cupo),
+        ultimos_digitos: ultimosDigitos.trim() === "" ? null : ultimosDigitos.trim(),
         color_hex: colorHex || null,
         imagen_fondo_url: fondoUrlFinal,
       };
@@ -505,6 +512,19 @@ export default function TarjetasPage() {
                 Lo actualizas tú a mano cuando quieras — no se calcula solo a partir de tus gastos.
               </p>
             </div>
+            <div>
+              <label className="text-xs text-gray-500 dark:text-gray-400">Últimos 4 dígitos (opcional)</label>
+              <input
+                value={ultimosDigitos}
+                onChange={(e) => setUltimosDigitos(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                inputMode="numeric"
+                placeholder="Ej: 5344"
+                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+              />
+              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                Para reconocerla de un vistazo (se muestra como &quot;•••• {ultimosDigitos || "1234"}&quot;).
+              </p>
+            </div>
             {tipo === "tarjeta_credito" && (
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400">Cupo (límite de crédito, opcional)</label>
@@ -539,6 +559,7 @@ export default function TarjetasPage() {
                     marca_id: marcaId || null,
                     saldo: saldo.trim() === "" ? null : Number(saldo),
                     cupo: cupo.trim() === "" ? null : Number(cupo),
+                    ultimos_digitos: ultimosDigitos.trim() === "" ? null : ultimosDigitos.trim(),
                     color_hex: colorHex,
                     imagen_fondo_url: previewFondo ?? imagenFondoUrl,
                   }}
@@ -699,7 +720,10 @@ export default function TarjetasPage() {
             <div className="sticky top-0 z-10 flex items-start justify-between gap-2 rounded-t-3xl bg-white p-5 pb-3 dark:bg-[#111113] sm:rounded-t-3xl">
               <div className="min-w-0">
                 <p className="truncate text-base font-bold">{entidadActiva.nombre}</p>
-                <p className="text-xs text-gray-400 dark:text-white/50">{TIPO_LABEL[entidadActiva.tipo]}</p>
+                <p className="text-xs text-gray-400 dark:text-white/50">
+                  {TIPO_LABEL[entidadActiva.tipo]}
+                  {entidadActiva.ultimos_digitos && ` · •••• ${entidadActiva.ultimos_digitos}`}
+                </p>
               </div>
               <button
                 onClick={() => setMostrarDetalle(false)}

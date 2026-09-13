@@ -308,7 +308,11 @@ export function DiariosLista({
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Felipe pidió que en la web el listado se vea "más estirado al
+          horizontal, no como cuadros" — antes esto armaba una grilla de
+          2-3 columnas en sm:/lg:; ahora queda siempre en una sola columna a
+          lo ancho completo, en cualquier tamaño de pantalla. */}
+      <div className="flex flex-col gap-2">
         {gastos.map((g) => {
           const marca = g.marca_id ? marcas.find((m) => m.id === g.marca_id) ?? null : null;
           const categoria = categoriasDisponibles.length > 1 ? categoriasDisponibles.find((c) => c.id === g.categoria_id) : null;

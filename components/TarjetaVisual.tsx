@@ -100,6 +100,13 @@ export function TarjetaVisual({
             <p className="text-2xl font-bold tracking-tight drop-shadow-sm">{formatCLP(gastoMes)}</p>
           </>
         )}
+        {/* Fila de dígitos enmascarados (mockup Cuentas.dc.html/Tarjetas.dc.html:
+            "•••• •••• •••• 5344") — solo si el usuario puso los últimos 4
+            dígitos al crear/editar la cuenta (migration_32), para reconocerla
+            de un vistazo. */}
+        {entidad.ultimos_digitos && (
+          <p className="mt-2 text-[13px] tracking-[0.2em] opacity-60">•••• •••• •••• {entidad.ultimos_digitos}</p>
+        )}
       </div>
     </div>
   );

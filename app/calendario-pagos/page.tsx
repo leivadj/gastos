@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { TarjetasCarousel } from "@/components/TarjetasCarousel";
 import { diaDelMes, formatCLP, mesActualISO, nombreMes, nombreMesCorto } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { CompraVigente, Entidad, GastoDiario, GastoFijo, Marca, Pago, Transferencia } from "@/lib/types";
+import { CompraVigente, Entidad, GastoFijo, Marca, Pago, Transferencia } from "@/lib/types";
 
 type Tab = "pagos" | "intensidad";
 type Nivel = 0 | 1 | 2 | 3 | 4;
@@ -67,7 +68,11 @@ export default function CalendarioPagosPage() {
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
-  const [gastosDiarios, setGastosDiarios] = useState<GastoDiario[]>([]);
+  // Solo id + entidad_id (no hace falta el resto de `compras` acá) — a
+  // diferencia de `cuotas` (vista_cuotas_mes_actual, solo el mes en curso),
+  // esto trae TODAS las compras sin importar el mes, para poder saber a qué
+  // cuenta pertenece un pago de un mes anterior en la pestaña "Intensidad".
+  const [comprasEntidad, setComprasEntidad] = useState<{ id: string; entidad_id: string | null }[]>([]);
   const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [cargando, setCargando] = useState(true);
   // Pestaña "Intensidad" — filtro de "Movimientos internos" (mockup PDF
@@ -83,27 +88,36 @@ export default function CalendarioPagosPage() {
   // tiene sentido navegarlos hacia atrás).
   const [mesOffset, setMesOffset] = useState(0);
   const [diaSeleccionado, setDiaSeleccionado] = useState<string | null>(null);
+  // Cuenta seleccionada en el carrusel "Por tarjeta" de la pestaña
+  // "Intensidad" (mockup Calendario.dc.html) — el gasto/ingreso diario que se
+  // muestra abajo es el de ESTA cuenta, no el total de todas.
+  const [cuentaActivaId, setCuentaActivaId] = useState<string | null>(null);
 
   const mesActual = mesActualISO();
 
   async function cargarTodo() {
-    const [{ data: gf }, { data: c }, { data: e }, { data: m }, { data: pg }, { data: gd }, { data: tr }] = await Promise.all([
+    const [{ data: gf }, { data: c }, { data: e }, { data: m }, { data: pg }, { data: cp }, { data: tr }] = await Promise.all([
       supabase.from("gastos_fijos").select("*").eq("activo", true),
       supabase.from("vista_cuotas_mes_actual").select("*"),
       supabase.from("entidades").select("*"),
       supabase.from("marcas").select("*"),
       supabase.from("pagos").select("*"),
-      supabase.from("gastos_diarios").select("*"),
+      supabase.from("compras").select("id, entidad_id"),
       supabase.from("transferencias").select("*"),
     ]);
+    const listaEntidades = (e as Entidad[]) ?? [];
     setGastosFijos((gf as GastoFijo[]) ?? []);
     setCuotas((c as CompraVigente[]) ?? []);
-    setEntidades((e as Entidad[]) ?? []);
+    setEntidades(listaEntidades);
     setMarcas((m as Marca[]) ?? []);
     setPagos((pg as Pago[]) ?? []);
-    setGastosDiarios((gd as GastoDiario[]) ?? []);
+    setComprasEntidad((cp as { id: string; entidad_id: string | null }[]) ?? []);
     setTransferencias((tr as Transferencia[]) ?? []);
     setCargando(false);
+    setCuentaActivaId((actual) => {
+      if (actual && listaEntidades.some((x) => x.id === actual)) return actual;
+      return listaEntidades[0]?.id ?? null;
+    });
   }
 
   useEffect(() => {
@@ -200,27 +214,71 @@ export default function CalendarioPagosPage() {
   for (let d = 1; d <= diasEnMesI; d++) celdasI.push({ numero: d, delMes: true });
   while (celdasI.length % 7 !== 0) celdasI.push({ numero: celdasI.length - (primerDiaSemanaI + diasEnMesI) + 1, delMes: false });
 
-  // Gasto por día: gastos_diarios (gastos sueltos) + pagos ya marcados como
-  // pagados ese día — las únicas dos fuentes con fecha exacta (ver comentario
-  // arriba). Se filtra en el cliente en vez de volver a pedirle a Supabase
-  // cada vez que se cambia de mes, ya que ambas tablas ya están cargadas
-  // completas para el resto de la pantalla.
+  // A qué cuenta pertenece un pago (mirando el gasto_fijo o la compra que le
+  // dio origen — `pagos` no guarda entidad_id directo). gastos_diarios queda
+  // afuera a propósito: son gastos sueltos "sin tarjeta ni cuenta" (ver
+  // /gastos, pestaña Normal), no tienen entidad_id y por lo tanto no pueden
+  // atribuirse a ninguna cuenta puntual — por eso la intensidad diaria ahora
+  // es SIEMPRE por cuenta (mockup Calendario.dc.html), y ya no existe un
+  // total "de todas las cuentas" que los mezclaría de forma engañosa.
+  function entidadDePago(p: Pago): string | null {
+    if (p.origen === "gasto_fijo") return gastosFijos.find((g) => g.id === p.origen_id)?.entidad_id ?? null;
+    return comprasEntidad.find((c) => c.id === p.origen_id)?.entidad_id ?? null;
+  }
+
+  // Gasto por día DE LA CUENTA SELECCIONADA: pagos (gastos fijos/cuotas) ya
+  // marcados como pagados ese día en esa cuenta, más las transferencias que
+  // SALIERON de ella ese día (mismo criterio que /tarjetas →
+  // gastosCuentaActivaMes/ingresosCuentaActivaMes).
   const gastoPorDia = useMemo(() => {
     const mapa: Record<string, number> = {};
-    gastosDiarios.forEach((g) => {
-      if (g.fecha >= inicioMesI && g.fecha < inicioMesSiguienteI) {
-        mapa[g.fecha] = (mapa[g.fecha] ?? 0) + Number(g.monto);
-      }
-    });
+    if (!cuentaActivaId) return mapa;
     pagos.forEach((p) => {
-      if (p.pagado && p.fecha_pago && p.fecha_pago >= inicioMesI && p.fecha_pago < inicioMesSiguienteI && p.monto_real != null) {
-        mapa[p.fecha_pago] = (mapa[p.fecha_pago] ?? 0) + Number(p.monto_real);
-      }
+      if (!p.pagado || !p.fecha_pago || p.monto_real == null) return;
+      if (p.fecha_pago < inicioMesI || p.fecha_pago >= inicioMesSiguienteI) return;
+      if (entidadDePago(p) !== cuentaActivaId) return;
+      mapa[p.fecha_pago] = (mapa[p.fecha_pago] ?? 0) + Number(p.monto_real);
+    });
+    transferencias.forEach((t) => {
+      if (t.cuenta_origen_id !== cuentaActivaId) return;
+      if (t.fecha < inicioMesI || t.fecha >= inicioMesSiguienteI) return;
+      mapa[t.fecha] = (mapa[t.fecha] ?? 0) + Number(t.monto);
     });
     return mapa;
-  }, [gastosDiarios, pagos, inicioMesI, inicioMesSiguienteI]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagos, gastosFijos, comprasEntidad, transferencias, cuentaActivaId, inicioMesI, inicioMesSiguienteI]);
+
+  // Día con ingreso (punto verde, mockup Calendario.dc.html): transferencias
+  // que ENTRARON a la cuenta seleccionada ese día — a diferencia de
+  // `ingresos` (sueldo de una persona, sin fecha exacta), una transferencia
+  // sí tiene fecha exacta, así que acá SÍ se puede marcar el día real.
+  const ingresoPorDia = useMemo(() => {
+    const mapa: Record<string, number> = {};
+    if (!cuentaActivaId) return mapa;
+    transferencias.forEach((t) => {
+      if (t.cuenta_destino_id !== cuentaActivaId) return;
+      if (t.fecha < inicioMesI || t.fecha >= inicioMesSiguienteI) return;
+      mapa[t.fecha] = (mapa[t.fecha] ?? 0) + Number(t.monto);
+    });
+    return mapa;
+  }, [transferencias, cuentaActivaId, inicioMesI, inicioMesSiguienteI]);
 
   const maxDelMes = Math.max(0, ...Object.values(gastoPorDia));
+
+  // "Gastado este mes" por cuenta, para el carrusel "Por tarjeta" de esta
+  // pestaña (mismo cálculo que gastoPorEntidad en app/tarjetas/page.tsx).
+  const gastoPorEntidadCarrusel = useMemo(() => {
+    const acc: Record<string, number> = {};
+    cuotas.forEach((c) => {
+      if (!c.entidad_id) return;
+      acc[c.entidad_id] = (acc[c.entidad_id] ?? 0) + Number(c.monto_cuota);
+    });
+    gastosFijos.forEach((g) => {
+      if (!g.entidad_id) return;
+      acc[g.entidad_id] = (acc[g.entidad_id] ?? 0) + Number(g.monto_estimado);
+    });
+    return acc;
+  }, [cuotas, gastosFijos]);
 
   // "Movimientos internos" (mockup pág. 8) — traspasos entre cuentas propias
   // del mes que se está mirando en Intensidad, usando la misma tabla
@@ -250,15 +308,33 @@ export default function CalendarioPagosPage() {
     return cuotas.find((c) => c.compra_id === p.origen_id)?.descripcion ?? "Cuota de tarjeta";
   };
 
-  const movimientosDelDia = diaSeleccionado
+  const nombreEntidad = (id: string | null) => entidades.find((e) => e.id === id)?.nombre ?? "otra cuenta";
+
+  // Movimientos del día seleccionado, de la cuenta activa: pagos hechos ahí
+  // ese día (gasto) + transferencias que entraron o salieron de ella ese
+  // mismo día (ingreso/gasto según el sentido) — ya no incluye
+  // gastos_diarios (no tienen cuenta asociada, ver comentario en
+  // gastoPorDia más arriba).
+  const movimientosDelDia = diaSeleccionado && cuentaActivaId
     ? [
-        ...gastosDiarios.filter((g) => g.fecha === diaSeleccionado).map((g) => ({ key: `gd-${g.id}`, descripcion: g.descripcion, monto: Number(g.monto) })),
         ...pagos
-          .filter((p) => p.pagado && p.fecha_pago === diaSeleccionado && p.monto_real != null)
-          .map((p) => ({ key: `pg-${p.id}`, descripcion: descripcionPago(p), monto: Number(p.monto_real) })),
+          .filter((p) => p.pagado && p.fecha_pago === diaSeleccionado && p.monto_real != null && entidadDePago(p) === cuentaActivaId)
+          .map((p) => ({ key: `pg-${p.id}`, descripcion: descripcionPago(p), monto: Number(p.monto_real), signo: -1 as const })),
+        ...transferencias
+          .filter((t) => t.fecha === diaSeleccionado && (t.cuenta_origen_id === cuentaActivaId || t.cuenta_destino_id === cuentaActivaId))
+          .map((t) => {
+            const esSalida = t.cuenta_origen_id === cuentaActivaId;
+            return {
+              key: `t-${t.id}`,
+              descripcion: t.notas || (esSalida ? `Transferencia hacia ${nombreEntidad(t.cuenta_destino_id)}` : `Transferencia desde ${nombreEntidad(t.cuenta_origen_id)}`),
+              monto: Number(t.monto),
+              signo: (esSalida ? -1 : 1) as -1 | 1,
+            };
+          }),
       ]
     : [];
-  const totalDiaSeleccionado = movimientosDelDia.reduce((acc, m) => acc + m.monto, 0);
+  const gastoDiaSeleccionado = movimientosDelDia.filter((m) => m.signo === -1).reduce((acc, m) => acc + m.monto, 0);
+  const ingresoDiaSeleccionado = movimientosDelDia.filter((m) => m.signo === 1).reduce((acc, m) => acc + m.monto, 0);
 
   function abrirMarcarPagado(ev: Evento) {
     setError("");
@@ -338,7 +414,36 @@ export default function CalendarioPagosPage() {
 
       {tab === "intensidad" && (
         <div className="space-y-4">
-          <Card>
+          {entidades.length === 0 ? (
+            <Card>
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                Todavía no tienes cuentas creadas — agrega una en{" "}
+                <a href="/tarjetas" className="font-semibold text-brand-from dark:text-white">
+                  Cuentas
+                </a>{" "}
+                para ver su intensidad diaria de gasto.
+              </p>
+            </Card>
+          ) : (
+            <>
+              {/* "Por tarjeta" (mockup Calendario.dc.html): la intensidad
+                  diaria de acá abajo es SIEMPRE de una cuenta puntual, elegida
+                  en este mismo carrusel que ya se usa en /tarjetas. */}
+              <div>
+                <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Por tarjeta</p>
+                <TarjetasCarousel
+                  entidades={entidades}
+                  marcas={marcas}
+                  gastoPorEntidad={gastoPorEntidadCarrusel}
+                  activaId={cuentaActivaId}
+                  onCambiarActiva={(id) => {
+                    setCuentaActivaId(id);
+                    setDiaSeleccionado(null);
+                  }}
+                />
+              </div>
+
+              <Card>
             <div className="mb-3 flex items-center justify-between">
               <button
                 onClick={() => {
@@ -374,13 +479,14 @@ export default function CalendarioPagosPage() {
                 const nivel = celda.delMes && fechaISO ? nivelDe(fechaISO) : 0;
                 const esHoy = celda.delMes && mesOffset === 0 && celda.numero === hoyDia;
                 const seleccionada = fechaISO === diaSeleccionado;
+                const tieneIngreso = celda.delMes && fechaISO ? (ingresoPorDia[fechaISO] ?? 0) > 0 : false;
                 return (
                   <button
                     key={i}
                     type="button"
                     disabled={!celda.delMes}
                     onClick={() => fechaISO && setDiaSeleccionado(fechaISO === diaSeleccionado ? null : fechaISO)}
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl text-[13px] font-semibold transition ${
+                    className={`relative flex h-10 w-10 items-center justify-center rounded-xl text-[13px] font-semibold transition ${
                       celda.delMes ? "text-gray-700 dark:text-gray-200" : "text-gray-300 dark:text-gray-600"
                     } ${esHoy ? "ring-[1.5px] ring-brand-from dark:ring-white" : ""} ${
                       seleccionada ? "ring-2 ring-brand-from dark:ring-white" : ""
@@ -388,6 +494,9 @@ export default function CalendarioPagosPage() {
                     style={celda.delMes ? estiloNivel(nivel) : undefined}
                   >
                     {celda.numero}
+                    {tieneIngreso && (
+                      <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-white bg-ingreso dark:border-gray-900" />
+                    )}
                   </button>
                 );
               })}
@@ -398,6 +507,10 @@ export default function CalendarioPagosPage() {
                 <span key={n} className="h-3.5 w-3.5 rounded-[4px]" style={estiloNivel(n)} />
               ))}
               más
+            </div>
+            <div className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+              <span className="h-2 w-2 rounded-full bg-ingreso" />
+              día con ingreso
             </div>
           </Card>
 
@@ -478,27 +591,30 @@ export default function CalendarioPagosPage() {
                     ✕
                   </button>
                 </div>
-                {/* Solo se muestra el total de gasto (rojo), no de ingreso: a
-                    diferencia del mockup, esta cuenta no tiene fecha exacta
-                    de ingreso en el esquema real (ver comentario arriba de
-                    esta pantalla) — mostrar un "+$0" fijo sería engañoso. */}
-                <div className="mt-1.5 flex items-center gap-3 text-xs">
-                  <span className="font-bold text-gasto">-{formatCLP(totalDiaSeleccionado)}</span>
+                {/* Ahora sí se muestran ambas cifras (mockup: "+$2.850.000 ·
+                    -$86.750"): al ser por cuenta, el ingreso sale de
+                    transferencias que entraron a ESTA cuenta ese día, que sí
+                    tienen fecha exacta (a diferencia de `ingresos`, el sueldo
+                    de una persona, que solo guarda el mes). */}
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  {ingresoDiaSeleccionado > 0 && <span className="font-bold text-ingreso">+{formatCLP(ingresoDiaSeleccionado)}</span>}
+                  {gastoDiaSeleccionado > 0 && <span className="font-bold text-gasto">-{formatCLP(gastoDiaSeleccionado)}</span>}
                   <span className="text-white/40">· {movimientosDelDia.length} movimiento{movimientosDelDia.length === 1 ? "" : "s"}</span>
                 </div>
 
                 {movimientosDelDia.length === 0 ? (
-                  <p className="mt-4 text-sm text-white/40">Sin gastos registrados este día.</p>
+                  <p className="mt-4 text-sm text-white/40">Sin movimientos registrados este día en esta cuenta.</p>
                 ) : (
                   <ul className="mt-3 divide-y divide-white/10">
                     {movimientosDelDia.map((m) => (
                       <li key={m.key} className="flex items-center gap-3 py-2.5">
                         <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">
-                          💸
+                          {m.signo === 1 ? "↙️" : "💸"}
                         </span>
                         <span className="min-w-0 flex-1 truncate text-sm font-medium">{m.descripcion}</span>
-                        <span className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-gasto">
-                          -{formatCLP(m.monto)}
+                        <span className={`shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold ${m.signo === 1 ? "text-ingreso" : "text-gasto"}`}>
+                          {m.signo === 1 ? "+" : "-"}
+                          {formatCLP(m.monto)}
                         </span>
                       </li>
                     ))}
@@ -506,6 +622,8 @@ export default function CalendarioPagosPage() {
                 )}
               </div>
             </div>
+          )}
+            </>
           )}
         </div>
       )}

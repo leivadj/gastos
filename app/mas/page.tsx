@@ -6,13 +6,14 @@ import { supabase } from "@/lib/supabaseClient";
 import { adminNavItem, esAdmin as checkEsAdmin, navItems } from "@/components/navItems";
 import { PerfilPropioCard } from "@/components/PerfilPropioCard";
 
-// Todo lo que antes vivía suelto en esta pantalla (Metas, Auto, Salud,
-// Ingresos, Grupos, Personas, Sugerencias, Admin) más las pantallas de la
-// app anterior a este rediseño (Gastos, Calendario, Movimientos, Reportes)
-// — Felipe pidió que TODO esto quede dentro de "Herramientas de la versión
-// anterior", dejando esta pantalla solo con la tarjeta de perfil propio y
-// ese acordeón colapsado. "Auto" y "Salud" son pantallas nuevas de gastos
-// sueltos (ver navItems.tsx).
+// Todo lo que no entra en la barra inferior (Metas, Auto, Salud, Ingresos,
+// Grupos, Personas, Sugerencias, Admin, Gastos, Calendario, Movimientos,
+// Reportes) vive acá agrupado. Esto NO es la app anterior al rediseño —
+// son pantallas actuales del rediseño v2, así que la etiqueta ya no dice
+// "versión anterior" (Felipe reportó no encontrar varias de estas — el
+// nombre daba a entender que eran herramientas viejas/descartables) y el
+// acordeón arranca abierto en vez de colapsado. "Auto" y "Salud" son
+// pantallas nuevas de gastos sueltos (ver navItems.tsx).
 const HREFS_HERRAMIENTAS_ANTERIORES = [
   "/metas-ahorro",
   "/auto",
@@ -29,7 +30,7 @@ const HREFS_HERRAMIENTAS_ANTERIORES = [
 
 export default function MasPage() {
   const [esAdminUsuario, setEsAdminUsuario] = useState(false);
-  const [herramientasAbiertas, setHerramientasAbiertas] = useState(false);
+  const [herramientasAbiertas, setHerramientasAbiertas] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setEsAdminUsuario(checkEsAdmin(data.session?.user?.email)));
@@ -46,7 +47,7 @@ export default function MasPage() {
     <div className="space-y-6 pb-10 pt-2">
       <div>
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Más</h1>
-        <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">Tu perfil y las herramientas de la versión anterior.</p>
+        <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">Tu perfil y el resto de las secciones.</p>
       </div>
 
       <PerfilPropioCard />
@@ -63,7 +64,7 @@ export default function MasPage() {
             </svg>
           </span>
           <span className="flex-1 text-left text-[15px] font-medium text-gray-500 dark:text-gray-400">
-            Herramientas de la versión anterior
+            Todas las secciones
           </span>
           <svg
             width="16"
@@ -83,7 +84,7 @@ export default function MasPage() {
           <div className="border-t border-gray-50 dark:border-white/10">
             <p className="px-5 pt-3 text-[11px] text-gray-400 dark:text-gray-500">
               Metas, auto, salud, ingresos, grupos, personas, sugerencias, gastos, calendario de pagos, movimientos y
-              reportes{esAdminUsuario ? " y ajustes" : ""} — de la app anterior a este rediseño.
+              reportes{esAdminUsuario ? " y ajustes" : ""}.
             </p>
             {itemsAnteriores.map((item, i) => (
               <Link

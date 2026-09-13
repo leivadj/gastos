@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { CategoriaPicker } from "@/components/CategoriaPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
@@ -231,7 +232,14 @@ export function FormMovimiento({
   // hojas de la app) con su propio fondo oscuro + difuminado, así siempre
   // cabe entero y se nota claramente que es una ventana aparte, por encima.
   function DropdownCuentas({ valor, onElegir, onTransferencia }: { valor: string; onElegir: (id: string) => void; onTransferencia?: () => void }) {
-    return (
+    // createPortal: este dropdown se abre DENTRO de la hoja "Nuevo
+    // movimiento", que a su vez ya está portada a <body> (ver más abajo) —
+    // pero antes de que ese cambio existiera este overlay quedaba anidado
+    // en el árbol normal de React y podía terminar detrás de contenido de la
+    // página en escritorio (mismo bug de stacking que /tarjetas y
+    // /movimientos, ver los comentarios ahí). Se porta también acá, directo
+    // a <body>, para no depender de dónde quede montada la hoja que lo abre.
+    return createPortal(
       <div
         className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4"
         onClick={() => setSelectorAbierto(null)}
@@ -309,7 +317,8 @@ export function FormMovimiento({
             </>
           )}
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
@@ -430,11 +439,22 @@ export function FormMovimiento({
 
   const titulo = modoTransferencia ? "Transferencia entre cuentas" : "Nuevo movimiento";
 
-  return (
+  // createPortal: se monta como hijo directo de <body> (mismo motivo que
+  // /tarjetas y /movimientos, ver los comentarios ahí) — antes esta hoja se
+  // abría desde el "+" del rail de escritorio (dentro de <aside> en
+  // DesktopSidebar.tsx) o de la barra inferior, y sin portal podía terminar
+  // por detrás de contenido de la página (ej. las tarjetas de "Personas"),
+  // en vez de siempre por encima de todo.
+  //
+  // "sm:max-w-lg lg:max-w-xl" (antes "sm:max-w-md" en todos los tamaños):
+  // en escritorio hay espacio de sobra y este formulario no es un mockup de
+  // celular estirado — se le da más aire horizontal en vez de dejarlo
+  // angosto y muy alto.
+  return createPortal(
     <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4" onClick={onClose}>
       <form
         onSubmit={handleSubmit}
-        className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-10 shadow-xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl sm:pb-5"
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-10 shadow-xl dark:bg-[#111113] dark:text-white sm:max-h-[85vh] sm:max-w-lg sm:rounded-3xl sm:pb-5 lg:max-w-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -746,6 +766,7 @@ export function FormMovimiento({
           {guardando ? "Guardando…" : modoTransferencia ? "Guardar transferencia" : tipo === "gasto" ? "Guardar movimiento" : "Guardar ingreso"}
         </button>
       </form>
-    </div>
+    </div>,
+    document.body
   );
 }

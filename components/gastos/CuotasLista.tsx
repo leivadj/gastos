@@ -467,7 +467,11 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Felipe pidió que en la web el listado se vea "más estirado al
+          horizontal, no como cuadros" — antes esto armaba una grilla de
+          2-3 columnas en sm:/lg:; ahora queda siempre en una sola columna a
+          lo ancho completo, en cualquier tamaño de pantalla. */}
+      <div className="flex flex-col gap-3">
         {lista.map((c) => {
           const activa = c.cuota_actual >= 1 && c.cuota_actual <= c.n_cuotas;
           const progreso = Math.min(100, Math.max(0, (c.cuota_actual / c.n_cuotas) * 100));

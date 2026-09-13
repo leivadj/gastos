@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
@@ -115,6 +115,94 @@ const ITEMS: ItemRail[] = [
   },
 ];
 
+// Rutas que en el mockup NO tienen ícono propio en el rail (Metas, Auto,
+// Salud, Grupos, Ingresos, Sugerencias) pero SÍ existen como pantallas
+// completas del rediseño — en celular viven dentro de "Más" (ver
+// app/mas/page.tsx), pero en escritorio, al calcar el rail de 8 íconos
+// exacto del mockup, quedaron sin ningún punto de entrada: ni ícono propio
+// ni un "Más" que las agrupara. Felipe reportó "los menus faltantes en la
+// app" — este ítem "Más" (mismo ícono de 4 cuadros que su versión móvil)
+// es el arreglo: abre un popover con estos 6 destinos en vez de agregar
+// más íconos sueltos al rail (que dejaría de calcar el mockup).
+const ITEMS_MAS: ItemRail[] = [
+  {
+    key: "metas-ahorro",
+    href: "/metas-ahorro",
+    label: "Metas de ahorro",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    ),
+  },
+  {
+    key: "auto",
+    href: "/auto",
+    label: "Auto",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <path
+          d="M4 16v-3.5a2 2 0 0 1 1.2-1.8l1.3-3.4A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.3l1.3 3.4a2 2 0 0 1 1.2 1.8V16"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M4 16h16" strokeLinecap="round" />
+        <circle cx="7.5" cy="16.5" r="1.5" />
+        <circle cx="16.5" cy="16.5" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    key: "salud",
+    href: "/salud",
+    label: "Salud",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <path
+          d="M12 20s-7-4.35-9.5-8.5C.8 8.2 2.4 5 5.6 5c1.8 0 3.1 1 4.4 2.6C11.3 6 12.6 5 14.4 5c3.2 0 4.8 3.2 3.1 6.5C15 15.65 12 20 12 20Z"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+  },
+  {
+    key: "grupos",
+    href: "/grupos",
+    label: "Grupos",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="3.5" y="4" width="17" height="6" rx="1.5" />
+        <rect x="3.5" y="14" width="7.5" height="6" rx="1.5" />
+        <rect x="13" y="14" width="7.5" height="6" rx="1.5" />
+      </svg>
+    ),
+  },
+  {
+    key: "ingresos",
+    href: "/ingresos",
+    label: "Ingresos",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <path d="M4 16 9.5 10.5 13.5 14.5 20 8" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M14.5 8H20v5.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    key: "sugerencias",
+    href: "/sugerencias",
+    label: "Sugerencias",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="3" y="5" width="18" height="14" rx="2.2" />
+        <path d="m3.5 6 8.5 6.5L20.5 6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+];
+
 const ITEM_PERSONAS: ItemRail = {
   key: "personas",
   href: "/personas",
@@ -174,6 +262,17 @@ export function DesktopSidebar() {
   const [session, setSession] = useState<Session | null>(null);
   const [personaSelf, setPersonaSelf] = useState<Persona | null>(null);
   const { preferencia, setPreferencia } = useTheme();
+  const [masAbierto, setMasAbierto] = useState(false);
+  const refMas = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!masAbierto) return;
+    function onClick(e: MouseEvent) {
+      if (refMas.current && !refMas.current.contains(e.target as Node)) setMasAbierto(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [masAbierto]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -249,6 +348,50 @@ export function DesktopSidebar() {
         );
       })}
 
+      <div className="relative" ref={refMas}>
+        <button
+          type="button"
+          title="Más"
+          aria-label="Más"
+          onClick={() => setMasAbierto((v) => !v)}
+          className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl transition ${
+            ITEMS_MAS.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
+              ? "bg-brand-gradient text-white"
+              : "text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+          }`}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+            <rect x="4" y="4" width="7" height="7" rx="1.8" />
+            <rect x="13" y="4" width="7" height="7" rx="1.8" />
+            <rect x="4" y="13" width="7" height="7" rx="1.8" />
+            <rect x="13" y="13" width="7" height="7" rx="1.8" />
+          </svg>
+        </button>
+
+        {masAbierto && (
+          <div className="absolute bottom-0 left-full z-40 ml-2 w-52 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-2xl dark:border-white/10 dark:bg-gray-900">
+            {ITEMS_MAS.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  onClick={() => setMasAbierto(false)}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-gray-50 text-gray-800 dark:bg-white/10 dark:text-white"
+                      : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <span className="shrink-0 text-gray-400 dark:text-gray-500">{item.icon}</span>
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="flex-1" />
 
       <button
@@ -265,9 +408,12 @@ export function DesktopSidebar() {
           navega directo al Perfil (mismo destino que el avatar del mockup),
           igual que en el header de Inicio en celular. "Cerrar sesión" ya
           vive en el propio Perfil (ver PerfilPropioCard.tsx), así que no se
-          perdió esa función, solo dejó de estar duplicada acá. */}
+          perdió esa función, solo dejó de estar duplicada acá.
+          BUG reportado por Felipe: esto apuntaba a /personas (gestión de
+          "otras personas" para repartos) en vez de a su propio perfil —
+          "Tu perfil" vive en /mas (arriba de todo, ver PerfilPropioCard). */}
       <Link
-        href="/personas"
+        href="/mas"
         aria-label="Ir a tu perfil"
         title="Tu perfil"
         className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-gray-800 text-[12.5px] font-bold text-white transition hover:opacity-90 dark:bg-white dark:text-black"

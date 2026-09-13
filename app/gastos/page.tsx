@@ -69,9 +69,25 @@ function GastosContenido() {
 
   return (
     <div className="space-y-4 pb-10">
-      <div>
-        <h1 className="text-lg font-bold text-gray-800 dark:text-white">Gastos</h1>
-        <p className="text-xs text-gray-400 dark:text-gray-500">Normal, recurrente y cuotas — todos los gastos del hogar.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">Gastos</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Normal, recurrente y cuotas — todos los gastos del hogar.</p>
+        </div>
+        {/* Felipe: "necesito el menu generar reporte en la web" — /reportes ya
+            existe y está en el rail de escritorio, pero ese rail es solo
+            íconos (sin texto), así que era fácil no encontrarlo. Este acceso
+            directo con etiqueta queda visible en las 3 pestañas. */}
+        <Link
+          href="/reportes"
+          className="hidden shrink-0 items-center gap-1.5 rounded-full border border-gray-200 px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/5 md:flex"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 3.5 3.5 12l8.5 8.5 8.5-8.5z" />
+            <path d="M12 8v4l3 1.5" />
+          </svg>
+          Generar reporte
+        </Link>
       </div>
 
       <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-sm dark:bg-white/5">

@@ -44,6 +44,10 @@ export interface Entidad {
   // esto puesto, /tarjetas calcula solo el cupo disponible. null = todavía
   // no lo puso. Ver migration_28_cupo_tarjetas.sql.
   cupo: number | null;
+  // Últimos 4 dígitos de la tarjeta/cuenta, para reconocerla de un vistazo
+  // (ej. "•••• 5344") — opcional, texto (no número: puede empezar con "0").
+  // Ver migration_32_ultimos_digitos.sql.
+  ultimos_digitos: string | null;
 }
 
 export type TipoMarca =

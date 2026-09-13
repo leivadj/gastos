@@ -1038,7 +1038,11 @@ export default function DashboardPage() {
             <IconoChevronDer />
           </button>
         </div>
-        <Link href="/personas" aria-label="Ir a tu perfil">
+        {/* BUG reportado por Felipe: esto llevaba a /personas (gestión de
+            "otras personas" para repartos) en vez de a su propio perfil.
+            "Tu perfil" (PerfilPropioCard) vive en /mas — ver
+            components/PerfilPropioCard.tsx. */}
+        <Link href="/mas" aria-label="Ir a tu perfil">
           <PersonaAvatar
             fotoUrl={personas.find((p) => p.es_self)?.foto_url}
             nombre={personas.find((p) => p.es_self)?.nombre ?? "?"}
