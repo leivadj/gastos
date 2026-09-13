@@ -43,8 +43,11 @@ import {
 } from "@/lib/types";
 import { useDeviceType } from "@/lib/useDeviceType";
 
-const COLORES = ["#7C3AED", "#EC4899", "#F97316", "#10B981", "#3B82F6", "#F43F5E", "#8B5CF6", "#14B8A6"];
-const AVATAR_COLORES = ["#F59E0B", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6"];
+// Rediseño v2: mismos tonos grises + reservados que la dona de
+// "Gastos por categoría" de PresupuestoContenido.tsx (esta es la versión de
+// escritorio del mismo gráfico) — ver también lib/avatarColor.ts.
+const COLORES = ["#111112", "#3A3A3D", "#6E6E72", "#9B9995", "#C9C7C2", "#E2584B", "#5DCB86", "#8A8A8D"];
+const AVATAR_COLORES = ["#111112", "#3A3A3D", "#54585C", "#6E6E72", "#8A8A8D"];
 
 function formatCompacto(valor: number): string {
   return new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 1 }).format(valor);
@@ -400,7 +403,7 @@ export default function DashboardPage() {
                 <Bar
                   dataKey="total"
                   radius={[6, 6, 0, 0]}
-                  fill="#7C3AED"
+                  fill="#17171A"
                   style={{ cursor: "pointer" }}
                   onClick={(d: any) => setPersonaSeleccionada(d?.persona_id ?? d?.payload?.persona_id ?? null)}
                 />

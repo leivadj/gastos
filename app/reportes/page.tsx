@@ -10,9 +10,14 @@ import { promedioMovil } from "@/lib/promedioMovil";
 import { Compra, GastoDiario, GastoFijo, Ingreso, Pago } from "@/lib/types";
 
 const N_MESES = 6;
-const COLOR_GASTO = "#DDD6FE"; // violet-200, mismo tono que el mockup
-const COLOR_GASTO_ACTUAL = "#7C3AED"; // brand-from
-const COLOR_INGRESO = "#10B981"; // emerald-500, mismo verde que "pagado"/"ingreso" en el resto de la app
+// Reservados v2 (ver tailwind.config.ts: colors.gasto/ingreso) — el gráfico
+// muestra montos reales de gasto/ingreso, así que usa esos mismos tokens.
+// El mes actual se resalta con el rojo "gasto" a toda intensidad; los meses
+// anteriores usan una versión clara del mismo tono en vez de un color
+// distinto, para no perder el significado "esto es gasto".
+const COLOR_GASTO = "#F3B7AC"; // gasto (#E2584B), versión clara — meses anteriores
+const COLOR_GASTO_ACTUAL = "#E2584B"; // gasto — mes actual
+const COLOR_INGRESO = "#5DCB86"; // ingreso
 
 type MesRef = { iso: string; year: number; month: number; label: string; labelLargo: string };
 
