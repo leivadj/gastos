@@ -13,6 +13,22 @@ import { mensajeError } from "@/lib/supabaseError";
 import { formatCLP, mesActualISO } from "@/lib/format";
 import { Ingreso, Persona, ResumenPersonaMes } from "@/lib/types";
 
+// Fila deshabilitada para algo que el mockup muestra pero que hoy no es
+// una función real de la app (ver el comentario donde se usa, más abajo).
+function FilaProximamente({ titulo, descripcion }: { titulo: string; descripcion: string }) {
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-dashed border-gray-200 px-3 py-2 opacity-60 dark:border-white/10">
+      <div className="min-w-0 pr-2">
+        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{titulo}</p>
+        <p className="truncate text-[10.5px] text-gray-400 dark:text-gray-500">{descripcion}</p>
+      </div>
+      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-500">
+        Próximamente
+      </span>
+    </div>
+  );
+}
+
 // Adivina un nombre a partir del correo (ej. "leiva.dj@gmail.com" -> "Leiva
 // Dj") para no dejar el perfil sin nombre al crearlo solo — se puede
 // cambiar al toque desde "editar".
@@ -236,12 +252,41 @@ export function PerfilPropioCard() {
         </Link>
       </div>
 
-      <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
+      {/* Estas 3 filas están en el mockup pero no son funciones que existan
+          hoy (unir cuentas en un PDF, conectar cuentas bancarias de
+          verdad, cobro de una suscripción) — Felipe pidió dejarlas
+          visibles en su lugar del mockup, marcadas "Próximamente" en vez
+          de ocultarlas o simular que ya funcionan. */}
+      <div className="mt-3 space-y-2">
+        <FilaProximamente titulo="Cartola consolidado" descripcion="Une todas tus cuentas en un solo PDF" />
+        <FilaProximamente titulo="Integraciones" descripcion="Conectar tus cuentas bancarias automáticamente" />
+        <FilaProximamente titulo="Suscripción Premium" descripcion="Funciones extra con una suscripción paga" />
+      </div>
+
+      <p className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+        Configuración
+      </p>
+
+      <div className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
         <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tema</span>
         <ThemeToggle />
       </div>
 
       <NotificacionesPush />
+
+      <div className="mt-2 space-y-2">
+        <FilaProximamente titulo="Inicio del mes" descripcion="Elegir qué día del mes empieza tu ciclo (hoy siempre es el día 1)" />
+        <FilaProximamente titulo="Balance" descripcion="Elegir qué cuentas suman al balance (hoy suma todas)" />
+        <Link
+          href="/categorias"
+          className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 dark:border-white/10 dark:text-gray-300"
+        >
+          Categorías
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-300 dark:text-gray-600">
+            <path d="m9 6 6 6-6 6" />
+          </svg>
+        </Link>
+      </div>
 
       <button
         onClick={() => supabase.auth.signOut()}
