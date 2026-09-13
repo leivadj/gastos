@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { DividirGastoSheet, ItemADividir } from "@/components/DividirGastoSheet";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import {
@@ -18,7 +19,7 @@ import { diaDelMes, formatCLP, mesActualISO, nombreMes, nombreMesCorto } from "@
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, Compra, Entidad, GastoDiario, GastoFijo, Ingreso, Marca, Pago, Persona } from "@/lib/types";
+import { Categoria, Compra, Entidad, GastoDiario, GastoFijo, Grupo, Ingreso, ItemParticipante, Marca, OrigenItem, Pago, Persona } from "@/lib/types";
 
 type TipoMovimiento = "fijo" | "variable" | "cuota" | "diario" | "ingreso";
 
@@ -42,6 +43,12 @@ type Movimiento = {
   entidadId: string | null;
   marcaId: string | null;
   icono: string | null;
+  // Solo para tipo "cuota"/"fijo"/"variable" — las únicas con reparto real
+  // (ver DividirGastoSheet.tsx). Ausentes (undefined) en "diario"/"ingreso".
+  origen?: OrigenItem;
+  origenId?: string;
+  categoriaId?: string | null;
+  grupoId?: string | null;
 };
 
 // Pantalla "Movimientos": une en un solo listado cronológico, mes a mes, lo
@@ -70,15 +77,20 @@ export default function MovimientosPage() {
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
 
   const [ref, setRef] = useState<MesRef>(mesRefActual());
   const [filtros, setFiltros] = useState<TipoMovimiento[]>([]);
+  // Movimiento en el que se abrió "Dividir gasto" (mockup PDF pág. 13) — ver
+  // DividirGastoSheet.tsx. Solo cuotas/fijos/variables tienen esta opción.
+  const [dividiendo, setDividiendo] = useState<Movimiento | null>(null);
 
   async function cargarTodo() {
     try {
-      const [{ data: c }, { data: gf }, { data: gd }, { data: ing }, { data: pg }, { data: cat }, { data: e }, { data: m }, { data: p }] =
+      const [{ data: c }, { data: gf }, { data: gd }, { data: ing }, { data: pg }, { data: cat }, { data: e }, { data: m }, { data: p }, { data: gr }, { data: ipCompra }, { data: ipFijo }] =
         await Promise.all([
           supabase.from("compras").select("*"),
           supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -89,6 +101,9 @@ export default function MovimientosPage() {
           supabase.from("entidades").select("*"),
           supabase.from("marcas").select("*"),
           supabase.from("personas").select("*").eq("activo", true),
+          supabase.from("grupos").select("*").order("nombre"),
+          supabase.from("item_participantes").select("*").eq("origen", "compra"),
+          supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
         ]);
       setCompras((c as Compra[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -99,6 +114,17 @@ export default function MovimientosPage() {
       setEntidades((e as Entidad[]) ?? []);
       setMarcas((m as Marca[]) ?? []);
       setPersonas((p as Persona[]) ?? []);
+      setGrupos((gr as Grupo[]) ?? []);
+      const agrupado: Record<string, ItemParticipante[]> = {};
+      ((ipCompra as ItemParticipante[]) ?? []).forEach((row) => {
+        if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
+        agrupado[row.origen_id].push(row);
+      });
+      ((ipFijo as ItemParticipante[]) ?? []).forEach((row) => {
+        if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
+        agrupado[row.origen_id].push(row);
+      });
+      setParticipantesPorItem(agrupado);
     } catch (err) {
       setError(mensajeError(err) || "No se pudieron cargar los movimientos.");
     } finally {
@@ -148,6 +174,10 @@ export default function MovimientosPage() {
         entidadId: c.entidad_id,
         marcaId: c.marca_id,
         icono: c.icono,
+        origen: "compra" as const,
+        origenId: c.id,
+        categoriaId: c.categoria_id,
+        grupoId: c.grupo_id,
       },
     ];
   });
@@ -179,6 +209,10 @@ export default function MovimientosPage() {
       entidadId: g.entidad_id,
       marcaId: g.marca_id,
       icono: g.icono,
+      origen: "gasto_fijo" as const,
+      origenId: g.id,
+      categoriaId: g.categoria_id,
+      grupoId: g.grupo_id,
     };
   });
 
@@ -244,12 +278,16 @@ export default function MovimientosPage() {
     if (enMesActual && dia === hoyDiaNumero - 1) return `Ayer · ${dia} ${mesCorto}`;
     return `${dia} ${mesCorto}`;
   }
-  const grupos: { label: string; items: typeof visibles }[] = [];
+  function fechaCorta(dia: number): string {
+    const fechaDia = `${refIso.slice(0, 7)}-${String(dia).padStart(2, "0")}`;
+    return `${dia} ${nombreMesCorto(fechaDia)}`;
+  }
+  const gruposDia: { label: string; items: typeof visibles }[] = [];
   visibles.forEach((m) => {
     const label = m.dia == null ? "Sin fecha" : etiquetaDia(m.dia);
-    const grupo = grupos.find((g) => g.label === label);
-    if (grupo) grupo.items.push(m);
-    else grupos.push({ label, items: [m] });
+    const grupoDia = gruposDia.find((g) => g.label === label);
+    if (grupoDia) grupoDia.items.push(m);
+    else gruposDia.push({ label, items: [m] });
   });
 
   function toggleFiltro(tipo: TipoMovimiento) {
@@ -331,15 +369,16 @@ export default function MovimientosPage() {
           <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">Sin movimientos para este filtro.</p>
         ) : (
           <div className="space-y-4">
-            {grupos.map((grupo) => (
-              <div key={grupo.label}>
+            {gruposDia.map((grupoDia) => (
+              <div key={grupoDia.label}>
                 <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                  {grupo.label}
+                  {grupoDia.label}
                 </p>
                 <div className="divide-y divide-gray-100 dark:divide-white/10">
-                  {grupo.items.map((m) => {
+                  {grupoDia.items.map((m) => {
                     const marcaItem = marcaDe(m.marcaId);
                     const esIngreso = m.tipo === "ingreso";
+                    const puedeDividirse = m.origen != null && m.origenId != null;
                     return (
                       <div key={m.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
                         <EntidadAvatar
@@ -357,11 +396,18 @@ export default function MovimientosPage() {
                             {m.pagado === false && <span className="ml-1.5 text-gray-300 dark:text-gray-600">· Pendiente</span>}
                           </p>
                         </div>
-                        <p className={`shrink-0 text-sm font-semibold ${esIngreso ? "text-ingreso" : "text-gasto"}`}>
-                          {esIngreso ? "+" : "-"}
-                          {m.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
-                          {formatCLP(m.monto)}
-                        </p>
+                        <div className="flex shrink-0 flex-col items-end gap-0.5">
+                          <p className={`text-sm font-semibold ${esIngreso ? "text-ingreso" : "text-gasto"}`}>
+                            {esIngreso ? "+" : "-"}
+                            {m.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
+                            {formatCLP(m.monto)}
+                          </p>
+                          {puedeDividirse && (
+                            <button onClick={() => setDividiendo(m)} className="text-[11px] font-semibold text-brand-from dark:text-white">
+                              Dividir
+                            </button>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -373,6 +419,25 @@ export default function MovimientosPage() {
       </Card>
 
       {error && <p className="text-center text-xs text-red-500 dark:text-red-400">{error}</p>}
+
+      {dividiendo && dividiendo.origen && dividiendo.origenId && (
+        <DividirGastoSheet
+          item={{
+            origen: dividiendo.origen,
+            origenId: dividiendo.origenId,
+            descripcion: dividiendo.descripcion,
+            categoriaNombre: categoriaDe(dividiendo.categoriaId ?? null)?.nombre ?? "Sin categoría",
+            fechaLabel: dividiendo.dia != null ? fechaCorta(dividiendo.dia) : "Sin fecha",
+            monto: dividiendo.monto,
+            grupoId: dividiendo.grupoId ?? null,
+          }}
+          grupos={grupos}
+          personas={personas}
+          participantesActuales={participantesPorItem[dividiendo.origenId] ?? []}
+          onClose={() => setDividiendo(null)}
+          onGuardado={cargarTodo}
+        />
+      )}
     </div>
   );
 }
