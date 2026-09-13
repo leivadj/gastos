@@ -20,8 +20,12 @@ function fechaCorta(fechaISO: string): string {
 // ni reparto entre personas. Se usa en 3 lugares con la misma lógica, cada
 // uno atado a una categoría compartida distinta del catálogo (ver
 // migration_21 para "Hogar" y migration_22 para "Auto"/"Salud"):
-//   - Pestaña "Diarios" de /gastos (categoriaNombre="Hogar", el original):
-//     compras chicas/improvisadas del día a día (pan, queso...).
+//   - Pestaña "Normal" de /gastos, debajo de las compras de un solo pago
+//     (categoriasElegibles=Hogar/Feria/Panadería/Educación): compras
+//     chicas/improvisadas del día a día (pan, queso...) — antes tenía su
+//     propia pestaña "Diarios", fusionada acá cuando /gastos pasó a 3
+//     categorías (Normal/Recurrente/Cuotas, misma taxonomía que "Nuevo
+//     movimiento").
 //   - /auto (categoriaNombre="Auto"): bencina, mecánico, mantención.
 //   - /salud (categoriaNombre="Salud"): remedios, visita al doctor.
 // Al ser todas gastos_diarios con categoria_id, ya participan solas en el

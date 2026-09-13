@@ -77,8 +77,8 @@ export default function ServiciosBasicosPage() {
         <Card>
           <p className="text-sm text-gray-400 dark:text-gray-500">
             Todavía no tienes gastos fijos marcados como &quot;monto variable&quot;. Puedes hacerlo en la pestaña{" "}
-            <Link href="/gastos?tab=variables" className="font-semibold text-brand-from dark:text-white">
-              Variables
+            <Link href="/gastos?tab=recurrente" className="font-semibold text-brand-from dark:text-white">
+              Recurrente
             </Link>{" "}
             de Gastos.
           </p>

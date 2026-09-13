@@ -9,9 +9,10 @@ export function esAdmin(email?: string | null): boolean {
 // variable (que llevan al detalle "Hogar > Servicios básicos", una
 // sub-página sin ítem propio de navegación) y un resumen de metas de
 // ahorro. La gestión (alta/edición/baja) de todos los gastos vive en
-// /gastos — una sola pantalla con pestañas (Fijos, Variables, Cuotas,
-// Diarios) que reemplazó a las antiguas /gastos-fijos y /compras (ambas
-// rutas quedaron como redirect por si había accesos directos guardados) —
+// /gastos — una sola pantalla con pestañas (Normal, Recurrente, Cuotas —
+// misma taxonomía que "Nuevo movimiento") que reemplazó a las antiguas
+// /gastos-fijos y /compras (ambas rutas quedaron como redirect por si
+// había accesos directos guardados) —
 // agrupada en "Más", y también accesible con "Gestionar gastos" al fondo
 // de Presupuesto. "Auto" y "Salud" son gastos sueltos de carga rápida
 // (mismo patrón que "Diarios" de /gastos, ver DiariosLista.tsx) atados a

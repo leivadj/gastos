@@ -16,13 +16,17 @@ import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
 import { Categoria, CategoriaGrupoPreferido, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
 
-// Pestañas "Fijos" y "Variables" de /gastos: misma tabla (gastos_fijos),
-// filtradas por tipo_monto — antes eran dos secciones de una sola pantalla
-// (/gastos-fijos), ahora dos pestañas separadas que comparten este mismo
-// componente. El formulario de alta arranca con el tipo de la pestaña
-// actual, pero se puede cambiar (por si un ítem cambia de "cobra siempre lo
-// mismo" a "vencimiento fijo, monto variable" o viceversa).
-export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo" | "variable" }) {
+// Pestaña "Recurrente" de /gastos: gastos_fijos, sin filtrar por tipo_monto
+// — Felipe pidió que /gastos tenga solo 3 categorías (Normal/Recurrente/
+// Cuotas, la misma taxonomía que ya usa "Nuevo movimiento"), así que "monto
+// fijo" y "monto variable" (antes dos pestañas separadas, "Fijos" y
+// "Variables") ahora conviven en una sola lista — la distinción sigue
+// existiendo (el form la sigue preguntando, cada tarjeta muestra una
+// etiqueta "Fijo"/"Variable"), solo dejó de ser el criterio que separa
+// pestañas. Si en el futuro hiciera falta volver a filtrar por uno de los
+// dos (ej. una pantalla dedicada), la prop `tipoMonto` sigue aceptando un
+// valor único para eso — sin ella, se listan ambos.
+export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fijo" | "variable" }) {
   const [gastos, setGastos] = useState<GastoFijo[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
@@ -42,7 +46,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [diaMes, setDiaMes] = useState("1");
-  const [tipoMonto, setTipoMonto] = useState<"fijo" | "variable">(tabTipoMonto);
+  const [tipoMonto, setTipoMonto] = useState<"fijo" | "variable">(tabTipoMonto ?? "fijo");
   const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [grupoId, setGrupoId] = useState("");
@@ -106,7 +110,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setDescripcion("");
     setMonto("");
     setDiaMes("1");
-    setTipoMonto(tabTipoMonto);
+    setTipoMonto(tabTipoMonto ?? "fijo");
     setEntidadId("");
     setCategoriaId("");
     setGrupoId("");
@@ -118,7 +122,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   }
 
   function abrirFormNuevo() {
-    setTipoMonto(tabTipoMonto);
+    setTipoMonto(tabTipoMonto ?? "fijo");
     if (unicaPersona) setParticipantes([{ persona_id: unicaPersona.id, porcentaje: null }]);
     setMostrarForm(true);
   }
@@ -239,8 +243,10 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     return nombres.join(", ");
   }
 
-  const lista = gastos.filter((g) => g.tipo_monto === tabTipoMonto);
+  const lista = tabTipoMonto ? gastos.filter((g) => g.tipo_monto === tabTipoMonto) : gastos;
   const total = lista.reduce((acc, g) => acc + montoVigente(g).monto, 0);
+  const totalFijo = gastos.filter((g) => g.tipo_monto === "fijo").reduce((acc, g) => acc + montoVigente(g).monto, 0);
+  const totalVariable = gastos.filter((g) => g.tipo_monto === "variable").reduce((acc, g) => acc + montoVigente(g).monto, 0);
 
   return (
     <div className="space-y-4">
@@ -445,12 +451,29 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
 
       {lista.length > 0 && (
         <Card>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500 dark:text-gray-400">
-              {tabTipoMonto === "fijo" ? "Total monto fijo / mes" : "Total variable (promedio móvil) / mes"}
-            </span>
-            <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(total)}</span>
-          </div>
+          {tabTipoMonto ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">
+                {tabTipoMonto === "fijo" ? "Total monto fijo / mes" : "Total variable (promedio móvil) / mes"}
+              </span>
+              <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(total)}</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Monto fijo / mes</span>
+                <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(totalFijo)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Monto variable (promedio móvil) / mes</span>
+                <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(totalVariable)}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-gray-100 pt-1.5 dark:border-white/10">
+                <span className="font-semibold text-gray-600 dark:text-gray-300">Total recurrente / mes</span>
+                <span className="font-bold text-gray-800 dark:text-white">{formatCLP(total)}</span>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
@@ -473,7 +496,14 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                           className="h-9 w-9"
                         />
                         <div>
-                          <p className="font-semibold text-gray-800 dark:text-white">{g.descripcion}</p>
+                          <p className="flex items-center gap-1.5 font-semibold text-gray-800 dark:text-white">
+                            {g.descripcion}
+                            {!tabTipoMonto && (
+                              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gray-400 dark:bg-white/10 dark:text-gray-500">
+                                {g.tipo_monto === "variable" ? "Variable" : "Fijo"}
+                              </span>
+                            )}
+                          </p>
                           <p className="text-xs text-gray-400 dark:text-gray-500">
                             {nombreEntidad(g.entidad_id) ? `${nombreEntidad(g.entidad_id)} · ` : ""}
                             {nombreCategoria(g.categoria_id)}
@@ -514,6 +544,12 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                       </button>
                     </div>
                     <dl className="mt-3 space-y-1.5 text-xs">
+                      {!tabTipoMonto && (
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-gray-400 dark:text-gray-500">Tipo</dt>
+                          <dd className="font-medium text-gray-700 dark:text-gray-200">{g.tipo_monto === "variable" ? "Monto variable" : "Monto fijo"}</dd>
+                        </div>
+                      )}
                       <div className="flex justify-between gap-3">
                         <dt className="text-gray-400 dark:text-gray-500">{esPromedio ? "Promedio móvil" : g.tipo_monto === "variable" ? "Monto estimado" : "Monto"}</dt>
                         <dd className="font-medium text-gray-700 dark:text-gray-200">{formatCLP(montoActual)}</dd>
@@ -571,7 +607,11 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
         })}
         {lista.length === 0 && !mostrarForm && (
           <p className="text-center text-sm text-gray-400 dark:text-gray-500">
-            {tabTipoMonto === "fijo" ? "Aún no hay gastos de monto fijo." : "Aún no hay gastos de monto variable."}
+            {tabTipoMonto === "fijo"
+              ? "Aún no hay gastos de monto fijo."
+              : tabTipoMonto === "variable"
+              ? "Aún no hay gastos de monto variable."
+              : "Aún no hay gastos recurrentes."}
           </p>
         )}
       </div>
