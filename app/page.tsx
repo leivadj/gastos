@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { IngresosContenido } from "@/components/IngresosContenido";
+import { PresupuestoContenido } from "@/components/PresupuestoContenido";
 import {
   PieChart,
   Pie,
@@ -144,6 +146,14 @@ export default function DashboardPage() {
   const [ingresosMes, setIngresosMes] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
+  // Rediseño v2: en celular, Inicio/Ingresos/Presupuesto se fusionan en una
+  // sola pantalla "Resumen" con pestañas (como en el mockup de Not Pato) en
+  // vez de 3 pantallas sueltas — Felipe notó que "Presupuesto" ya
+  // aparecía como pestaña arriba Y como destino propio en el nav inferior.
+  // En escritorio se mantienen como páginas separadas del sidebar (hay
+  // espacio de sobra ahí), así que esta pestaña solo aplica al layout
+  // mobile de más abajo.
+  const [tabResumen, setTabResumen] = useState<"resumen" | "ingresos" | "presupuesto">("resumen");
 
   useEffect(() => {
     async function cargar() {
@@ -513,8 +523,32 @@ export default function DashboardPage() {
 
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
-  const contenido = esMobile ? (
-      <div className="space-y-5 pb-10">
+  const tabsResumen: { id: typeof tabResumen; label: string }[] = [
+    { id: "resumen", label: "Resumen" },
+    { id: "ingresos", label: "Ingresos" },
+    { id: "presupuesto", label: "Presupuestos" },
+  ];
+
+  const barraTabsResumen = (
+    <div className="-mb-1 flex gap-2">
+      {tabsResumen.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setTabResumen(t.id)}
+          className={`rounded-full px-4 py-2 text-[13px] font-semibold transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95 ${
+            tabResumen === t.id
+              ? "bg-black text-white dark:bg-white dark:text-black"
+              : "text-gray-400 dark:text-gray-500"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const vistaResumenTab = (
+      <div className="space-y-5">
         {/* Hero a sangre, fuera del padding del layout */}
         <div className="-mx-4 -mt-4 rounded-b-[2rem] bg-brand-gradient px-5 pb-6 pt-6 text-white">
           <div className="flex items-center justify-between">
@@ -579,6 +613,15 @@ export default function DashboardPage() {
         {tarjetaPersonas}
         {tarjetaCuotas}
       </div>
+  );
+
+  const contenido = esMobile ? (
+    <div className="space-y-4 pb-10">
+      {barraTabsResumen}
+      {tabResumen === "resumen" && vistaResumenTab}
+      {tabResumen === "ingresos" && <IngresosContenido ocultarTitulo />}
+      {tabResumen === "presupuesto" && <PresupuestoContenido ocultarTitulo />}
+    </div>
   ) : (
     // ---- Layout de escritorio (navegador en PC/tablet) ----
     <div className="space-y-6 pb-10">
