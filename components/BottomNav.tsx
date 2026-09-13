@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { navItems, masNavItem } from "@/components/navItems";
 import { MovimientoFab } from "@/components/MovimientoRapido";
+import { EVENTO_HOJA_PANTALLA_COMPLETA } from "@/lib/sheetVisibility";
 
 // Rutas que "pertenecen" a la pestaña Más, para que se marque activa aunque
 // el usuario esté en /gastos, /calendario-pagos, /grupos, /admin, etc. (no
@@ -44,6 +46,18 @@ const RUTAS_INICIO = ["/", "/presupuesto", "/ingresos", "/servicios-basicos"];
 // en vez de solo cambiar de color de golpe.
 export function BottomNav() {
   const pathname = usePathname();
+  // Ver lib/sheetVisibility.ts: mientras una hoja de pantalla completa (ej.
+  // detalle de tarjeta en /tarjetas) está abierta, esta barra se oculta del
+  // todo en vez de quedar visible (borrosa) por detrás del fondo oscuro.
+  const [oculta, setOculta] = useState(false);
+
+  useEffect(() => {
+    function onCambio(e: Event) {
+      setOculta(Boolean((e as CustomEvent<{ abierta: boolean }>).detail?.abierta));
+    }
+    window.addEventListener(EVENTO_HOJA_PANTALLA_COMPLETA, onCambio);
+    return () => window.removeEventListener(EVENTO_HOJA_PANTALLA_COMPLETA, onCambio);
+  }, []);
 
   const inicio = navItems.find((item) => item.href === "/")!;
   const cuentas = navItems.find((item) => item.href === "/tarjetas")!;
@@ -72,6 +86,8 @@ export function BottomNav() {
       </Link>
     );
   }
+
+  if (oculta) return null;
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-20 rounded-t-3xl bg-white/90 shadow-[0_-8px_30px_rgba(17,24,39,0.06)] backdrop-blur-xl dark:bg-black/80 dark:shadow-[0_-8px_30px_rgba(0,0,0,0.4)]">

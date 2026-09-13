@@ -347,6 +347,17 @@ export interface PreferenciasMenu {
   ocultos: string[];
 }
 
+// Objetivo mensual de gasto por categoría (ver migration_31_presupuesto_
+// categorias.sql) — para las barras "gasto vs. presupuesto" de Inicio. No es
+// por mes calendario: es el objetivo recurrente de esa categoría (como
+// monto_estimado en GastoFijo), se compara siempre contra el mes que se esté
+// viendo.
+export interface PresupuestoCategoria {
+  id: string;
+  categoria_id: string;
+  monto_mensual: number;
+}
+
 export type TipoDocumentoAuto = "permiso_circulacion" | "revision_tecnica" | "seguro" | "otro";
 
 // Documento del auto con vencimiento anual (permiso de circulación, revisión

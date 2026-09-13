@@ -48,6 +48,7 @@ import {
   MetaAhorroProgreso,
   Pago,
   Persona,
+  PresupuestoCategoria,
   RepartoCuota,
   RepartoGastoDiario,
   RepartoGastoFijo,
@@ -175,8 +176,17 @@ export default function DashboardPage() {
   const [ingresosLista, setIngresosLista] = useState<Ingreso[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
+  const [presupuestos, setPresupuestos] = useState<PresupuestoCategoria[]>([]);
   const [cargando, setCargando] = useState(true);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
+  // Estado del bloque "Presupuesto por categoría" (ver más abajo, Feature G
+  // del pedido de Felipe) — agregar/editar/quitar un objetivo mensual por
+  // categoría (migration_31_presupuesto_categorias.sql).
+  const [nuevoPresupuestoCategoriaId, setNuevoPresupuestoCategoriaId] = useState("");
+  const [nuevoPresupuestoMonto, setNuevoPresupuestoMonto] = useState("");
+  const [editandoPresupuestoId, setEditandoPresupuestoId] = useState<string | null>(null);
+  const [editandoPresupuestoMonto, setEditandoPresupuestoMonto] = useState("");
+  const [guardandoPresupuesto, setGuardandoPresupuesto] = useState(false);
   // Mes que se está viendo en Inicio — antes "Septiembre de 2026" era un
   // rótulo fijo sin forma de navegar a meses anteriores; ahora es un
   // MesRef con flechas ‹ › junto al nombre del mes (mobile y escritorio).
@@ -217,6 +227,7 @@ export default function DashboardPage() {
         { data: mt },
         { data: gr },
         { data: tr },
+        { data: pc },
       ] = await Promise.all([
         supabase.from("compras").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -234,6 +245,7 @@ export default function DashboardPage() {
         supabase.from("vista_metas_ahorro_progreso").select("*").eq("activa", true).order("nombre"),
         supabase.from("grupos").select("*"),
         supabase.from("transferencias").select("*"),
+        supabase.from("presupuestos_categoria").select("*"),
       ]);
       setComprasRaw((c as Compra[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -251,6 +263,7 @@ export default function DashboardPage() {
       setMetas((mt as MetaAhorroProgreso[]) ?? []);
       setGrupos((gr as Grupo[]) ?? []);
       setTransferencias((tr as Transferencia[]) ?? []);
+      setPresupuestos((pc as PresupuestoCategoria[]) ?? []);
       setCargando(false);
     }
     cargar();
@@ -495,6 +508,63 @@ export default function DashboardPage() {
   // sola persona en la cuenta) y el grid se acomoda solo.
   const numTarjetasSecundarias = (enMesActual ? 1 : 0) + (metas[0] ? 1 : 0) + (enMesActual && personas.length > 1 ? 1 : 0);
 
+  // Presupuesto por categoría (Feature G del pedido de Felipe): un objetivo
+  // mensual por categoría (migration_31_presupuesto_categorias.sql) contra
+  // lo efectivamente gastado este mes, agrupado por categoria_id (a
+  // diferencia de resumenGastosMes, que agrupa por NOMBRE para la dona —
+  // acá hace falta el id para cruzar contra `presupuestos`).
+  async function guardarPresupuesto(categoriaId: string, monto: number) {
+    if (!categoriaId || !(monto > 0)) return;
+    setGuardandoPresupuesto(true);
+    const { error } = await supabase
+      .from("presupuestos_categoria")
+      .upsert({ categoria_id: categoriaId, monto_mensual: monto }, { onConflict: "owner_id,categoria_id" });
+    if (!error) {
+      setPresupuestos((actual) => [...actual.filter((p) => p.categoria_id !== categoriaId), { id: crypto.randomUUID(), categoria_id: categoriaId, monto_mensual: monto }]);
+      setNuevoPresupuestoCategoriaId("");
+      setNuevoPresupuestoMonto("");
+      setEditandoPresupuestoId(null);
+    }
+    setGuardandoPresupuesto(false);
+  }
+
+  async function eliminarPresupuesto(categoriaId: string) {
+    setPresupuestos((actual) => actual.filter((p) => p.categoria_id !== categoriaId));
+    await supabase.from("presupuestos_categoria").delete().eq("categoria_id", categoriaId);
+  }
+
+  const gastoPorCategoriaId: Record<string, number> = {};
+  cuotas.forEach((c) => {
+    if (!c.categoria_id) return;
+    gastoPorCategoriaId[c.categoria_id] = (gastoPorCategoriaId[c.categoria_id] ?? 0) + Number(c.monto_cuota);
+  });
+  gastosFijos.forEach((g) => {
+    if (!g.categoria_id) return;
+    gastoPorCategoriaId[g.categoria_id] = (gastoPorCategoriaId[g.categoria_id] ?? 0) + Number(g.monto_estimado);
+  });
+  gastosDiarios.forEach((d) => {
+    if (!d.categoria_id) return;
+    gastoPorCategoriaId[d.categoria_id] = (gastoPorCategoriaId[d.categoria_id] ?? 0) + Number(d.monto);
+  });
+
+  const categoriasConPresupuesto = presupuestos
+    .map((p) => ({ presupuesto: p, categoria: categorias.find((c) => c.id === p.categoria_id) ?? null }))
+    .filter((x): x is { presupuesto: PresupuestoCategoria; categoria: Categoria } => x.categoria != null)
+    .sort((a, b) => a.categoria.nombre.localeCompare(b.categoria.nombre));
+  const categoriasDisponiblesParaPresupuesto = categorias.filter((c) => !presupuestos.some((p) => p.categoria_id === c.id));
+
+  // Calendario de actividad (Feature G): días del mes que tuvieron algún
+  // movimiento — cuotas y gastos fijos "ocurren" cada mes en su día de cargo
+  // (fecha_primera_cuota/dia_mes_pago), gastos diarios y transferencias
+  // tienen fecha real.
+  const diasConMovimiento = new Set<number>();
+  cuotas.forEach((c) => diasConMovimiento.add(diaDelMes(c.fecha_primera_cuota)));
+  gastosFijos.forEach((g) => {
+    if (g.dia_mes_pago != null) diasConMovimiento.add(g.dia_mes_pago);
+  });
+  gastosDiarios.forEach((d) => diasConMovimiento.add(diaDelMes(d.fecha)));
+  transferencias.filter((t) => t.fecha.slice(0, 7) === refMesTexto).forEach((t) => diasConMovimiento.add(diaDelMes(t.fecha)));
+
   if (cargando) {
     return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
@@ -568,6 +638,159 @@ export default function DashboardPage() {
     </Card>
   );
 
+  // Tarjeta "Presupuesto por categoría" (Feature G): barra de gasto-vs-
+  // objetivo por cada categoría con presupuesto definido, más un mini form
+  // para agregar/editar/quitar objetivos.
+  const tarjetaPresupuestoCategorias = (
+    <Card>
+      <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Presupuesto por categoría</p>
+      {categoriasConPresupuesto.length === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500">
+          Todavía no defines un presupuesto por categoría — agrega uno abajo para ver cuánto llevas gastado.
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {categoriasConPresupuesto.map(({ presupuesto, categoria }) => {
+            const gastado = gastoPorCategoriaId[categoria.id] ?? 0;
+            const pct = Math.min(100, Math.round((gastado / presupuesto.monto_mensual) * 100));
+            const sobrepasado = gastado > presupuesto.monto_mensual;
+            const editando = editandoPresupuestoId === categoria.id;
+            return (
+              <div key={categoria.id}>
+                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+                  <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-gray-700 dark:text-gray-200">
+                    {categoria.icono ? `${categoria.icono} ` : ""}
+                    {categoria.nombre}
+                  </span>
+                  {editando ? (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <input
+                        type="number"
+                        autoFocus
+                        value={editandoPresupuestoMonto}
+                        onChange={(e) => setEditandoPresupuestoMonto(e.target.value)}
+                        className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-right text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      />
+                      <button
+                        type="button"
+                        disabled={guardandoPresupuesto}
+                        onClick={() => guardarPresupuesto(categoria.id, Number(editandoPresupuestoMonto))}
+                        className="text-[11px] font-semibold text-brand-from dark:text-white"
+                      >
+                        Guardar
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-gray-400 dark:text-gray-500">
+                      {formatCLP(gastado)} / {formatCLP(presupuesto.monto_mensual)}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditandoPresupuestoId(categoria.id);
+                          setEditandoPresupuestoMonto(String(presupuesto.monto_mensual));
+                        }}
+                        aria-label={`Editar presupuesto de ${categoria.nombre}`}
+                        className="text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
+                      >
+                        ✎
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => eliminarPresupuesto(categoria.id)}
+                        aria-label={`Quitar presupuesto de ${categoria.nombre}`}
+                        className="text-gray-300 hover:text-red-400 dark:text-gray-600"
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  )}
+                </div>
+                <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                  <div className={`h-full ${sobrepasado ? "bg-gasto" : "bg-brand-gradient"}`} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3 dark:border-white/10">
+        <select
+          value={nuevoPresupuestoCategoriaId}
+          onChange={(e) => setNuevoPresupuestoCategoriaId(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+        >
+          <option value="">+ Agregar categoría…</option>
+          {categoriasDisponiblesParaPresupuesto.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nombre}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          value={nuevoPresupuestoMonto}
+          onChange={(e) => setNuevoPresupuestoMonto(e.target.value)}
+          placeholder="$ mensual"
+          className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+        />
+        <button
+          type="button"
+          disabled={!nuevoPresupuestoCategoriaId || !nuevoPresupuestoMonto || guardandoPresupuesto}
+          onClick={() => guardarPresupuesto(nuevoPresupuestoCategoriaId, Number(nuevoPresupuestoMonto))}
+          className="shrink-0 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-black"
+        >
+          Agregar
+        </button>
+      </div>
+    </Card>
+  );
+
+  // Tarjeta "Actividad del mes" (Feature G): calendario simple con los días
+  // que tuvieron algún movimiento marcados.
+  const NOMBRES_DIA_SEMANA = ["D", "L", "M", "M", "J", "V", "S"];
+  const diasEnMesRef = new Date(ref.year, ref.month + 1, 0).getDate();
+  const primerDiaSemanaRef = new Date(ref.year, ref.month, 1).getDay();
+  const celdasCalendario: (number | null)[] = [
+    ...Array.from({ length: primerDiaSemanaRef }, () => null),
+    ...Array.from({ length: diasEnMesRef }, (_, i) => i + 1),
+  ];
+
+  const tarjetaCalendarioActividad = (
+    <Card>
+      <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Actividad del mes</p>
+      <div className="grid grid-cols-7 gap-y-1 text-center">
+        {NOMBRES_DIA_SEMANA.map((d, i) => (
+          <span key={i} className="text-[10px] font-semibold uppercase text-gray-300 dark:text-gray-600">
+            {d}
+          </span>
+        ))}
+        {celdasCalendario.map((dia, i) => {
+          const esHoy = enMesActual && dia === hoyDia;
+          const tieneMovimiento = dia != null && diasConMovimiento.has(dia);
+          return (
+            <div key={i} className="flex items-center justify-center py-0.5">
+              <span
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
+                  dia == null
+                    ? ""
+                    : esHoy
+                    ? "bg-gray-800 font-bold text-white dark:bg-white dark:text-black"
+                    : tieneMovimiento
+                    ? "bg-brand-gradient/15 font-semibold text-gray-800 dark:bg-white/15 dark:text-white"
+                    : "text-gray-300 dark:text-gray-600"
+                }`}
+              >
+                {dia ?? ""}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">Los días marcados tuvieron algún movimiento.</p>
+    </Card>
+  );
+
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
   const tabsResumen: { id: typeof tabResumen; label: string }[] = [
@@ -636,6 +859,8 @@ export default function DashboardPage() {
       </Card>
 
       {tarjetaCategoria}
+      {tarjetaPresupuestoCategorias}
+      {tarjetaCalendarioActividad}
     </div>
   );
 
@@ -955,6 +1180,11 @@ export default function DashboardPage() {
           </ul>
         )}
       </Card>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        {tarjetaPresupuestoCategorias}
+        {tarjetaCalendarioActividad}
+      </div>
     </div>
   );
 

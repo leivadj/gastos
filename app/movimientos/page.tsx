@@ -19,9 +19,9 @@ import { diaDelMes, formatCLP, mesActualISO, nombreMes, nombreMesCorto } from "@
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, Compra, Entidad, GastoDiario, GastoFijo, Grupo, Ingreso, ItemParticipante, Marca, OrigenItem, Pago, Persona } from "@/lib/types";
+import { Categoria, Compra, Entidad, GastoDiario, GastoFijo, Grupo, Ingreso, ItemParticipante, Marca, OrigenItem, Pago, Persona, Transferencia } from "@/lib/types";
 
-type TipoMovimiento = "fijo" | "variable" | "cuota" | "diario" | "ingreso";
+type TipoMovimiento = "fijo" | "variable" | "cuota" | "diario" | "ingreso" | "transferencia";
 
 // Rediseño v2: el mockup (Movimientos.dc.html) simplifica el filtro a 3
 // pestañas de selección única — Todo / Ingresos / Gastos — en vez de los 5
@@ -54,6 +54,13 @@ type Movimiento = {
   origenId?: string;
   categoriaId?: string | null;
   grupoId?: string | null;
+  // Solo para tipo "ingreso" (de quién) y "transferencia" (entre qué
+  // cuentas) — el detalle al hacer clic en el movimiento (ver
+  // MovimientoDetalleSheet más abajo) los usa para mostrar esa info.
+  personaId?: string | null;
+  cuentaOrigenId?: string | null;
+  cuentaDestinoId?: string | null;
+  notas?: string | null;
 };
 
 // Pantalla "Movimientos": une en un solo listado cronológico, mes a mes, lo
@@ -77,6 +84,7 @@ export default function MovimientosPage() {
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
   const [gastosDiarios, setGastosDiarios] = useState<GastoDiario[]>([]);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
@@ -97,15 +105,19 @@ export default function MovimientosPage() {
   // Movimiento en el que se abrió "Dividir gasto" (mockup PDF pág. 13) — ver
   // DividirGastoSheet.tsx. Solo cuotas/fijos/variables tienen esta opción.
   const [dividiendo, setDividiendo] = useState<Movimiento | null>(null);
+  // Movimiento en el que se hizo clic para ver su detalle de solo lectura
+  // (método de pago, categoría, cuotas, persona/reparto) — ver Feature I.
+  const [detalleAbierto, setDetalleAbierto] = useState<Movimiento | null>(null);
 
   async function cargarTodo() {
     try {
-      const [{ data: c }, { data: gf }, { data: gd }, { data: ing }, { data: pg }, { data: cat }, { data: e }, { data: m }, { data: p }, { data: gr }, { data: ipCompra }, { data: ipFijo }] =
+      const [{ data: c }, { data: gf }, { data: gd }, { data: ing }, { data: tr }, { data: pg }, { data: cat }, { data: e }, { data: m }, { data: p }, { data: gr }, { data: ipCompra }, { data: ipFijo }] =
         await Promise.all([
           supabase.from("compras").select("*"),
           supabase.from("gastos_fijos").select("*").eq("activo", true),
           supabase.from("gastos_diarios").select("*"),
           supabase.from("ingresos").select("*"),
+          supabase.from("transferencias").select("*"),
           supabase.from("pagos").select("*"),
           supabase.from("categorias").select("*"),
           supabase.from("entidades").select("*"),
@@ -119,6 +131,7 @@ export default function MovimientosPage() {
       setGastosFijos((gf as GastoFijo[]) ?? []);
       setGastosDiarios((gd as GastoDiario[]) ?? []);
       setIngresos((ing as Ingreso[]) ?? []);
+      setTransferencias((tr as Transferencia[]) ?? []);
       setPagos((pg as Pago[]) ?? []);
       setCategorias((cat as Categoria[]) ?? []);
       setEntidades((e as Entidad[]) ?? []);
@@ -247,6 +260,7 @@ export default function MovimientosPage() {
         entidadId: null,
         marcaId: null,
         icono: categoria?.icono ?? null,
+        categoriaId: d.categoria_id,
       };
     });
 
@@ -266,10 +280,34 @@ export default function MovimientosPage() {
         entidadId: null,
         marcaId: null,
         icono: "💰",
+        personaId: i.persona_id,
       };
     });
 
-  const todos = [...movCuotas, ...movFijos, ...movDiarios, ...movIngresos];
+  // Transferencias entre tus propias cuentas (ej. BancoEstado → Mercado
+  // Pago): no son gasto ni ingreso (no afectan el balance del mes, ver
+  // lib/types.ts), pero Felipe pidió verlas en el listado con una flecha
+  // que indique de dónde salió y hacia dónde fue la plata.
+  const movTransferencias: Movimiento[] = transferencias
+    .filter((t) => t.fecha.slice(0, 7) === refMesTexto)
+    .map((t) => ({
+      key: `transferencia-${t.id}`,
+      tipo: "transferencia" as const,
+      descripcion: `${entidadDe(t.cuenta_origen_id)?.nombre ?? "Efectivo"} → ${entidadDe(t.cuenta_destino_id)?.nombre ?? "Efectivo"}`,
+      detalle: t.notas || "Transferencia entre tus cuentas",
+      dia: diaDelMes(t.fecha),
+      monto: Number(t.monto),
+      esPromedio: false,
+      pagado: null,
+      entidadId: null,
+      marcaId: null,
+      icono: "⇄",
+      cuentaOrigenId: t.cuenta_origen_id,
+      cuentaDestinoId: t.cuenta_destino_id,
+      notas: t.notas,
+    }));
+
+  const todos = [...movCuotas, ...movFijos, ...movDiarios, ...movIngresos, ...movTransferencias];
 
   const totalGastos = [...movCuotas, ...movFijos, ...movDiarios].reduce((acc, m) => acc + m.monto, 0);
   const totalIngresos = movIngresos.reduce((acc, m) => acc + m.monto, 0);
@@ -323,7 +361,7 @@ export default function MovimientosPage() {
       <div>
         <h1 className="text-lg font-bold text-gray-800 dark:text-white">Movimientos</h1>
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          Fijos, variables, cuotas, diarios e ingresos, en un solo listado por mes.
+          Fijos, variables, cuotas, diarios, ingresos y transferencias entre tus cuentas, en un solo listado por mes.
         </p>
       </div>
 
@@ -409,9 +447,15 @@ export default function MovimientosPage() {
                   {grupoDia.items.map((m) => {
                     const marcaItem = marcaDe(m.marcaId);
                     const esIngreso = m.tipo === "ingreso";
+                    const esTransferencia = m.tipo === "transferencia";
                     const puedeDividirse = m.origen != null && m.origenId != null;
                     return (
-                      <div key={m.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                      <button
+                        type="button"
+                        key={m.key}
+                        onClick={() => setDetalleAbierto(m)}
+                        className="flex w-full items-center gap-3 py-2.5 text-left first:pt-0 last:pb-0"
+                      >
                         <EntidadAvatar
                           entidad={entidadDe(m.entidadId)}
                           marca={marcaItem ?? marcaDeEntidad(m.entidadId)}
@@ -428,18 +472,30 @@ export default function MovimientosPage() {
                           </p>
                         </div>
                         <div className="flex shrink-0 flex-col items-end gap-0.5">
-                          <p className={`text-sm font-semibold ${esIngreso ? "text-ingreso" : "text-gasto"}`}>
-                            {esIngreso ? "+" : "-"}
+                          <p
+                            className={`text-sm font-semibold ${
+                              esTransferencia ? "text-gray-500 dark:text-gray-400" : esIngreso ? "text-ingreso" : "text-gasto"
+                            }`}
+                          >
+                            {!esTransferencia && (esIngreso ? "+" : "-")}
                             {m.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
                             {formatCLP(m.monto)}
                           </p>
                           {puedeDividirse && (
-                            <button onClick={() => setDividiendo(m)} className="text-[11px] font-semibold text-brand-from dark:text-white">
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDividiendo(m);
+                              }}
+                              className="text-[11px] font-semibold text-brand-from dark:text-white"
+                            >
                               Dividir
-                            </button>
+                            </span>
                           )}
                         </div>
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -469,6 +525,102 @@ export default function MovimientosPage() {
           onGuardado={cargarTodo}
         />
       )}
+
+      {detalleAbierto && (() => {
+        const m = detalleAbierto;
+        const esIngreso = m.tipo === "ingreso";
+        const esTransferencia = m.tipo === "transferencia";
+        const metodoPago = esTransferencia
+          ? null
+          : m.entidadId
+          ? entidadDe(m.entidadId)?.nombre ?? "Efectivo"
+          : "Efectivo";
+        const participantes = m.origenId ? participantesPorItem[m.origenId] ?? [] : [];
+        return (
+          <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={() => setDetalleAbierto(null)}>
+            <div
+              className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 flex items-start justify-between gap-2 rounded-t-3xl bg-white p-5 pb-3 dark:bg-[#111113]">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-bold">{m.descripcion}</p>
+                  <p className="text-xs text-gray-400 dark:text-white/50">{m.dia != null ? fechaCorta(m.dia) : "Sin fecha"}</p>
+                </div>
+                <button
+                  onClick={() => setDetalleAbierto(null)}
+                  aria-label="Cerrar"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-3 p-5 pt-0">
+                <p
+                  className={`text-3xl font-bold ${
+                    esTransferencia ? "text-gray-700 dark:text-gray-200" : esIngreso ? "text-ingreso" : "text-gasto"
+                  }`}
+                >
+                  {!esTransferencia && (esIngreso ? "+" : "-")}
+                  {formatCLP(m.monto)}
+                </p>
+
+                <div className="divide-y divide-gray-100 rounded-2xl border border-gray-100 dark:divide-white/10 dark:border-white/10">
+                  {!esTransferencia && (
+                    <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+                      <span className="text-gray-400 dark:text-white/50">Pagado con</span>
+                      <span className="font-semibold">{metodoPago}</span>
+                    </div>
+                  )}
+                  {!esTransferencia && !esIngreso && (
+                    <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+                      <span className="text-gray-400 dark:text-white/50">Categoría</span>
+                      <span className="font-semibold">{categoriaDe(m.categoriaId ?? null)?.nombre ?? "Sin categoría"}</span>
+                    </div>
+                  )}
+                  {m.tipo === "cuota" && (
+                    <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+                      <span className="text-gray-400 dark:text-white/50">Cuotas</span>
+                      <span className="font-semibold">{m.detalle}</span>
+                    </div>
+                  )}
+                  {esIngreso && (
+                    <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+                      <span className="text-gray-400 dark:text-white/50">De quién</span>
+                      <span className="font-semibold">{nombrePersona(m.personaId ?? null) ?? "—"}</span>
+                    </div>
+                  )}
+                  {esTransferencia && (
+                    <>
+                      <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+                        <span className="text-gray-400 dark:text-white/50">Desde</span>
+                        <span className="font-semibold">{entidadDe(m.cuentaOrigenId ?? null)?.nombre ?? "Efectivo"}</span>
+                      </div>
+                      <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+                        <span className="text-gray-400 dark:text-white/50">Hacia</span>
+                        <span className="font-semibold">{entidadDe(m.cuentaDestinoId ?? null)?.nombre ?? "Efectivo"}</span>
+                      </div>
+                    </>
+                  )}
+                  {!esTransferencia && !esIngreso && (
+                    <div className="flex items-center justify-between px-3.5 py-2.5 text-sm">
+                      <span className="text-gray-400 dark:text-white/50">Compartido</span>
+                      <span className="font-semibold">
+                        {participantes.length === 0
+                          ? "No"
+                          : participantes.length === 1
+                          ? "No · asignado a " + (nombrePersona(participantes[0].persona_id) ?? "—")
+                          : `Sí · ${participantes.map((p) => nombrePersona(p.persona_id) ?? "—").join(", ")}`}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -109,6 +109,7 @@ export function MovimientoFab({ variante = "en-nav" }: { variante?: "en-nav" | "
 }
 
 type Tipo = "gasto" | "ingreso";
+type TipoPago = "normal" | "recurrente" | "cuotas";
 
 // Hoja única "Nuevo movimiento" — calcada de AgregarGasto.dc.html (estados A
 // y B). Segmentado Gasto/Ingreso arriba; el selector de cuenta (chip
@@ -150,7 +151,9 @@ export function FormMovimiento({
 
   const unicaPersona = personas.length === 1 ? personas[0] : null;
   const activas = personas;
-  const [asignacion, setAsignacion] = useState<"self" | "otro" | "dividir">("self");
+  const [tipoPago, setTipoPago] = useState<TipoPago>("normal");
+  const [numeroCuotas, setNumeroCuotas] = useState("2");
+  const [compartir, setCompartir] = useState(false);
   const [participantesManual, setParticipantesManual] = useState<Participante[]>([]);
   const [personaIngresoId, setPersonaIngresoId] = useState(unicaPersona?.id ?? "");
 
@@ -168,12 +171,9 @@ export function FormMovimiento({
 
   const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId) ?? null;
   const marcaSeleccionada = marcas.find((m) => m.id === marcaId) ?? null;
-  // Con exactamente 2 personas activas (el caso real de esta cuenta), "tú"
-  // es la primera y "el otro" la segunda — igual de arbitrario que el
-  // mockup, que muestra "Felipe (tú)" / "Marianela" en ese orden.
+  // "Tú" es la primera persona activa — igual de arbitrario que el mockup,
+  // que muestra "Felipe (tú)" primero en ese orden.
   const yo = activas[0] ?? null;
-  const otraPersona = activas.length === 2 ? activas[1] : null;
-  const grupoHogar = grupos[0] ?? null;
 
   function nombreEntidad(id: string): string {
     if (!id) return "Efectivo · sin tarjeta";
@@ -274,35 +274,62 @@ export function FormMovimiento({
     );
   }
 
-  function participantesParaGuardar(): { grupoId: string | null; participantes: Participante[] } {
-    if (activas.length <= 1) return { grupoId: null, participantes: [] };
-    if (asignacion === "dividir") {
-      if (grupoHogar) return { grupoId: grupoHogar.id, participantes: [] };
-      return {
-        grupoId: null,
-        participantes: activas.length === 2 ? [{ persona_id: yo!.id, porcentaje: null }, { persona_id: otraPersona!.id, porcentaje: null }] : participantesManual,
-      };
-    }
-    if (asignacion === "otro" && otraPersona) return { grupoId: null, participantes: [{ persona_id: otraPersona.id, porcentaje: null }] };
-    return { grupoId: null, participantes: yo ? [{ persona_id: yo.id, porcentaje: null }] : participantesManual };
+  // Genera la lista de participantes a guardar en item_participantes. Si
+  // "Compartir gasto" está apagado (o solo hay una persona en la cuenta), el
+  // gasto queda 100% asignado a "tú" — igual que antes. Si está prendido, se
+  // usa lo que el usuario armó en ParticipantesPicker (puede incluir 2 o más
+  // personas, con % editable o en blanco = partes iguales del resto).
+  function participantesParaGuardar(): Participante[] {
+    if (activas.length <= 1) return [];
+    if (compartir && participantesManual.length > 0) return participantesManual;
+    return yo ? [{ persona_id: yo.id, porcentaje: null }] : [];
   }
 
   async function guardarGasto() {
+    const descripcionFinal = descripcion.trim() || marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Gasto";
+    const participantes = participantesParaGuardar();
+
+    // "Recurrente" (se repite todos los meses) no es una compra en cuotas —
+    // va a gastos_fijos, la misma tabla que alimenta /gastos → Fijos y el
+    // Calendario de pagos. dia_mes_pago sale del día de la fecha elegida.
+    if (tipoPago === "recurrente") {
+      const dia = Number(fecha.slice(8, 10)) || 1;
+      const payload = {
+        descripcion: descripcionFinal,
+        monto_estimado: Number(monto),
+        dia_mes_pago: dia,
+        tipo_monto: "fijo" as const,
+        activo: true,
+        entidad_id: entidadId || null,
+        categoria_id: categoriaId || null,
+        marca_id: marcaId || null,
+        grupo_id: null as string | null,
+      };
+      const { data, error: dbError } = await supabase.from("gastos_fijos").insert(payload).select().single();
+      if (dbError) throw dbError;
+      if (participantes.length > 0 && data) {
+        const { error: partError } = await supabase.from("item_participantes").insert(
+          participantes.map((p) => ({ origen: "gasto_fijo", origen_id: data.id, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+        );
+        if (partError) throw partError;
+      }
+      avisarGuardado("gasto");
+      return;
+    }
+
     const payload = {
-      descripcion: descripcion.trim() || marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Gasto",
+      descripcion: descripcionFinal,
       monto_total: Number(monto),
-      n_cuotas: 1,
+      n_cuotas: tipoPago === "cuotas" ? Math.max(1, Number(numeroCuotas) || 1) : 1,
       fecha_primera_cuota: fecha,
       entidad_id: entidadId || null,
       categoria_id: categoriaId || null,
       marca_id: marcaId || null,
       grupo_id: null as string | null,
     };
-    const { grupoId, participantes } = participantesParaGuardar();
-    payload.grupo_id = grupoId;
     const { data, error: dbError } = await supabase.from("compras").insert(payload).select().single();
     if (dbError) throw dbError;
-    if (!grupoId && participantes.length > 0 && data) {
+    if (participantes.length > 0 && data) {
       const { error: partError } = await supabase.from("item_participantes").insert(
         participantes.map((p) => ({ origen: "compra", origen_id: data.id, persona_id: p.persona_id, porcentaje: p.porcentaje }))
       );
@@ -359,7 +386,7 @@ export function FormMovimiento({
   const titulo = modoTransferencia ? "Transferencia entre cuentas" : "Nuevo movimiento";
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 px-0 sm:items-center sm:px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4" onClick={onClose}>
       <form
         onSubmit={handleSubmit}
         className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-10 shadow-xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl sm:pb-5"
@@ -555,65 +582,83 @@ export function FormMovimiento({
           </div>
         )}
 
-        {!modoTransferencia && tipo === "gasto" && activas.length === 2 && (
+        {!modoTransferencia && tipo === "gasto" && (
           <>
-            <p className="mb-2 mt-4 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              Asignar a · {grupoHogar?.nombre ?? "Grupo compartido"}
-            </p>
-            <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-              <button
-                type="button"
-                onClick={() => setAsignacion("self")}
-                className={`flex shrink-0 items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3.5 text-xs font-semibold ${
-                  asignacion === "self" ? "border-gray-800 bg-gray-800 text-white dark:border-white dark:bg-white dark:text-black" : "border-gray-200 text-gray-600 dark:border-white/15 dark:text-gray-300"
-                }`}
-              >
-                <span
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
-                  style={{ backgroundColor: asignacion === "self" ? undefined : colorFor(yo?.nombre ?? "") }}
-                >
-                  {(yo?.nombre ?? "?").slice(0, 2).toUpperCase()}
-                </span>
-                {yo?.nombre?.split(" ")[0] ?? "Tú"} (tú)
-              </button>
-              {otraPersona && (
+            <p className="mb-2 mt-4 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Tipo de pago</p>
+            <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-xs dark:bg-white/10">
+              {(
+                [
+                  { key: "normal", label: "Normal" },
+                  { key: "recurrente", label: "Recurrente" },
+                  { key: "cuotas", label: "Cuotas" },
+                ] as { key: TipoPago; label: string }[]
+              ).map((op) => (
                 <button
+                  key={op.key}
                   type="button"
-                  onClick={() => setAsignacion("otro")}
-                  className={`flex shrink-0 items-center gap-2 rounded-full border py-1.5 pl-1.5 pr-3.5 text-xs font-semibold ${
-                    asignacion === "otro" ? "border-gray-800 bg-gray-800 text-white dark:border-white dark:bg-white dark:text-black" : "border-gray-200 text-gray-600 dark:border-white/15 dark:text-gray-300"
+                  onClick={() => setTipoPago(op.key)}
+                  className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
+                    tipoPago === op.key ? "bg-white text-gray-800 shadow-sm dark:bg-[#F2F2F0] dark:text-black" : "text-gray-500 dark:text-gray-400"
                   }`}
                 >
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: colorFor(otraPersona.nombre) }}>
-                    {otraPersona.nombre.slice(0, 2).toUpperCase()}
-                  </span>
-                  {otraPersona.nombre.split(" ")[0]}
+                  {op.label}
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setAsignacion("dividir")}
-                className={`flex shrink-0 items-center gap-2 rounded-full border border-dashed py-1.5 pl-3 pr-3.5 text-xs font-semibold ${
-                  asignacion === "dividir" ? "border-gray-800 text-gray-800 dark:border-white dark:text-white" : "border-gray-300 text-gray-500 dark:border-white/20 dark:text-gray-400"
-                }`}
-              >
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-                Dividir entre ambos
-              </button>
+              ))}
             </div>
             <p className="mt-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
-              Esta fila solo aparece si {grupoHogar?.nombre ?? "tu grupo"} tiene más de una persona.
+              {tipoPago === "normal" && "Un solo pago, no se repite."}
+              {tipoPago === "recurrente" && "Se repite todos los meses (arriendo, suscripción, etc.)."}
+              {tipoPago === "cuotas" && "Compra en cuotas — indica cuántas cuotas."}
             </p>
+            {tipoPago === "cuotas" && (
+              <input
+                type="number"
+                min={2}
+                required
+                value={numeroCuotas}
+                onChange={(e) => setNumeroCuotas(e.target.value)}
+                placeholder="N° de cuotas"
+                className="mt-2 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium dark:border-white/10 dark:bg-white/5"
+              />
+            )}
           </>
         )}
 
-        {!modoTransferencia && tipo === "gasto" && activas.length > 2 && (
-          <div className="mt-4">
-            <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Asignar a</p>
-            <ParticipantesPicker personas={personas} value={participantesManual} onChange={setParticipantesManual} montoTotal={monto ? Number(monto) : undefined} />
-          </div>
+        {!modoTransferencia && tipo === "gasto" && activas.length > 1 && (
+          <>
+            <label className="mt-4 flex items-center justify-between gap-2 rounded-2xl border border-gray-200 px-3.5 py-3 dark:border-white/10">
+              <span className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  style={{ backgroundColor: colorFor(yo?.nombre ?? "") }}
+                >
+                  {(yo?.nombre ?? "?").slice(0, 2).toUpperCase()}
+                </span>
+                Compartir gasto
+              </span>
+              <input
+                type="checkbox"
+                checked={compartir}
+                onChange={(e) => setCompartir(e.target.checked)}
+                className="h-5 w-5 accent-gray-800 dark:accent-white"
+              />
+            </label>
+
+            {compartir && (
+              <div className="mt-3">
+                <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">¿Con quién se reparte?</p>
+                <ParticipantesPicker
+                  personas={activas}
+                  value={participantesManual}
+                  onChange={setParticipantesManual}
+                  montoTotal={monto ? Number(monto) : undefined}
+                />
+                <p className="mt-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Elige a las personas y, si no es en partes iguales, edita el % de cada una.
+                </p>
+              </div>
+            )}
+          </>
         )}
 
         {error && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>}

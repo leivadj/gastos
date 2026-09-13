@@ -11,6 +11,7 @@ import { colorFor } from "@/lib/avatarColor";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
+import { avisarHojaPantallaCompleta } from "@/lib/sheetVisibility";
 
 function traducirError(err: unknown): string {
   const msg = mensajeError(err);
@@ -111,6 +112,15 @@ export default function TarjetasPage() {
       if (previewFondo) URL.revokeObjectURL(previewFondo);
     };
   }, [previewFondo]);
+
+  // Mientras el detalle de la cuenta está abierto (hoja de pantalla
+  // completa), se oculta BottomNav — ver lib/sheetVisibility.ts.
+  useEffect(() => {
+    avisarHojaPantallaCompleta(mostrarDetalle);
+    return () => {
+      if (mostrarDetalle) avisarHojaPantallaCompleta(false);
+    };
+  }, [mostrarDetalle]);
 
   function aplicarTipoPorMarca(m: Marca) {
     if (m.tipo === "banco") setTipo("tarjeta_credito");
@@ -654,98 +664,105 @@ export default function TarjetasPage() {
       {mostrarDetalle && entidadActiva && (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={() => setMostrarDetalle(false)}>
           <div
-            className="max-h-[90vh] w-full space-y-4 overflow-y-auto rounded-t-3xl bg-[#111113] p-5 text-white sm:max-w-md sm:rounded-3xl"
+            className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-2">
+            {/* Header sticky: antes se desplazaba junto con el resto del
+                contenido dentro de este mismo panel con scroll, así que al
+                bajar a ver los movimientos el botón de cerrar (✕) quedaba
+                fuera de la pantalla y no había forma de cerrar la hoja sin
+                volver a subir el scroll del todo. */}
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-2 rounded-t-3xl bg-white p-5 pb-3 dark:bg-[#111113] sm:rounded-t-3xl">
               <div className="min-w-0">
                 <p className="truncate text-base font-bold">{entidadActiva.nombre}</p>
-                <p className="text-xs text-white/50">{TIPO_LABEL[entidadActiva.tipo]}</p>
+                <p className="text-xs text-gray-400 dark:text-white/50">{TIPO_LABEL[entidadActiva.tipo]}</p>
               </div>
               <button
                 onClick={() => setMostrarDetalle(false)}
                 aria-label="Cerrar"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10"
               >
                 ✕
               </button>
             </div>
 
-            {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null ? (
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-white/50">Cupo disponible</p>
-                <p className="text-3xl font-bold">{formatCLP(disponiblePorEntidad[entidadActiva.id] ?? entidadActiva.cupo)}</p>
-                <p className="mt-0.5 text-xs text-white/50">de {formatCLP(entidadActiva.cupo)}</p>
-              </div>
-            ) : entidadActiva.saldo != null ? (
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-white/50">Saldo disponible</p>
-                <p className="text-3xl font-bold">{formatCLP(entidadActiva.saldo)}</p>
-              </div>
-            ) : null}
+            <div className="space-y-4 p-5 pt-0">
+              {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null ? (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-white/50">Cupo disponible</p>
+                  <p className="text-3xl font-bold">{formatCLP(disponiblePorEntidad[entidadActiva.id] ?? entidadActiva.cupo)}</p>
+                  <p className="mt-0.5 text-xs text-gray-400 dark:text-white/50">de {formatCLP(entidadActiva.cupo)}</p>
+                </div>
+              ) : entidadActiva.saldo != null ? (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-white/50">Saldo disponible</p>
+                  <p className="text-3xl font-bold">{formatCLP(entidadActiva.saldo)}</p>
+                </div>
+              ) : null}
 
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="rounded-2xl bg-white/5 p-3.5">
-                <p className="text-[11px] text-white/50">Ingresos este mes</p>
-                <p className="mt-0.5 text-sm font-bold text-ingreso">+{formatCLP(ingresosCuentaActivaMes)}</p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="rounded-2xl bg-gray-50 p-3.5 dark:bg-white/5">
+                  <p className="text-[11px] text-gray-400 dark:text-white/50">Ingresos este mes</p>
+                  <p className="mt-0.5 text-sm font-bold text-ingreso">+{formatCLP(ingresosCuentaActivaMes)}</p>
+                </div>
+                <div className="rounded-2xl bg-gray-50 p-3.5 dark:bg-white/5">
+                  <p className="text-[11px] text-gray-400 dark:text-white/50">Gastos este mes</p>
+                  <p className="mt-0.5 text-sm font-bold text-gasto">-{formatCLP(gastosCuentaActivaMes)}</p>
+                </div>
               </div>
-              <div className="rounded-2xl bg-white/5 p-3.5">
-                <p className="text-[11px] text-white/50">Gastos este mes</p>
-                <p className="mt-0.5 text-sm font-bold text-gasto">-{formatCLP(gastosCuentaActivaMes)}</p>
-              </div>
-            </div>
 
-            <div>
-              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-white/50">Movimientos de esta cuenta</p>
-              {itemsActivos.length === 0 ? (
-                <p className="py-1 text-sm text-white/40">Sin movimientos este mes con esta cuenta.</p>
-              ) : (
-                <ul className="divide-y divide-white/10">
-                  {itemsActivos.map((it) => (
-                    <li key={it.key} className="flex items-center gap-3 py-2.5">
-                      <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-9 w-9" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">{it.descripcion}</p>
-                        <p className="text-xs text-white/50">
-                          {it.categoria} · {it.detalle}
+              <div>
+                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-white/50">Movimientos de esta cuenta</p>
+                {itemsActivos.length === 0 ? (
+                  <p className="py-1 text-sm text-gray-400 dark:text-white/40">Sin movimientos este mes con esta cuenta.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100 dark:divide-white/10">
+                    {itemsActivos.map((it) => (
+                      <li key={it.key} className="flex items-center gap-3 py-2.5">
+                        <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-9 w-9" />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium">{it.descripcion}</p>
+                          <p className="text-xs text-gray-400 dark:text-white/50">
+                            {it.categoria} · {it.detalle}
+                          </p>
+                        </div>
+                        <p className={`shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold dark:bg-white/10 ${it.signo === 1 ? "text-ingreso" : "text-gasto"}`}>
+                          {it.signo === 1 ? "+" : "-"}
+                          {formatCLP(it.monto)}
                         </p>
-                      </div>
-                      <p className={`shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold ${it.signo === 1 ? "text-ingreso" : "text-gasto"}`}>
-                        {it.signo === 1 ? "+" : "-"}
-                        {formatCLP(it.monto)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
-            <div className="flex gap-2.5 pt-1">
-              <button
-                onClick={exportarMovimientosCSV}
-                disabled={itemsActivos.length === 0}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 py-3 text-xs font-bold disabled:opacity-40"
-              >
-                Exportar
-              </button>
-              <button
-                onClick={() => {
-                  setMostrarDetalle(false);
-                  iniciarEdicion(entidadActiva);
-                }}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 py-3 text-xs font-bold"
-              >
-                Editar
-              </button>
-              <button
-                onClick={() => {
-                  setMostrarDetalle(false);
-                  eliminar(entidadActiva.id);
-                }}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gasto/10 py-3 text-xs font-bold text-gasto"
-              >
-                Eliminar
-              </button>
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  onClick={exportarMovimientosCSV}
+                  disabled={itemsActivos.length === 0}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gray-100 py-3 text-xs font-bold disabled:opacity-40 dark:bg-white/10"
+                >
+                  Exportar
+                </button>
+                <button
+                  onClick={() => {
+                    setMostrarDetalle(false);
+                    iniciarEdicion(entidadActiva);
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gray-100 py-3 text-xs font-bold dark:bg-white/10"
+                >
+                  Editar
+                </button>
+                <button
+                  onClick={() => {
+                    setMostrarDetalle(false);
+                    eliminar(entidadActiva.id);
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gasto/10 py-3 text-xs font-bold text-gasto"
+                >
+                  Eliminar
+                </button>
+              </div>
             </div>
           </div>
         </div>

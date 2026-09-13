@@ -73,6 +73,18 @@ export function PresupuestoContenido({ ocultarTitulo = false }: { ocultarTitulo?
   const restoTotal = restoCategorias.reduce((acc, d) => acc + d.value, 0);
   const pct = (valor: number) => (totalGastos > 0 ? `${Math.round((valor / totalGastos) * 1000) / 10}%` : "0%");
 
+  // Totales separados por tipo de pago (mismo criterio que el selector
+  // "Normal / Recurrente / Cuotas" de "Nuevo movimiento" — ver
+  // MovimientoRapido.tsx): "Normal" y "Cuotas" son compras (vista_cuotas_mes_
+  // actual ya trae la cuota vigente de este mes de cada una, sea de 1 sola
+  // cuota o de varias), separadas por su n_cuotas; "Recurrente" son los
+  // gastos_fijos activos. gastosDiarios queda fuera (no es un tipo de pago
+  // de "Nuevo movimiento", es la carga rápida de /gastos → Diarios).
+  const totalPagoUnico = cuotas.filter((c) => c.n_cuotas === 1).reduce((acc, c) => acc + Number(c.monto_cuota), 0);
+  const totalPagoCuotas = cuotas.filter((c) => c.n_cuotas > 1).reduce((acc, c) => acc + Number(c.monto_cuota), 0);
+  const totalPagoRecurrente = gastosFijos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
+  const totalPorTipoPago = totalPagoUnico + totalPagoCuotas + totalPagoRecurrente;
+
   const gastosVariables = gastosFijos.filter((g) => g.tipo_monto === "variable");
   const metasEnProgreso = metas.filter((m) => m.monto_actual < m.monto_objetivo).slice(0, 2);
 
@@ -141,6 +153,32 @@ export function PresupuestoContenido({ ocultarTitulo = false }: { ocultarTitulo?
               <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" />
               Variable · {formatCLP(totalTipoVariable)}
             </span>
+          </div>
+        </Card>
+      )}
+
+      {totalPorTipoPago > 0 && (
+        <Card>
+          <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Por tipo de pago</p>
+          <div className="space-y-2.5 text-sm">
+            {[
+              { label: "Pago único (normal)", valor: totalPagoUnico },
+              { label: "Pago recurrente", valor: totalPagoRecurrente },
+              { label: "Pago en cuotas", valor: totalPagoCuotas },
+            ].map((fila) => (
+              <div key={fila.label}>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-300">{fila.label}</span>
+                  <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(fila.valor)}</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                  <div
+                    className="h-full bg-brand-gradient"
+                    style={{ width: `${totalPorTipoPago > 0 ? (fila.valor / totalPorTipoPago) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}
