@@ -240,7 +240,7 @@ export default function MovimientosPage() {
   function pill(activo: boolean) {
     return `shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
       activo
-        ? "bg-purple-50 text-brand-from dark:bg-white/10 dark:text-white"
+        ? "bg-gray-50 text-brand-from dark:bg-white/10 dark:text-white"
         : "bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400"
     }`;
   }
@@ -281,7 +281,7 @@ export default function MovimientosPage() {
         <div className="mt-3 grid grid-cols-3 gap-2 border-t border-gray-50 pt-3 text-center dark:border-white/10">
           <div>
             <p className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Ingresos</p>
-            <p className="mt-0.5 text-sm font-bold text-emerald-600">{formatCLP(totalIngresos)}</p>
+            <p className="mt-0.5 text-sm font-bold text-ingreso">{formatCLP(totalIngresos)}</p>
           </div>
           <div>
             <p className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Gastos</p>
@@ -289,7 +289,7 @@ export default function MovimientosPage() {
           </div>
           <div>
             <p className="text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Balance</p>
-            <p className={`mt-0.5 text-sm font-bold ${balance < 0 ? "text-red-500 dark:text-red-400" : "text-gray-800 dark:text-white"}`}>
+            <p className={`mt-0.5 text-sm font-bold ${balance < 0 ? "text-gasto" : "text-gray-800 dark:text-white"}`}>
               {formatCLP(balance)}
             </p>
           </div>
@@ -332,7 +332,7 @@ export default function MovimientosPage() {
                     {m.pagado === false && <span className="ml-1.5 text-gray-300 dark:text-gray-600">· Pendiente</span>}
                   </p>
                 </div>
-                <p className={`shrink-0 text-sm font-semibold ${esIngreso ? "text-emerald-600" : "text-gray-800 dark:text-white"}`}>
+                <p className={`shrink-0 text-sm font-semibold ${esIngreso ? "text-ingreso" : "text-gray-800 dark:text-white"}`}>
                   {esIngreso && "+"}
                   {m.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
                   {formatCLP(m.monto)}

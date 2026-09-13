@@ -5,9 +5,10 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
+import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { TIPO_CORTO } from "@/components/TarjetaVisual";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, Entidad, Marca } from "@/lib/types";
+import { Categoria, Entidad, Grupo, Marca, Participante, Persona } from "@/lib/types";
 
 // Avisa a cualquier pantalla que esté escuchando (dashboard, /gastos,
 // /ingresos...) que se guardó un movimiento rápido, para que refresque sus
@@ -104,16 +105,22 @@ export function MovimientoFab({
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
 
   async function cargarCatalogos() {
-    const [{ data: e }, { data: m }, { data: cat }] = await Promise.all([
+    const [{ data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }] = await Promise.all([
       supabase.from("entidades").select("*").order("nombre"),
       supabase.from("marcas").select("*").order("nombre"),
       supabase.from("categorias").select("*").order("nombre"),
+      supabase.from("personas").select("*").eq("activo", true).order("nombre"),
+      supabase.from("grupos").select("*").order("nombre"),
     ]);
     setEntidades((e as Entidad[]) ?? []);
     setMarcas((m as Marca[]) ?? []);
     setCategorias((cat as Categoria[]) ?? []);
+    setPersonas((p as Persona[]) ?? []);
+    setGrupos((gr as Grupo[]) ?? []);
   }
 
   useEffect(() => {
@@ -147,7 +154,7 @@ export function MovimientoFab({
             onClick={() => setAbierto(false)}
             className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-purple-100 text-brand-from">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
               <IconoCuotas />
             </span>
             Compra en cuotas
@@ -157,7 +164,7 @@ export function MovimientoFab({
             onClick={() => setAbierto(false)}
             className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700"
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
               <IconoPagoFijo />
             </span>
             Pago fijo
@@ -169,7 +176,7 @@ export function MovimientoFab({
         className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
         style={{ animationDelay: "120ms" }}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-100 text-sky-600">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
           <IconoTransferencia />
         </span>
         Transferencia
@@ -179,7 +186,7 @@ export function MovimientoFab({
         className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
         style={{ animationDelay: "60ms" }}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
           <IconoIngreso />
         </span>
         Ingreso
@@ -188,7 +195,7 @@ export function MovimientoFab({
         onClick={() => abrir("gasto")}
         className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-pink-100 text-pink-600">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
           <IconoGasto />
         </span>
         Gasto
@@ -250,11 +257,13 @@ export function MovimientoFab({
           entidades={entidades}
           marcas={marcas}
           categorias={categorias}
+          personas={personas}
+          grupos={grupos}
           onClose={() => setModal(null)}
           onCatalogoActualizado={cargarCatalogos}
         />
       )}
-      {modal === "ingreso" && <FormIngreso onClose={() => setModal(null)} />}
+      {modal === "ingreso" && <FormIngreso personas={personas} onClose={() => setModal(null)} />}
       {modal === "transferencia" && <FormTransferencia entidades={entidades} onClose={() => setModal(null)} />}
     </>
   );
@@ -264,12 +273,16 @@ function FormGasto({
   entidades,
   marcas,
   categorias,
+  personas,
+  grupos,
   onClose,
   onCatalogoActualizado,
 }: {
   entidades: Entidad[];
   marcas: Marca[];
   categorias: Categoria[];
+  personas: Persona[];
+  grupos: Grupo[];
   onClose: () => void;
   onCatalogoActualizado: () => void | Promise<void>;
 }) {
@@ -279,11 +292,19 @@ function FormGasto({
   const [marcaId, setMarcaId] = useState("");
   const [entidadId, setEntidadId] = useState("");
   const [fecha, setFecha] = useState(hoyISO());
+  const [grupoId, setGrupoId] = useState("");
+  // Si en la cuenta solo hay una persona activa, se le asigna sola sin
+  // mostrar el selector (ver el mismo patrón en components/gastos/CuotasLista.tsx).
+  const unicaPersona = personas.length === 1 ? personas[0] : null;
+  const [participantes, setParticipantes] = useState<Participante[]>(
+    unicaPersona ? [{ persona_id: unicaPersona.id, porcentaje: null }] : []
+  );
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
   const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId) ?? null;
   const marcaSeleccionada = marcas.find((m) => m.id === marcaId) ?? null;
+  const grupoSeleccionado = grupos.find((g) => g.id === grupoId) ?? null;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -298,9 +319,19 @@ function FormGasto({
         entidad_id: entidadId || null,
         categoria_id: categoriaId || null,
         marca_id: marcaId || null,
+        grupo_id: grupoId || null,
       };
-      const { error: dbError } = await supabase.from("compras").insert(payload);
+      const { data, error: dbError } = await supabase.from("compras").insert(payload).select().single();
       if (dbError) throw dbError;
+      // Mismo reparto que usa Cuotas: si no se eligió un grupo (que ya trae
+      // su propio reparto) y hay personas asignadas, se guardan en
+      // item_participantes — así "Personas"/"Reportes" lo cuentan bien.
+      if (!grupoId && participantes.length > 0 && data) {
+        const { error: partError } = await supabase.from("item_participantes").insert(
+          participantes.map((p) => ({ origen: "compra", origen_id: data.id, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+        );
+        if (partError) throw partError;
+      }
       avisarGuardado("gasto");
       onClose();
     } catch (err) {
@@ -385,6 +416,37 @@ function FormGasto({
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
+        {personas.length > 1 && (
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">Asignar a</label>
+            <select
+              value={grupoId}
+              onChange={(e) => setGrupoId(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+            >
+              <option value="">— Elegir personas —</option>
+              {grupos.map((g) => (
+                <option key={g.id} value={g.id}>
+                  Grupo {g.nombre}
+                </option>
+              ))}
+            </select>
+            {grupoSeleccionado ? (
+              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                El reparto lo define el grupo &quot;{grupoSeleccionado.nombre}&quot;. Para cambiarlo, ve a Grupos.
+              </p>
+            ) : (
+              <div className="mt-2">
+                <ParticipantesPicker
+                  personas={personas}
+                  value={participantes}
+                  onChange={setParticipantes}
+                  montoTotal={monto ? Number(monto) : undefined}
+                />
+              </div>
+            )}
+          </div>
+        )}
         {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
         <button
           type="submit"
@@ -394,17 +456,21 @@ function FormGasto({
           {guardando ? "Guardando…" : "Guardar gasto"}
         </button>
         <p className="text-center text-[11px] text-gray-400 dark:text-gray-500">
-          No se reparte entre personas automáticamente — si quieres dividirlo, créalo desde Cuotas.
+          ¿Es en cuotas? Créalo desde Cuotas para repartirlo en varios meses.
         </p>
       </form>
     </HojaInferior>
   );
 }
 
-function FormIngreso({ onClose }: { onClose: () => void }) {
+function FormIngreso({ personas, onClose }: { personas: Persona[]; onClose: () => void }) {
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [fecha, setFecha] = useState(hoyISO());
+  // Igual que en FormGasto: con una sola persona en la cuenta no tiene
+  // sentido preguntar de quién es el ingreso, se asigna sola.
+  const unicaPersona = personas.length === 1 ? personas[0] : null;
+  const [personaId, setPersonaId] = useState(unicaPersona?.id ?? "");
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
@@ -415,7 +481,7 @@ function FormIngreso({ onClose }: { onClose: () => void }) {
     try {
       const mes = `${fecha.slice(0, 7)}-01`;
       const payload = {
-        persona_id: null,
+        persona_id: personaId || null,
         monto: Number(monto),
         mes,
         descripcion: descripcion.trim() || null,
@@ -466,6 +532,23 @@ function FormIngreso({ onClose }: { onClose: () => void }) {
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
           />
         </div>
+        {personas.length > 1 && (
+          <div>
+            <label className="text-xs text-gray-500 dark:text-gray-400">¿De quién?</label>
+            <select
+              value={personaId}
+              onChange={(e) => setPersonaId(e.target.value)}
+              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+            >
+              <option value="">—</option>
+              {personas.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
         <button
           type="submit"

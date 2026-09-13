@@ -1,24 +1,23 @@
 import type { Metadata, Viewport } from "next";
-// Rediseño "estilo Haulo" (Fase 1): una tipografía redondeada y con pesos
-// bien bold para los montos y títulos, en vez de la fuente del sistema — es
-// una de las cosas que más contribuye a que Haulo se sienta "amigable".
-// Nunito tiene terminaciones redondeadas y llega hasta peso 900, y sigue
-// siendo perfectamente legible en textos chicos (inputs, listas), así que
-// se usa como ÚNICA familia de la app en vez de mezclar dos fuentes.
+// Rediseño v2 (negro/blanco, inspirado en Rimu para escritorio y en la
+// distribución de Not Pato para el celular, ver conversación con Felipe de
+// septiembre 2026): Plus Jakarta Sans en vez de la fuente del sistema —
+// reemplaza el intento anterior "estilo Haulo" (Nunito), que quedó
+// descartado antes de tocar ninguna pantalla real.
 //
-// Se carga con @fontsource (el archivo de la fuente queda empaquetado en el
-// build, en vez de con next/font/google, que en cada build tiene que salir
-// a bajar el CSS/los archivos desde fonts.googleapis.com — en el sandbox de
-// desarrollo esa salida de red está bloqueada por política de la
-// organización, y aunque en Vercel si funciona, empaquetarla evita depender
-// de que Google Fonts esté disponible en cada build y además evita una
-// conexión más al cargar la app para quien la usa.
-import "@fontsource/nunito/400.css";
-import "@fontsource/nunito/500.css";
-import "@fontsource/nunito/600.css";
-import "@fontsource/nunito/700.css";
-import "@fontsource/nunito/800.css";
-import "@fontsource/nunito/900.css";
+// Se sigue cargando con @fontsource (el archivo de la fuente queda
+// empaquetado en el build) en vez de con next/font/google, que en cada
+// build tiene que salir a bajar el CSS/los archivos desde
+// fonts.googleapis.com — en el sandbox de desarrollo esa salida de red está
+// bloqueada por política de la organización, y aunque en Vercel sí
+// funciona, empaquetarla evita depender de que Google Fonts esté disponible
+// en cada build y además evita una conexión más al cargar la app para quien
+// la usa.
+import "@fontsource/plus-jakarta-sans/400.css";
+import "@fontsource/plus-jakarta-sans/500.css";
+import "@fontsource/plus-jakarta-sans/600.css";
+import "@fontsource/plus-jakarta-sans/700.css";
+import "@fontsource/plus-jakarta-sans/800.css";
 import "./globals.css";
 import { AuthGate } from "@/components/AuthGate";
 import { ThemeProvider } from "@/lib/theme";
@@ -59,10 +58,12 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   // Sigue el sistema por defecto (el selector propio de la app manda una
-  // vez cargada, ver lib/theme.tsx) — así la barra del navegador/PWA no
-  // queda morada de golpe sobre un teléfono en modo oscuro del sistema.
+  // vez cargada, ver lib/theme.tsx) — así la barra del navegador/PWA
+  // coincide con el fondo real de cada tema del rediseño v2 (blanco casi
+  // puro en claro, negro puro en oscuro) en vez del morado de la marca
+  // anterior.
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#7C3AED" },
+    { media: "(prefers-color-scheme: light)", color: "#FAFAF8" },
     { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
 };

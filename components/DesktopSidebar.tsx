@@ -437,7 +437,7 @@ export function DesktopSidebar() {
               href={item.href}
               className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
                 active
-                  ? "bg-purple-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+                  ? "bg-gray-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
                   : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
               }`}
             >
@@ -451,7 +451,7 @@ export function DesktopSidebar() {
             href="/admin"
             className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
               pathname === "/admin"
-                ? "bg-purple-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+                ? "bg-gray-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
                 : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
             }`}
           >

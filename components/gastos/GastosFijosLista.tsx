@@ -300,7 +300,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                   onClick={() => setTipoMonto("fijo")}
                   className={`rounded-lg border px-3 py-2 text-left text-xs font-medium ${
                     tipoMonto === "fijo"
-                      ? "border-brand-from bg-purple-50 text-brand-from dark:bg-white/10 dark:text-white"
+                      ? "border-brand-from bg-gray-50 text-brand-from dark:bg-white/10 dark:text-white"
                       : "border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400"
                   }`}
                 >
@@ -312,7 +312,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                   onClick={() => setTipoMonto("variable")}
                   className={`rounded-lg border px-3 py-2 text-left text-xs font-medium ${
                     tipoMonto === "variable"
-                      ? "border-brand-from bg-purple-50 text-brand-from dark:bg-white/10 dark:text-white"
+                      ? "border-brand-from bg-gray-50 text-brand-from dark:bg-white/10 dark:text-white"
                       : "border-gray-200 dark:border-white/10 text-gray-500 dark:text-gray-400"
                   }`}
                 >
@@ -321,7 +321,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                 </button>
               </div>
               {tipoMonto === "variable" && (
-                <p className="mt-1.5 rounded-lg bg-purple-50 px-3 py-2 text-[11px] text-brand-from dark:bg-white/10 dark:text-white">
+                <p className="mt-1.5 rounded-lg bg-gray-50 px-3 py-2 text-[11px] text-brand-from dark:bg-white/10 dark:text-white">
                   Vence siempre el mismo día, pero el monto cambia cada mes. Una vez que registres pagos reales en el
                   Calendario de pagos, acá se va a mostrar el promedio móvil en vez del monto estimado.
                 </p>
@@ -408,7 +408,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
               )}
             </div>
             {grupoId ? (
-              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                 El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;. Para cambiarlo, ve a Grupos.
               </p>
             ) : unicaPersona ? null : (
@@ -482,7 +482,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                         </div>
                       </button>
                       <div className="flex shrink-0 items-center gap-3 pt-0.5">
-                        <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from dark:text-pink-400">
+                        <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from dark:text-white">
                           editar
                         </button>
                         <button onClick={() => desactivar(g.id)} className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400">
@@ -552,7 +552,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                     <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => iniciarEdicion(g)}
-                        className="flex-1 rounded-lg bg-purple-50 py-2 text-xs font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+                        className="flex-1 rounded-lg bg-gray-50 py-2 text-xs font-semibold text-brand-from dark:bg-white/10 dark:text-white"
                       >
                         Editar
                       </button>

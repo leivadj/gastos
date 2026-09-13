@@ -94,7 +94,7 @@ export function MarcaSugeridaPicker({
           type="button"
           onClick={() => onChange("")}
           className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-            value === "" ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+            value === "" ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
           }`}
           style={{ width: 64 }}
         >
@@ -109,7 +109,7 @@ export function MarcaSugeridaPicker({
             key={m.id}
             onClick={() => onChange(m.id === value ? "" : m.id)}
             className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-              value === m.id ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+              value === m.id ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
             }`}
             style={{ width: 64 }}
           >
@@ -123,7 +123,7 @@ export function MarcaSugeridaPicker({
           type="button"
           onClick={() => setBuscando((v) => !v)}
           className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-            buscando ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 border-dashed dark:border-white/10"
+            buscando ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 border-dashed dark:border-white/10"
           }`}
           style={{ width: 64 }}
         >
@@ -164,7 +164,7 @@ export function MarcaSugeridaPicker({
           )}
 
           {textoNorm && !marcaExacta && (
-            <div className="space-y-2 rounded-lg bg-purple-50 p-2 dark:bg-white/10">
+            <div className="space-y-2 rounded-lg bg-gray-50 p-2 dark:bg-white/10">
               <p className="text-xs text-brand-from dark:text-white">
                 &quot;{texto.trim()}&quot; no está en {label.toLowerCase()} — agrégalo:
               </p>

@@ -255,7 +255,7 @@ export function CuotasLista() {
         className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm dark:bg-gray-900 dark:shadow-none"
       >
         <span className="text-gray-600 dark:text-gray-300">Gestionar tus tarjetas y cuentas</span>
-        <span className="text-brand-from dark:text-pink-400">→</span>
+        <span className="text-brand-from dark:text-white">→</span>
       </Link>
 
       {mostrarForm && (
@@ -312,7 +312,7 @@ export function CuotasLista() {
               </p>
             </div>
             {nCuotas && montoCuota && (
-              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                 Total del crédito: {formatCLP(Number(nCuotas) * Number(montoCuota))} — aproximado, sin contar
                 intereses u otros cargos que el banco sume aparte.
               </p>
@@ -398,7 +398,7 @@ export function CuotasLista() {
               )}
             </div>
             {grupoId ? (
-              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                 El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;. Para cambiarlo, ve a Grupos.
               </p>
             ) : unicaPersona ? null : (
@@ -466,7 +466,7 @@ export function CuotasLista() {
                         </div>
                       </button>
                       <div className="flex shrink-0 items-center gap-3 pt-0.5">
-                        <button onClick={() => iniciarEdicion(c)} className="text-xs text-brand-from dark:text-pink-400">
+                        <button onClick={() => iniciarEdicion(c)} className="text-xs text-brand-from dark:text-white">
                           editar
                         </button>
                         <button onClick={() => eliminar(c.compra_id)} className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400">
@@ -546,7 +546,7 @@ export function CuotasLista() {
                     <div className="mt-3 flex gap-2">
                       <button
                         onClick={() => iniciarEdicion(c)}
-                        className="flex-1 rounded-lg bg-purple-50 py-2 text-xs font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+                        className="flex-1 rounded-lg bg-gray-50 py-2 text-xs font-semibold text-brand-from dark:bg-white/10 dark:text-white"
                       >
                         Editar
                       </button>

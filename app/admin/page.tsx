@@ -423,7 +423,7 @@ export default function AdminPage() {
                     </div>
                   </div>
                   <div className="mt-2 flex items-center justify-between gap-2">
-                    <label className="cursor-pointer text-[11px] text-brand-from dark:text-pink-400">
+                    <label className="cursor-pointer text-[11px] text-brand-from dark:text-white">
                       {subiendoId === m.id ? "subiendo…" : m.logo_url ? "cambiar logo" : "+ subir logo"}
                       <input
                         type="file"
@@ -439,7 +439,7 @@ export default function AdminPage() {
                     </label>
                     <button
                       onClick={() => setEditandoIconoMarca(editandoIconoMarca === m.id ? null : m.id)}
-                      className="text-[11px] text-brand-from dark:text-pink-400"
+                      className="text-[11px] text-brand-from dark:text-white"
                     >
                       cambiar ícono
                     </button>
@@ -561,7 +561,7 @@ export default function AdminPage() {
                   <div className="flex items-center gap-3">
                     <button
                       onClick={() => guardarDatosCategoria(c.id)}
-                      className="text-[11px] font-semibold text-brand-from dark:text-pink-400"
+                      className="text-[11px] font-semibold text-brand-from dark:text-white"
                     >
                       guardar
                     </button>
@@ -577,13 +577,13 @@ export default function AdminPage() {
                 <div className="mt-2 flex items-center gap-3">
                   <button
                     onClick={() => iniciarEdicionCategoria(c)}
-                    className="text-[11px] text-brand-from dark:text-pink-400"
+                    className="text-[11px] text-brand-from dark:text-white"
                   >
                     editar
                   </button>
                   <button
                     onClick={() => setEditandoIconoCat(editandoIconoCat === c.id ? null : c.id)}
-                    className="text-[11px] text-brand-from dark:text-pink-400"
+                    className="text-[11px] text-brand-from dark:text-white"
                   >
                     cambiar ícono
                   </button>

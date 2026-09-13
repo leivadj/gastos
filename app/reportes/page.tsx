@@ -10,9 +10,14 @@ import { promedioMovil } from "@/lib/promedioMovil";
 import { Compra, GastoDiario, GastoFijo, Ingreso, Pago } from "@/lib/types";
 
 const N_MESES = 6;
-const COLOR_GASTO = "#DDD6FE"; // violet-200, mismo tono que el mockup
-const COLOR_GASTO_ACTUAL = "#7C3AED"; // brand-from
-const COLOR_INGRESO = "#10B981"; // emerald-500, mismo verde que "pagado"/"ingreso" en el resto de la app
+// Reservados v2 (ver tailwind.config.ts: colors.gasto/ingreso) — el gráfico
+// muestra montos reales de gasto/ingreso, así que usa esos mismos tokens.
+// El mes actual se resalta con el rojo "gasto" a toda intensidad; los meses
+// anteriores usan una versión clara del mismo tono en vez de un color
+// distinto, para no perder el significado "esto es gasto".
+const COLOR_GASTO = "#F3B7AC"; // gasto (#E2584B), versión clara — meses anteriores
+const COLOR_GASTO_ACTUAL = "#E2584B"; // gasto — mes actual
+const COLOR_INGRESO = "#5DCB86"; // ingreso
 
 type MesRef = { iso: string; year: number; month: number; label: string; labelLargo: string };
 
@@ -175,7 +180,7 @@ export default function ReportesPage() {
       <div className="grid grid-cols-2 gap-3">
         <Card>
           <p className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">Ahorro promedio</p>
-          <p className={`mt-1.5 text-lg font-extrabold ${ahorroPromedio < 0 ? "text-red-500 dark:text-red-400" : "text-gray-800 dark:text-white"}`}>
+          <p className={`mt-1.5 text-lg font-extrabold ${ahorroPromedio < 0 ? "text-gasto" : "text-gray-800 dark:text-white"}`}>
             {formatCLP(ahorroPromedio)}
           </p>
           <p className="mt-0.5 text-[10.5px] text-gray-400 dark:text-gray-500">por mes, {N_MESES} meses</p>
@@ -198,12 +203,12 @@ export default function ReportesPage() {
         <div className="mt-2 space-y-2 text-sm">
           {datos.map((d) => (
             <div key={d.iso} className="flex items-center justify-between gap-2">
-              <span className={`w-9 shrink-0 font-medium ${d.esActual ? "text-brand-from dark:text-pink-400" : "text-gray-500 dark:text-gray-300"}`}>
+              <span className={`w-9 shrink-0 font-medium ${d.esActual ? "text-brand-from dark:text-white" : "text-gray-500 dark:text-gray-300"}`}>
                 {d.label}
               </span>
               <span className="flex-1 text-right text-gray-400 dark:text-gray-500">{formatCLP(d.gastos)}</span>
-              <span className="flex-1 text-right text-emerald-600">{formatCLP(d.ingresos)}</span>
-              <span className={`w-24 shrink-0 text-right font-semibold ${d.ahorro < 0 ? "text-red-500 dark:text-red-400" : "text-gray-800 dark:text-white"}`}>
+              <span className="flex-1 text-right text-ingreso">{formatCLP(d.ingresos)}</span>
+              <span className={`w-24 shrink-0 text-right font-semibold ${d.ahorro < 0 ? "text-gasto" : "text-gray-800 dark:text-white"}`}>
                 {formatCLP(d.ahorro)}
               </span>
             </div>

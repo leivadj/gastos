@@ -55,7 +55,7 @@ export function ParticipantesPicker({
           <div
             key={p.id}
             className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
-              seleccionada ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+              seleccionada ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
             }`}
           >
             <button type="button" onClick={() => toggle(p.id)} className="flex flex-1 items-center gap-2 text-left">

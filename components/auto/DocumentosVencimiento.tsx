@@ -205,7 +205,7 @@ export function DocumentosVencimiento() {
                     key={t}
                     onClick={() => elegirTipo(t)}
                     className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-center ${
-                      tipo === t ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+                      tipo === t ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
                     }`}
                   >
                     <span className="text-lg leading-none">{TIPO_INFO[t].icono}</span>

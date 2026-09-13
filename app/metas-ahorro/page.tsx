@@ -185,7 +185,7 @@ export default function MetasAhorroPage() {
                   </p>
                 </div>
               </button>
-              <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-pink-100 dark:bg-pink-900/40">
+              <div className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
                 <div
                   className={`h-full ${cumplida ? "bg-emerald-400" : "bg-brand-gradient"}`}
                   style={{ width: `${pct}%` }}
@@ -238,7 +238,7 @@ export default function MetasAhorroPage() {
               </div>
 
               {aportandoId === m.meta_id ? (
-                <div className="mt-3 space-y-2 rounded-lg bg-purple-50 dark:bg-white/10 p-3">
+                <div className="mt-3 space-y-2 rounded-lg bg-gray-50 dark:bg-white/10 p-3">
                   <div className="grid grid-cols-2 gap-2">
                     <input
                       type="number"
@@ -281,7 +281,7 @@ export default function MetasAhorroPage() {
               ) : (
                 <button
                   onClick={() => abrirAporte(m.meta_id)}
-                  className="mt-3 w-full rounded-lg bg-purple-50 dark:bg-white/10 py-2 text-xs font-semibold text-brand-from dark:text-white"
+                  className="mt-3 w-full rounded-lg bg-gray-50 dark:bg-white/10 py-2 text-xs font-semibold text-brand-from dark:text-white"
                 >
                   + Agregar aporte
                 </button>

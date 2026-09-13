@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { IngresosContenido } from "@/components/IngresosContenido";
+import { PresupuestoContenido } from "@/components/PresupuestoContenido";
 import {
   PieChart,
   Pie,
@@ -41,8 +43,11 @@ import {
 } from "@/lib/types";
 import { useDeviceType } from "@/lib/useDeviceType";
 
-const COLORES = ["#7C3AED", "#EC4899", "#F97316", "#10B981", "#3B82F6", "#F43F5E", "#8B5CF6", "#14B8A6"];
-const AVATAR_COLORES = ["#F59E0B", "#10B981", "#3B82F6", "#EC4899", "#8B5CF6"];
+// Rediseño v2: mismos tonos grises + reservados que la dona de
+// "Gastos por categoría" de PresupuestoContenido.tsx (esta es la versión de
+// escritorio del mismo gráfico) — ver también lib/avatarColor.ts.
+const COLORES = ["#111112", "#3A3A3D", "#6E6E72", "#9B9995", "#C9C7C2", "#E2584B", "#5DCB86", "#8A8A8D"];
+const AVATAR_COLORES = ["#111112", "#3A3A3D", "#54585C", "#6E6E72", "#8A8A8D"];
 
 function formatCompacto(valor: number): string {
   return new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 1 }).format(valor);
@@ -144,6 +149,14 @@ export default function DashboardPage() {
   const [ingresosMes, setIngresosMes] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
+  // Rediseño v2: en celular, Inicio/Ingresos/Presupuesto se fusionan en una
+  // sola pantalla "Resumen" con pestañas (como en el mockup de Not Pato) en
+  // vez de 3 pantallas sueltas — Felipe notó que "Presupuesto" ya
+  // aparecía como pestaña arriba Y como destino propio en el nav inferior.
+  // En escritorio se mantienen como páginas separadas del sidebar (hay
+  // espacio de sobra ahí), así que esta pestaña solo aplica al layout
+  // mobile de más abajo.
+  const [tabResumen, setTabResumen] = useState<"resumen" | "ingresos" | "presupuesto">("resumen");
 
   useEffect(() => {
     async function cargar() {
@@ -358,7 +371,7 @@ export default function DashboardPage() {
   const tarjetaFijoVariable = totalGastos > 0 && (
     <Card>
       <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Fijo vs. variable</p>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-pink-100 dark:bg-pink-950/50">
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10/50">
         <div className="h-full bg-brand-gradient" style={{ width: `${pctFijo}%` }} />
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -367,7 +380,7 @@ export default function DashboardPage() {
           Fijo · {formatCLP(totalTipoFijo)}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-pink-200 dark:bg-pink-800" />
+          <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" />
           Variable · {formatCLP(totalTipoVariable)}
         </span>
       </div>
@@ -390,7 +403,7 @@ export default function DashboardPage() {
                 <Bar
                   dataKey="total"
                   radius={[6, 6, 0, 0]}
-                  fill="#7C3AED"
+                  fill="#17171A"
                   style={{ cursor: "pointer" }}
                   onClick={(d: any) => setPersonaSeleccionada(d?.persona_id ?? d?.payload?.persona_id ?? null)}
                 />
@@ -444,7 +457,7 @@ export default function DashboardPage() {
           <IconoProximosPagos className="text-gray-400 dark:text-gray-500" />
           Próximos pagos
         </p>
-        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from dark:text-pink-400">
+        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from dark:text-white">
           Ver todos
         </Link>
       </div>
@@ -481,7 +494,7 @@ export default function DashboardPage() {
           <IconoMetas className="text-gray-400 dark:text-gray-500" />
           Metas de ahorro
         </p>
-        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from dark:text-pink-400">
+        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from dark:text-white">
           Ver todas
         </Link>
       </div>
@@ -513,8 +526,32 @@ export default function DashboardPage() {
 
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
-  const contenido = esMobile ? (
-      <div className="space-y-5 pb-10">
+  const tabsResumen: { id: typeof tabResumen; label: string }[] = [
+    { id: "resumen", label: "Resumen" },
+    { id: "ingresos", label: "Ingresos" },
+    { id: "presupuesto", label: "Presupuestos" },
+  ];
+
+  const barraTabsResumen = (
+    <div className="-mb-1 flex gap-2">
+      {tabsResumen.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => setTabResumen(t.id)}
+          className={`rounded-full px-4 py-2 text-[13px] font-semibold transition-transform duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] active:scale-95 ${
+            tabResumen === t.id
+              ? "bg-black text-white dark:bg-white dark:text-black"
+              : "text-gray-400 dark:text-gray-500"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+
+  const vistaResumenTab = (
+      <div className="space-y-5">
         {/* Hero a sangre, fuera del padding del layout */}
         <div className="-mx-4 -mt-4 rounded-b-[2rem] bg-brand-gradient px-5 pb-6 pt-6 text-white">
           <div className="flex items-center justify-between">
@@ -579,6 +616,15 @@ export default function DashboardPage() {
         {tarjetaPersonas}
         {tarjetaCuotas}
       </div>
+  );
+
+  const contenido = esMobile ? (
+    <div className="space-y-4 pb-10">
+      {barraTabsResumen}
+      {tabResumen === "resumen" && vistaResumenTab}
+      {tabResumen === "ingresos" && <IngresosContenido ocultarTitulo />}
+      {tabResumen === "presupuesto" && <PresupuestoContenido ocultarTitulo />}
+    </div>
   ) : (
     // ---- Layout de escritorio (navegador en PC/tablet) ----
     <div className="space-y-6 pb-10">

@@ -233,7 +233,7 @@ export default function SugerenciasPage() {
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <span className="text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(sug.monto)}</span>
-                  <button onClick={() => abrirConfirmar(sug)} className="text-xs font-medium text-brand-from dark:text-pink-400">
+                  <button onClick={() => abrirConfirmar(sug)} className="text-xs font-medium text-brand-from dark:text-white">
                     {abiertaId === sug.id ? "cerrar" : "confirmar"}
                   </button>
                   <button onClick={() => descartar(sug)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
