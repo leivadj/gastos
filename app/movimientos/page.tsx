@@ -14,7 +14,7 @@ import {
   mesSiguiente,
   MesRef,
 } from "@/lib/cuotasHistoricas";
-import { diaDelMes, formatCLP, mesActualISO, nombreMes } from "@/lib/format";
+import { diaDelMes, formatCLP, mesActualISO, nombreMes, nombreMesCorto } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
@@ -233,6 +233,25 @@ export default function MovimientosPage() {
     return b.dia - a.dia;
   });
 
+  // Agrupados por día ("HOY · 13 SEP", "AYER · 12 SEP", "11 SEP" — calcado
+  // del mockup, que agrupa los movimientos por fecha en vez de mostrar un
+  // numerito de día en cada fila).
+  const hoyDiaNumero = new Date().getDate();
+  function etiquetaDia(dia: number): string {
+    const fechaDia = `${refIso.slice(0, 7)}-${String(dia).padStart(2, "0")}`;
+    const mesCorto = nombreMesCorto(fechaDia).toUpperCase();
+    if (enMesActual && dia === hoyDiaNumero) return `Hoy · ${dia} ${mesCorto}`;
+    if (enMesActual && dia === hoyDiaNumero - 1) return `Ayer · ${dia} ${mesCorto}`;
+    return `${dia} ${mesCorto}`;
+  }
+  const grupos: { label: string; items: typeof visibles }[] = [];
+  visibles.forEach((m) => {
+    const label = m.dia == null ? "Sin fecha" : etiquetaDia(m.dia);
+    const grupo = grupos.find((g) => g.label === label);
+    if (grupo) grupo.items.push(m);
+    else grupos.push({ label, items: [m] });
+  });
+
   function toggleFiltro(tipo: TipoMovimiento) {
     setFiltros((actual) => (actual.includes(tipo) ? actual.filter((t) => t !== tipo) : [...actual, tipo]));
   }
@@ -308,42 +327,49 @@ export default function MovimientosPage() {
       </div>
 
       <Card>
-        <div className="divide-y divide-gray-100 dark:divide-white/10">
-          {visibles.map((m) => {
-            const marcaItem = marcaDe(m.marcaId);
-            const esIngreso = m.tipo === "ingreso";
-            return (
-              <div key={m.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg bg-gray-50 text-xs font-bold text-gray-400 dark:bg-white/5 dark:text-gray-500">
-                  {m.dia ?? "—"}
-                </div>
-                <EntidadAvatar
-                  entidad={entidadDe(m.entidadId)}
-                  marca={marcaItem ?? marcaDeEntidad(m.entidadId)}
-                  icono={m.icono}
-                  nombreFallback={m.descripcion}
-                  className="h-9 w-9"
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{m.descripcion}</p>
-                  <p className="truncate text-xs text-gray-400 dark:text-gray-500">
-                    {m.detalle}
-                    {m.pagado === true && <span className="ml-1.5 font-semibold text-emerald-500">· Pagado</span>}
-                    {m.pagado === false && <span className="ml-1.5 text-gray-300 dark:text-gray-600">· Pendiente</span>}
-                  </p>
-                </div>
-                <p className={`shrink-0 text-sm font-semibold ${esIngreso ? "text-ingreso" : "text-gray-800 dark:text-white"}`}>
-                  {esIngreso && "+"}
-                  {m.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
-                  {formatCLP(m.monto)}
+        {visibles.length === 0 ? (
+          <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">Sin movimientos para este filtro.</p>
+        ) : (
+          <div className="space-y-4">
+            {grupos.map((grupo) => (
+              <div key={grupo.label}>
+                <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                  {grupo.label}
                 </p>
+                <div className="divide-y divide-gray-100 dark:divide-white/10">
+                  {grupo.items.map((m) => {
+                    const marcaItem = marcaDe(m.marcaId);
+                    const esIngreso = m.tipo === "ingreso";
+                    return (
+                      <div key={m.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                        <EntidadAvatar
+                          entidad={entidadDe(m.entidadId)}
+                          marca={marcaItem ?? marcaDeEntidad(m.entidadId)}
+                          icono={m.icono}
+                          nombreFallback={m.descripcion}
+                          className="h-9 w-9"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{m.descripcion}</p>
+                          <p className="truncate text-xs text-gray-400 dark:text-gray-500">
+                            {m.detalle}
+                            {m.pagado === true && <span className="ml-1.5 font-semibold text-emerald-500">· Pagado</span>}
+                            {m.pagado === false && <span className="ml-1.5 text-gray-300 dark:text-gray-600">· Pendiente</span>}
+                          </p>
+                        </div>
+                        <p className={`shrink-0 text-sm font-semibold ${esIngreso ? "text-ingreso" : "text-gasto"}`}>
+                          {esIngreso ? "+" : "-"}
+                          {m.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
+                          {formatCLP(m.monto)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            );
-          })}
-          {visibles.length === 0 && (
-            <p className="py-6 text-center text-sm text-gray-400 dark:text-gray-500">Sin movimientos para este filtro.</p>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       {error && <p className="text-center text-xs text-red-500 dark:text-red-400">{error}</p>}

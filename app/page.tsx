@@ -10,16 +10,13 @@ import {
   Cell,
   ResponsiveContainer,
   Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
   LineChart,
   Line,
 } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { PersonaAvatar } from "@/components/PersonaAvatar";
 import { PersonaBreakdown } from "@/components/PersonaBreakdown";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { AvatarGroupHover } from "@/components/AvatarGroupHover";
@@ -53,6 +50,7 @@ import {
   RepartoGastoDiario,
   RepartoGastoFijo,
   ResumenPersonaMes,
+  Transferencia,
 } from "@/lib/types";
 import { useDeviceType } from "@/lib/useDeviceType";
 
@@ -64,16 +62,6 @@ const AVATAR_COLORES = ["#111112", "#3A3A3D", "#54585C", "#6E6E72", "#8A8A8D"];
 
 function formatCompacto(valor: number): string {
   return new Intl.NumberFormat("es-CL", { notation: "compact", maximumFractionDigits: 1 }).format(valor);
-}
-
-function IconoDisponible({ className = "" }: { className?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="3" y="6" width="18" height="13" rx="2.5" />
-      <path d="M3 10h18" />
-      <path d="M16.5 15h1" />
-    </svg>
-  );
 }
 
 function IconoIngresos({ className = "" }: { className?: string }) {
@@ -140,6 +128,7 @@ export default function DashboardPage() {
   const [metas, setMetas] = useState<MetaAhorroProgreso[]>([]);
   const [ingresosLista, setIngresosLista] = useState<Ingreso[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [ingresosMes, setIngresosMes] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
@@ -170,6 +159,7 @@ export default function DashboardPage() {
         { data: pg },
         { data: mt },
         { data: gr },
+        { data: tr },
       ] = await Promise.all([
         supabase.from("vista_cuotas_mes_actual").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -186,6 +176,7 @@ export default function DashboardPage() {
         supabase.from("pagos").select("*"),
         supabase.from("vista_metas_ahorro_progreso").select("*").eq("activa", true).order("nombre"),
         supabase.from("grupos").select("*"),
+        supabase.from("transferencias").select("*"),
       ]);
       setCuotas((c as CompraVigente[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -204,6 +195,7 @@ export default function DashboardPage() {
       setPagos((pg as Pago[]) ?? []);
       setMetas((mt as MetaAhorroProgreso[]) ?? []);
       setGrupos((gr as Grupo[]) ?? []);
+      setTransferencias((tr as Transferencia[]) ?? []);
       setCargando(false);
     }
     cargar();
@@ -402,6 +394,23 @@ export default function DashboardPage() {
   }));
   const nombreGrupoHogar = grupos[0]?.nombre ?? "Grupo compartido";
 
+  // Datos para la tabla "Apertura del mes / Ingresos / Gastos / Pago de
+  // tarjeta / Balance" de la pestaña "Resumen" móvil (mockup): "Pago de
+  // tarjeta" = transferencias de este mes hacia una tarjeta de crédito
+  // (mismo concepto que ya usa /tarjetas para "abonos"). "Apertura del
+  // mes" no se guarda como una foto fija en la base (el saldo de
+  // entidades.saldo es el saldo ACTUAL, no el de hace 13 días) — se
+  // aproxima restándole al saldo actual el movimiento neto de este mes,
+  // para no inventar un número sin relación con datos reales.
+  const totalEnCuentas = entidades
+    .filter((e) => e.tipo !== "tarjeta_credito" && e.saldo != null)
+    .reduce((acc, e) => acc + Number(e.saldo), 0);
+  const pagoTarjetaMes = transferencias
+    .filter((t) => t.fecha.slice(0, 7) === mesActualStr.slice(0, 7))
+    .filter((t) => entidades.find((e) => e.id === t.cuenta_destino_id)?.tipo === "tarjeta_credito")
+    .reduce((acc, t) => acc + Number(t.monto), 0);
+  const aperturaMes = totalEnCuentas - (ingresosMes - gastosYaPagados - pagoTarjetaMes);
+
   // Cuántas tarjetas entran en la fila "Cuentas próximas / Meta / Grupo
   // Hogar" del dashboard de escritorio — "Cuentas próximas" siempre va,
   // las otras dos son condicionales (sin metas activas, o una sola
@@ -481,58 +490,6 @@ export default function DashboardPage() {
     </Card>
   );
 
-  const tarjetaPersonas = (
-    <Card>
-      <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Cuánto le toca a cada persona</p>
-      {dataPersonas.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Sin datos este mes todavía.</p>
-      ) : (
-        <>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={dataPersonas}>
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis hide />
-                <Tooltip formatter={(v: number) => formatCLP(v)} />
-                <Bar
-                  dataKey="total"
-                  radius={[6, 6, 0, 0]}
-                  fill="#17171A"
-                  style={{ cursor: "pointer" }}
-                  onClick={(d: any) => setPersonaSeleccionada(d?.persona_id ?? d?.payload?.persona_id ?? null)}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <p className="mt-1 text-center text-[11px] text-gray-400 dark:text-gray-500">Toca una barra para ver el detalle</p>
-        </>
-      )}
-    </Card>
-  );
-
-  const tarjetaCuotas = (
-    <Card>
-      <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Cuotas activas este mes</p>
-      {cuotas.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">No hay compras en cuotas vigentes.</p>
-      ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-white/10">
-          {cuotas.map((c) => (
-            <li key={c.compra_id} className="flex items-center justify-between py-2.5 text-sm">
-              <div>
-                <p className="font-medium text-gray-700 dark:text-gray-200">{c.descripcion}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500">
-                  Cuota {c.cuota_actual} de {c.n_cuotas} · {categoriaNombre(c.categoria_id)}
-                </p>
-              </div>
-              <p className="font-semibold text-gray-800 dark:text-gray-100">{formatCLP(c.monto_cuota)}</p>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Card>
-  );
-
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
   const tabsResumen: { id: typeof tabResumen; label: string }[] = [
@@ -559,76 +516,68 @@ export default function DashboardPage() {
     </div>
   );
 
+  // Calcado de la pestaña "Resumen" del mockup: ya no es un hero con
+  // disponible/ingresos/gastos/comprometido — es una tarjeta tipo tabla
+  // (Apertura del mes/Ingresos/Gastos/Pago de tarjeta/Balance) más la
+  // misma dona de "Gastos por categoría" que ya existía. El desglose por
+  // persona y la lista de cuotas activas se pueden seguir viendo en
+  // /personas y /gastos — el mockup no los muestra acá.
   const vistaResumenTab = (
-      <div className="space-y-5">
-        {/* Hero a sangre, fuera del padding del layout */}
-        <div className="-mx-4 -mt-4 rounded-b-[2rem] bg-brand-gradient px-5 pb-6 pt-6 text-white">
-          <div className="flex items-center justify-between">
-            <span className="rounded-full bg-white/15 px-3 py-1 text-sm font-medium capitalize">
-              {nombreMes()} ▾
-            </span>
-            <AvatarGroupHover className="flex -space-x-2">
-              {personas.slice(0, 4).map((p, i) => (
-                <span
-                  key={p.id}
-                  title={p.nombre}
-                  className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white"
-                  style={{ background: AVATAR_COLORES[i % AVATAR_COLORES.length] }}
-                >
-                  {p.nombre.charAt(0).toUpperCase()}
-                </span>
-              ))}
-            </AvatarGroupHover>
-          </div>
-
-          <p className="mt-5 flex items-center gap-1.5 text-sm opacity-85">
-            <IconoDisponible className="text-white" />
-            Disponible este mes
-          </p>
-          <p className="text-4xl font-bold tracking-tight">
-            <ContadorOdometro texto={formatCLP(disponible)} />
-          </p>
-
-          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-            <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">
-                <IconoIngresos className="text-white" />
-                Ingresos
-              </p>
-              <p className="text-sm font-semibold">
-                <ContadorOdometro texto={formatCLP(ingresosMes)} />
-              </p>
-            </div>
-            <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">
-                <IconoGastos className="text-white" />
-                Gastos
-              </p>
-              <p className="text-sm font-semibold">
-                <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
-              </p>
-            </div>
-            <div className="rounded-xl bg-white/15 p-3">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">
-                <IconoComprometido className="text-white" />
-                Comprometido
-              </p>
-              <p className="text-sm font-semibold">
-                <ContadorOdometro texto={formatCLP(comprometido)} />
-              </p>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <Card>
+        <div className="flex items-center justify-between py-1 text-sm">
+          <span className="text-gray-400 dark:text-gray-500">Apertura del mes</span>
+          <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(aperturaMes)}</span>
         </div>
+        <div className="flex items-center justify-between border-t border-gray-50 py-2 text-sm dark:border-white/10">
+          <span className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+            <IconoIngresos className="text-ingreso" />
+            Ingresos
+          </span>
+          <span className="font-semibold text-ingreso">+{formatCLP(ingresosMes)}</span>
+        </div>
+        <div className="flex items-center justify-between border-t border-gray-50 py-2 text-sm dark:border-white/10">
+          <span className="flex items-center gap-1.5 text-gray-400 dark:text-gray-500">
+            <IconoGastos className="text-gasto" />
+            Gastos
+          </span>
+          <span className="font-semibold text-gasto">-{formatCLP(gastosYaPagados)}</span>
+        </div>
+        {pagoTarjetaMes > 0 && (
+          <div className="flex items-center justify-between border-t border-gray-50 py-2 text-sm dark:border-white/10">
+            <span className="text-gray-400 dark:text-gray-500">Pago de tarjeta</span>
+            <span className="font-semibold text-gasto">-{formatCLP(pagoTarjetaMes)}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between border-t border-gray-100 pt-2 text-sm dark:border-white/10">
+          <span className="font-semibold text-gray-700 dark:text-gray-200">Balance</span>
+          <span className="text-base font-bold text-gray-800 dark:text-white">{formatCLP(disponible)}</span>
+        </div>
+      </Card>
 
-        {tarjetaCategoria}
-        {tarjetaFijoVariable}
-        {tarjetaPersonas}
-        {tarjetaCuotas}
-      </div>
+      {tarjetaCategoria}
+    </div>
   );
 
   const contenido = esMobile ? (
     <div className="space-y-4 pb-10">
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          aria-label="Notificaciones"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300"
+        >
+          <IconoCampana />
+        </button>
+        <span className="rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium capitalize text-gray-700 dark:bg-white/10 dark:text-gray-200">
+          {nombreMes()} ▾
+        </span>
+        <PersonaAvatar
+          fotoUrl={personas.find((p) => p.es_self)?.foto_url}
+          nombre={personas.find((p) => p.es_self)?.nombre ?? "?"}
+          className="h-9 w-9 text-sm"
+        />
+      </div>
       {barraTabsResumen}
       {tabResumen === "resumen" && vistaResumenTab}
       {tabResumen === "ingresos" && <IngresosContenido ocultarTitulo />}
