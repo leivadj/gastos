@@ -8,27 +8,38 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // Rediseño v2 (negro/blanco, Rimu para escritorio + distribución de
+      // Not Pato para el celular — ver conversación con Felipe de
+      // septiembre 2026, y el mockup publicado en Claude Design). El
+      // "brand" gradiente violeta/rosa de la marca anterior queda apagado
+      // a un degradé casi negro: los componentes que ya usan
+      // bg-brand-gradient/text-brand-from/text-brand-to (CTAs, estados
+      // activos) heredan la nueva estética sin tener que tocar cada uno.
       colors: {
         brand: {
-          from: "#7C3AED", // violeta
-          to: "#EC4899",   // rosa
+          from: "#17171A",
+          to: "#000000",
         },
+        // Reservados: verde SOLO para montos de ingreso/positivos, rojo
+        // SOLO para montos de gasto/negativos y acciones destructivas —
+        // nunca para estados genéricos (toggle activo, chip seleccionado,
+        // etc., que usan blanco/negro). Mismos hex que el mockup.
+        ingreso: "#5DCB86",
+        gasto: "#E2584B",
       },
       backgroundImage: {
-        "brand-gradient": "linear-gradient(135deg, #7C3AED 0%, #EC4899 100%)",
+        "brand-gradient": "linear-gradient(135deg, #17171A 0%, #000000 100%)",
       },
-      // Rediseño "estilo Haulo" (Fase 1, ver conversación con Felipe del
-      // 11/09/2026): tipografía redondeada/bold en toda la app en vez de la
-      // fuente del sistema — se carga con @fontsource/nunito en
-      // app/layout.tsx (ver el comentario ahí sobre por qué no next/font)
-      // y acá se declara como el sans-serif por defecto, así ningún
-      // componente tiene que pedirla a mano.
+      // Plus Jakarta Sans en toda la app — se carga con @fontsource en
+      // app/layout.tsx (ver el comentario ahí sobre por qué no
+      // next/font/google). Reemplaza a Nunito ("estilo Haulo", descartado).
       fontFamily: {
-        sans: ["Nunito", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Plus Jakarta Sans", "ui-sans-serif", "system-ui", "sans-serif"],
       },
-      // Radios más grandes que el "3xl" (1.5rem) que ya trae Tailwind, para
-      // las hojas modales y tarjetas grandes del nuevo sistema — Haulo usa
-      // curvas bastante más pronunciadas que las que tenía la app.
+      // Radios grandes para hojas modales y tarjetas del rediseño v2 (28px
+      // el sheet que sube desde abajo, 36px sus esquinas superiores) —
+      // mismos valores que traía el intento "estilo Haulo", que nunca
+      // llegaron a usarse en ninguna pantalla real.
       borderRadius: {
         "4xl": "1.75rem", // 28px — tarjetas grandes, hoja modal
         "5xl": "2.25rem", // 36px — la hoja modal completa (esquinas superiores)
