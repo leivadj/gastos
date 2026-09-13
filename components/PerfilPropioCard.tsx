@@ -236,8 +236,8 @@ export function PerfilPropioCard() {
         </Link>
       </div>
 
-      <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-        <span className="text-xs font-semibold text-gray-500">Tema</span>
+      <div className="mt-3 flex items-center justify-between rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
+        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tema</span>
         <ThemeToggle />
       </div>
 
