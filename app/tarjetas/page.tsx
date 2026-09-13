@@ -50,6 +50,11 @@ export default function TarjetasPage() {
   const [activaId, setActivaId] = useState<string | null>(null);
 
   const [mostrarForm, setMostrarForm] = useState(false);
+  // Mockup pág. 3 (Cuentas.dc.html) separa la lista (carrusel + botón "Ver
+  // detalles de X") del detalle completo, que vive en una hoja aparte
+  // (Tarjetas.dc.html, pág. 7) — antes esta pantalla mostraba el detalle
+  // siempre visible debajo del carrusel, fusionando las dos pantallas.
+  const [mostrarDetalle, setMostrarDetalle] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -599,63 +604,33 @@ export default function TarjetasPage() {
           />
 
           {entidadActiva && (
-            <div className="space-y-3 rounded-2xl bg-brand-gradient p-4 text-white">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="truncate text-base font-bold">{entidadActiva.nombre}</p>
-                  <p className="text-xs opacity-70">{TIPO_LABEL[entidadActiva.tipo]}</p>
-                </div>
-                <div className="flex shrink-0 items-center gap-3">
-                  <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs font-medium opacity-90 hover:opacity-100">
-                    editar
-                  </button>
-                  <button onClick={() => eliminar(entidadActiva.id)} className="text-xs opacity-60 hover:text-red-300 hover:opacity-100">
-                    eliminar
-                  </button>
-                </div>
-              </div>
-
-              {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null ? (
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide opacity-60">Cupo disponible</p>
-                  <p className="text-2xl font-bold">{formatCLP(disponiblePorEntidad[entidadActiva.id] ?? entidadActiva.cupo)}</p>
-                  <p className="mt-0.5 text-xs opacity-60">de {formatCLP(entidadActiva.cupo)}</p>
-                </div>
-              ) : entidadActiva.saldo != null ? (
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide opacity-60">Saldo disponible</p>
-                  <p className="text-2xl font-bold">{formatCLP(entidadActiva.saldo)}</p>
-                </div>
-              ) : null}
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl bg-white/10 p-2.5">
-                  <p className="text-[10.5px] opacity-60">Ingresos este mes</p>
-                  <p className="mt-0.5 text-sm font-semibold text-ingreso">+{formatCLP(ingresosCuentaActivaMes)}</p>
-                </div>
-                <div className="rounded-xl bg-white/10 p-2.5">
-                  <p className="text-[10.5px] opacity-60">Gastos este mes</p>
-                  <p className="mt-0.5 text-sm font-semibold text-gasto">-{formatCLP(gastosCuentaActivaMes)}</p>
-                </div>
-              </div>
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setMostrarDetalle(true)}
+                className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-gray-200"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="6" width="18" height="13" rx="2.5" />
+                  <path d="M3 10h18" />
+                </svg>
+                Ver detalles de {entidadActiva.nombre}
+              </button>
             </div>
           )}
 
           <Card>
             <div className="mb-1 flex items-center justify-between">
-              <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Movimientos de esta cuenta</p>
-              {itemsActivos.length > 0 && (
-                <button onClick={exportarMovimientosCSV} className="shrink-0 text-xs font-semibold text-brand-from dark:text-white">
-                  Exportar
-                </button>
-              )}
+              <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Movimientos</p>
+              <a href="/movimientos" className="shrink-0 text-xs font-semibold text-brand-from dark:text-white">
+                Ver todos
+              </a>
             </div>
-            <p className="mb-3 text-xs capitalize text-gray-400 dark:text-gray-500">{nombreMes()}</p>
             {itemsActivos.length === 0 ? (
               <p className="py-2 text-sm text-gray-400 dark:text-gray-500">Sin movimientos este mes con esta cuenta.</p>
             ) : (
               <ul className="divide-y divide-gray-100 dark:divide-white/10">
-                {itemsActivos.map((it) => (
+                {itemsActivos.slice(0, 4).map((it) => (
                   <li key={it.key} className="flex items-center gap-3 py-2.5">
                     <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-8 w-8" />
                     <div className="min-w-0 flex-1">
@@ -673,48 +648,107 @@ export default function TarjetasPage() {
               </ul>
             )}
           </Card>
+        </>
+      )}
 
-          {entidades.length > 1 && (
-            <div>
-              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                Todas tus tarjetas y cuentas
-              </p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {entidades.map((e) => {
-                  const marca = resolverMarca(e, marcas);
-                  return (
-                    <Card key={e.id} className={`!p-3 ${e.id === activaId ? "ring-1 ring-brand-from" : ""}`}>
-                      <button type="button" onClick={() => setActivaId(e.id)} className="flex w-full items-center gap-3 text-left">
-                        <EntidadAvatar entidad={e} marca={marca} className="h-9 w-9" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{e.nombre}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">{TIPO_LABEL[e.tipo]}</p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          {e.tipo === "tarjeta_credito" && e.cupo != null ? (
-                            <>
-                              <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                                {formatCLP(disponiblePorEntidad[e.id] ?? e.cupo)}
-                              </p>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500">disponible de cupo</p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="text-xs font-medium text-gray-700 dark:text-gray-200">
-                                {formatCLP(e.saldo ?? gastoPorEntidad[e.id] ?? 0)}
-                              </p>
-                              <p className="text-[10px] text-gray-400 dark:text-gray-500">{e.saldo != null ? "saldo" : "gastado este mes"}</p>
-                            </>
-                          )}
-                        </div>
-                      </button>
-                    </Card>
-                  );
-                })}
+      {mostrarDetalle && entidadActiva && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 sm:items-center" onClick={() => setMostrarDetalle(false)}>
+          <div
+            className="max-h-[90vh] w-full space-y-4 overflow-y-auto rounded-t-3xl bg-[#111113] p-5 text-white sm:max-w-md sm:rounded-3xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-base font-bold">{entidadActiva.nombre}</p>
+                <p className="text-xs text-white/50">{TIPO_LABEL[entidadActiva.tipo]}</p>
+              </div>
+              <button
+                onClick={() => setMostrarDetalle(false)}
+                aria-label="Cerrar"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10"
+              >
+                ✕
+              </button>
+            </div>
+
+            {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null ? (
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-white/50">Cupo disponible</p>
+                <p className="text-3xl font-bold">{formatCLP(disponiblePorEntidad[entidadActiva.id] ?? entidadActiva.cupo)}</p>
+                <p className="mt-0.5 text-xs text-white/50">de {formatCLP(entidadActiva.cupo)}</p>
+              </div>
+            ) : entidadActiva.saldo != null ? (
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-white/50">Saldo disponible</p>
+                <p className="text-3xl font-bold">{formatCLP(entidadActiva.saldo)}</p>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="rounded-2xl bg-white/5 p-3.5">
+                <p className="text-[11px] text-white/50">Ingresos este mes</p>
+                <p className="mt-0.5 text-sm font-bold text-ingreso">+{formatCLP(ingresosCuentaActivaMes)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 p-3.5">
+                <p className="text-[11px] text-white/50">Gastos este mes</p>
+                <p className="mt-0.5 text-sm font-bold text-gasto">-{formatCLP(gastosCuentaActivaMes)}</p>
               </div>
             </div>
-          )}
-        </>
+
+            <div>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-white/50">Movimientos de esta cuenta</p>
+              {itemsActivos.length === 0 ? (
+                <p className="py-1 text-sm text-white/40">Sin movimientos este mes con esta cuenta.</p>
+              ) : (
+                <ul className="divide-y divide-white/10">
+                  {itemsActivos.map((it) => (
+                    <li key={it.key} className="flex items-center gap-3 py-2.5">
+                      <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-9 w-9" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{it.descripcion}</p>
+                        <p className="text-xs text-white/50">
+                          {it.categoria} · {it.detalle}
+                        </p>
+                      </div>
+                      <p className={`shrink-0 rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold ${it.signo === 1 ? "text-ingreso" : "text-gasto"}`}>
+                        {it.signo === 1 ? "+" : "-"}
+                        {formatCLP(it.monto)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="flex gap-2.5 pt-1">
+              <button
+                onClick={exportarMovimientosCSV}
+                disabled={itemsActivos.length === 0}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 py-3 text-xs font-bold disabled:opacity-40"
+              >
+                Exportar
+              </button>
+              <button
+                onClick={() => {
+                  setMostrarDetalle(false);
+                  iniciarEdicion(entidadActiva);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-white/10 py-3 text-xs font-bold"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => {
+                  setMostrarDetalle(false);
+                  eliminar(entidadActiva.id);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gasto/10 py-3 text-xs font-bold text-gasto"
+              >
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

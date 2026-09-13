@@ -23,12 +23,17 @@ import { Categoria, Compra, Entidad, GastoDiario, GastoFijo, Grupo, Ingreso, Ite
 
 type TipoMovimiento = "fijo" | "variable" | "cuota" | "diario" | "ingreso";
 
-const TIPOS: { id: TipoMovimiento; label: string }[] = [
-  { id: "fijo", label: "Fijos" },
-  { id: "variable", label: "Variables" },
-  { id: "cuota", label: "Cuotas" },
-  { id: "diario", label: "Diarios" },
-  { id: "ingreso", label: "Ingresos" },
+// Rediseño v2: el mockup (Movimientos.dc.html) simplifica el filtro a 3
+// pestañas de selección única — Todo / Ingresos / Gastos — en vez de los 5
+// chips de selección múltiple (Fijos/Variables/Cuotas/Diarios/Ingresos) de
+// la versión anterior. Fijos/Variables/Cuotas/Diarios siguen existiendo
+// como conceptos internos (cada uno con su propia lógica de cálculo más
+// abajo) pero ahora todos caen bajo la pestaña "Gastos".
+type Vista = "todo" | "ingresos" | "gastos";
+const VISTAS: { id: Vista; label: string }[] = [
+  { id: "todo", label: "Todo" },
+  { id: "ingresos", label: "Ingresos" },
+  { id: "gastos", label: "Gastos" },
 ];
 
 type Movimiento = {
@@ -83,7 +88,7 @@ export default function MovimientosPage() {
   const [error, setError] = useState("");
 
   const [ref, setRef] = useState<MesRef>(mesRefActual());
-  const [filtros, setFiltros] = useState<TipoMovimiento[]>([]);
+  const [vista, setVista] = useState<Vista>("todo");
   // Movimiento en el que se abrió "Dividir gasto" (mockup PDF pág. 13) — ver
   // DividirGastoSheet.tsx. Solo cuotas/fijos/variables tienen esta opción.
   const [dividiendo, setDividiendo] = useState<Movimiento | null>(null);
@@ -260,7 +265,9 @@ export default function MovimientosPage() {
   const totalIngresos = movIngresos.reduce((acc, m) => acc + m.monto, 0);
   const balance = totalIngresos - totalGastos;
 
-  const visibles = (filtros.length === 0 ? todos : todos.filter((m) => filtros.includes(m.tipo))).sort((a, b) => {
+  const visibles = (
+    vista === "todo" ? todos : vista === "ingresos" ? movIngresos : [...movCuotas, ...movFijos, ...movDiarios]
+  ).sort((a, b) => {
     if (a.dia == null && b.dia == null) return 0;
     if (a.dia == null) return 1;
     if (b.dia == null) return -1;
@@ -290,14 +297,10 @@ export default function MovimientosPage() {
     else gruposDia.push({ label, items: [m] });
   });
 
-  function toggleFiltro(tipo: TipoMovimiento) {
-    setFiltros((actual) => (actual.includes(tipo) ? actual.filter((t) => t !== tipo) : [...actual, tipo]));
-  }
-
   function pill(activo: boolean) {
     return `shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
       activo
-        ? "bg-gray-50 text-brand-from dark:bg-white/10 dark:text-white"
+        ? "bg-gray-800 text-white dark:bg-white dark:text-black"
         : "bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400"
     }`;
   }
@@ -353,13 +356,10 @@ export default function MovimientosPage() {
         </div>
       </Card>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        <button onClick={() => setFiltros([])} className={pill(filtros.length === 0)}>
-          Todos
-        </button>
-        {TIPOS.map((t) => (
-          <button key={t.id} onClick={() => toggleFiltro(t.id)} className={pill(filtros.includes(t.id))}>
-            {t.label}
+      <div className="flex gap-2">
+        {VISTAS.map((v) => (
+          <button key={v.id} onClick={() => setVista(v.id)} className={pill(vista === v.id)}>
+            {v.label}
           </button>
         ))}
       </div>

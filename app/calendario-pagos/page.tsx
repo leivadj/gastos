@@ -456,34 +456,56 @@ export default function CalendarioPagosPage() {
           </Card>
 
           {diaSeleccionado && (
-            <Card>
-              <div className="mb-2 flex items-center justify-between">
-                <p className="text-sm font-semibold capitalize text-gray-800 dark:text-white">
-                  {new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(new Date(`${diaSeleccionado}T12:00:00`))}
-                </p>
-                <button onClick={() => setDiaSeleccionado(null)} className="text-xs text-gray-400 dark:text-gray-500">
-                  cerrar ✕
-                </button>
-              </div>
-              {movimientosDelDia.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500">Sin gastos registrados este día.</p>
-              ) : (
-                <>
-                  <ul className="divide-y divide-gray-100 dark:divide-white/10">
+            // Rediseño v2 — el detalle del día pasa de tarjeta en línea a
+            // hoja inferior (bottom sheet), calcado de Calendario.dc.html
+            // ("Domingo 13 de septiembre" + resumen +ingreso/-gasto + lista).
+            <div
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
+              onClick={() => setDiaSeleccionado(null)}
+            >
+              <div
+                className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-[#111113] p-5 pb-7 text-white sm:max-w-md sm:rounded-3xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-3 flex justify-center sm:hidden">
+                  <div className="h-1 w-9 rounded-full bg-white/20" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-base font-bold capitalize">
+                    {new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(new Date(`${diaSeleccionado}T12:00:00`))}
+                  </p>
+                  <button onClick={() => setDiaSeleccionado(null)} aria-label="Cerrar" className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10">
+                    ✕
+                  </button>
+                </div>
+                {/* Solo se muestra el total de gasto (rojo), no de ingreso: a
+                    diferencia del mockup, esta cuenta no tiene fecha exacta
+                    de ingreso en el esquema real (ver comentario arriba de
+                    esta pantalla) — mostrar un "+$0" fijo sería engañoso. */}
+                <div className="mt-1.5 flex items-center gap-3 text-xs">
+                  <span className="font-bold text-gasto">-{formatCLP(totalDiaSeleccionado)}</span>
+                  <span className="text-white/40">· {movimientosDelDia.length} movimiento{movimientosDelDia.length === 1 ? "" : "s"}</span>
+                </div>
+
+                {movimientosDelDia.length === 0 ? (
+                  <p className="mt-4 text-sm text-white/40">Sin gastos registrados este día.</p>
+                ) : (
+                  <ul className="mt-3 divide-y divide-white/10">
                     {movimientosDelDia.map((m) => (
-                      <li key={m.key} className="flex items-center justify-between gap-2 py-2 text-sm">
-                        <span className="text-gray-600 dark:text-gray-300">{m.descripcion}</span>
-                        <span className="font-semibold text-gasto">{formatCLP(m.monto)}</span>
+                      <li key={m.key} className="flex items-center gap-3 py-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm">
+                          💸
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-sm font-medium">{m.descripcion}</span>
+                        <span className="shrink-0 rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold text-gasto">
+                          -{formatCLP(m.monto)}
+                        </span>
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-1 flex items-center justify-between border-t border-gray-100 pt-2 text-sm dark:border-white/10">
-                    <span className="font-semibold text-gray-500 dark:text-gray-400">Total del día</span>
-                    <span className="font-bold text-gasto">{formatCLP(totalDiaSeleccionado)}</span>
-                  </div>
-                </>
-              )}
-            </Card>
+                )}
+              </div>
+            </div>
           )}
         </div>
       )}

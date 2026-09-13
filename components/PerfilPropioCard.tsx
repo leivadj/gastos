@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -26,6 +26,147 @@ function FilaProximamente({ titulo, descripcion }: { titulo: string; descripcion
         Próximamente
       </span>
     </div>
+  );
+}
+
+// Variante clickeable de FilaProximamente — para "Reglas de
+// categorización" (única función de las 4 sin respaldo real que además
+// tiene una pantalla de demostración construida, ver
+// app/reglas-categorizacion/page.tsx), a diferencia de las otras 3
+// (Cartola consolidado/Integraciones/Suscripción Premium) que son solo una
+// fila deshabilitada sin nada detrás.
+function FilaProximamenteConDemo({ titulo, descripcion, href }: { titulo: string; descripcion: string; href: string }) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between rounded-lg border border-dashed border-gray-200 px-3 py-2 dark:border-white/10"
+    >
+      <div className="min-w-0 pr-2">
+        <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">{titulo}</p>
+        <p className="truncate text-[10.5px] text-gray-400 dark:text-gray-500">{descripcion}</p>
+      </div>
+      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-500">
+        Próximamente
+      </span>
+    </Link>
+  );
+}
+
+// Otra variante clickeable — para "Inicio del mes" y "Balance", que en vez
+// de llevar a una pantalla nueva abren una hoja (bottom sheet) de
+// demostración calcada de Sheets.dc.html (ver los dos componentes de más
+// abajo). Un <button> en vez de <Link> porque no navega, solo abre el sheet.
+function FilaProximamenteConSheet({ titulo, descripcion, onClick }: { titulo: string; descripcion: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center justify-between rounded-lg border border-dashed border-gray-200 px-3 py-2 text-left dark:border-white/10"
+    >
+      <div className="min-w-0 pr-2">
+        <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">{titulo}</p>
+        <p className="truncate text-[10.5px] text-gray-400 dark:text-gray-500">{descripcion}</p>
+      </div>
+      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-500">
+        Próximamente
+      </span>
+    </button>
+  );
+}
+
+// Envoltorio común de las hojas de demostración: mismo fondo oscuro +
+// bottom-sheet que el resto de la app (ver DividirGastoSheet.tsx), con un
+// aviso fijo de que es solo un ejemplo — ninguna de las dos guarda nada de
+// verdad todavía.
+function SheetDemo({ titulo, subtitulo, onClose, children, textoBoton }: { titulo: string; subtitulo?: string; onClose: () => void; children: ReactNode; textoBoton: string }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
+      <div
+        className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-[#111113] p-5 pb-7 text-white sm:max-w-sm sm:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-base font-bold">{titulo}</h2>
+            {subtitulo && <p className="mt-0.5 text-xs text-white/50">{subtitulo}</p>}
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">
+            ✕
+          </button>
+        </div>
+
+        {children}
+
+        <p className="mt-4 rounded-xl border border-dashed border-white/15 px-3 py-2 text-[10.5px] leading-relaxed text-white/40">
+          Vista de ejemplo — todavía no se puede guardar de verdad, próximamente.
+        </p>
+        <button
+          type="button"
+          disabled
+          className="mt-3 w-full cursor-not-allowed rounded-full bg-white/20 py-3 text-sm font-bold text-white/50"
+        >
+          {textoBoton}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// "Inicio del mes" (Sheets.dc.html) — elegir qué día del mes empieza el
+// ciclo. Grilla de ejemplo estática (día 1 marcado, igual que el mockup) —
+// hoy el ciclo siempre empieza el día 1 de cada mes en toda la app, esto
+// solo muestra cómo se vería el selector.
+function SheetInicioMesDemo({ onClose }: { onClose: () => void }) {
+  const dias = Array.from({ length: 14 }, (_, i) => i + 1);
+  return (
+    <SheetDemo titulo="Inicio del mes" subtitulo="¿Cuándo comienza tu ciclo?" onClose={onClose} textoBoton="Guardar">
+      <div className="mt-4 grid grid-cols-7 gap-1.5">
+        {dias.map((d) => (
+          <span
+            key={d}
+            className={`flex aspect-square items-center justify-center rounded-[10px] text-xs font-semibold ${
+              d === 1 ? "bg-white font-extrabold text-black" : "bg-white/5 text-white/70"
+            }`}
+          >
+            {d}
+          </span>
+        ))}
+      </div>
+      <p className="mt-3.5 text-[11.5px] text-white/50">Tu mes irá del 1 al 30 de cada mes.</p>
+    </SheetDemo>
+  );
+}
+
+// "Balance" (Sheets.dc.html) — elegir qué cuentas suman al balance
+// general. Switches de ejemplo estáticos (Débito/Efectivo activados, Cupo
+// TC desactivado, igual que el mockup) — hoy el balance de la app siempre
+// suma todas las cuentas.
+function SwitchDemo({ on }: { on: boolean }) {
+  return (
+    <span className={`relative inline-block h-[22px] w-9 shrink-0 rounded-full transition-colors ${on ? "bg-white" : "bg-white/15"}`}>
+      <span
+        className={`absolute top-[3px] h-4 w-4 rounded-full transition-transform ${on ? "translate-x-[19px] bg-black" : "translate-x-[3px] bg-white"}`}
+      />
+    </span>
+  );
+}
+function SheetBalanceDemo({ onClose }: { onClose: () => void }) {
+  const filas = [
+    { titulo: "Débito", on: true },
+    { titulo: "Efectivo", on: true },
+    { titulo: "Cupo TC", on: false },
+  ];
+  return (
+    <SheetDemo titulo="Balance" subtitulo="¿Qué incluir en tu balance?" onClose={onClose} textoBoton="Aplicar">
+      <div className="mt-3 divide-y divide-white/10">
+        {filas.map((f) => (
+          <div key={f.titulo} className="flex items-center gap-3 py-2.5">
+            <span className="flex-1 text-sm font-semibold">{f.titulo}</span>
+            <SwitchDemo on={f.on} />
+          </div>
+        ))}
+      </div>
+    </SheetDemo>
   );
 }
 
@@ -77,6 +218,7 @@ export function PerfilPropioCard() {
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorPerfil, setErrorPerfil] = useState("");
+  const [sheetAbierto, setSheetAbierto] = useState<"inicio_mes" | "balance" | null>(null);
   const intentoCrearPerfil = useRef(false);
 
   async function cargar() {
@@ -275,8 +417,21 @@ export function PerfilPropioCard() {
       <NotificacionesPush />
 
       <div className="mt-2 space-y-2">
-        <FilaProximamente titulo="Inicio del mes" descripcion="Elegir qué día del mes empieza tu ciclo (hoy siempre es el día 1)" />
-        <FilaProximamente titulo="Balance" descripcion="Elegir qué cuentas suman al balance (hoy suma todas)" />
+        <FilaProximamenteConSheet
+          titulo="Inicio del mes"
+          descripcion="Elegir qué día del mes empieza tu ciclo (hoy siempre es el día 1)"
+          onClick={() => setSheetAbierto("inicio_mes")}
+        />
+        <FilaProximamenteConSheet
+          titulo="Balance"
+          descripcion="Elegir qué cuentas suman al balance (hoy suma todas)"
+          onClick={() => setSheetAbierto("balance")}
+        />
+        <FilaProximamenteConDemo
+          titulo="Reglas de categorización"
+          descripcion="Aprende de tu correo qué categoría va con cada comercio"
+          href="/reglas-categorizacion"
+        />
         <Link
           href="/categorias"
           className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 dark:border-white/10 dark:text-gray-300"
@@ -294,6 +449,9 @@ export function PerfilPropioCard() {
       >
         Cerrar sesión
       </button>
+
+      {sheetAbierto === "inicio_mes" && <SheetInicioMesDemo onClose={() => setSheetAbierto(null)} />}
+      {sheetAbierto === "balance" && <SheetBalanceDemo onClose={() => setSheetAbierto(null)} />}
     </Card>
   );
 }
