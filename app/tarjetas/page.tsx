@@ -9,7 +9,7 @@ import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { Categoria, CompraVigente, Entidad, GastoFijo, Marca, Transferencia } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
 import { resolverMarca } from "@/lib/resolverMarca";
-import { formatCLP, nombreMes } from "@/lib/format";
+import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
 
 function traducirError(err: unknown): string {
@@ -305,6 +305,46 @@ export default function TarjetasPage() {
   );
   const hayAlgunSaldo = entidades.some((e) => e.saldo != null);
 
+  // "Saldo disponible / Ingresos este mes / Gastos este mes" (mockup PDF pág.
+  // 7, sheet de detalle de cuenta): ingresos = transferencias que ENTRARON a
+  // esta cuenta este mes (no hay otro "ingreso" ligado a una cuenta puntual
+  // en el esquema real); gastos = lo recurrente cargado ahí (cuotas + gastos
+  // fijos, ya calculado arriba en gastoPorEntidad) más las transferencias que
+  // SALIERON de esta cuenta este mes.
+  const prefijoMesActual = mesActualISO().slice(0, 7);
+  const ingresosCuentaActivaMes = useMemo(() => {
+    if (!activaId) return 0;
+    return transferencias
+      .filter((t) => t.cuenta_destino_id === activaId && t.fecha.slice(0, 7) === prefijoMesActual)
+      .reduce((acc, t) => acc + Number(t.monto), 0);
+  }, [transferencias, activaId, prefijoMesActual]);
+  const gastosCuentaActivaMes = useMemo(() => {
+    if (!activaId) return 0;
+    const salidas = transferencias
+      .filter((t) => t.cuenta_origen_id === activaId && t.fecha.slice(0, 7) === prefijoMesActual)
+      .reduce((acc, t) => acc + Number(t.monto), 0);
+    return (gastoPorEntidad[activaId] ?? 0) + salidas;
+  }, [transferencias, gastoPorEntidad, activaId, prefijoMesActual]);
+
+  // Exportar (mockup pág. 7, botón "Exportar" en el detalle de cuenta): CSV
+  // simple de los movimientos que se están viendo debajo ("itemsActivos"),
+  // se genera y descarga en el momento, sin backend.
+  function exportarMovimientosCSV() {
+    if (!entidadActiva) return;
+    const filas = [
+      ["Descripción", "Categoría", "Detalle", "Monto"],
+      ...itemsActivos.map((it) => [it.descripcion, it.categoria, it.detalle, String(it.signo * it.monto)]),
+    ];
+    const csv = filas.map((f) => f.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `movimientos-${entidadActiva.nombre.toLowerCase().replace(/\s+/g, "-")}-${prefijoMesActual}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const itemsActivos = useMemo(() => {
     if (!activaId) return [];
     return [
@@ -559,31 +599,57 @@ export default function TarjetasPage() {
           />
 
           {entidadActiva && (
-            <div className="px-1">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-                  {entidadActiva.nombre} <span className="font-normal text-gray-400 dark:text-gray-500">· {TIPO_LABEL[entidadActiva.tipo]}</span>
-                </p>
+            <div className="space-y-3 rounded-2xl bg-brand-gradient p-4 text-white">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-bold">{entidadActiva.nombre}</p>
+                  <p className="text-xs opacity-70">{TIPO_LABEL[entidadActiva.tipo]}</p>
+                </div>
                 <div className="flex shrink-0 items-center gap-3">
-                  <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from dark:text-white">
+                  <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs font-medium opacity-90 hover:opacity-100">
                     editar
                   </button>
-                  <button onClick={() => eliminar(entidadActiva.id)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
+                  <button onClick={() => eliminar(entidadActiva.id)} className="text-xs opacity-60 hover:text-red-300 hover:opacity-100">
                     eliminar
                   </button>
                 </div>
               </div>
-              {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null && (
-                <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                  Cupo disponible: {formatCLP(disponiblePorEntidad[entidadActiva.id] ?? entidadActiva.cupo)} de{" "}
-                  {formatCLP(entidadActiva.cupo)}
-                </p>
-              )}
+
+              {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null ? (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">Cupo disponible</p>
+                  <p className="text-2xl font-bold">{formatCLP(disponiblePorEntidad[entidadActiva.id] ?? entidadActiva.cupo)}</p>
+                  <p className="mt-0.5 text-xs opacity-60">de {formatCLP(entidadActiva.cupo)}</p>
+                </div>
+              ) : entidadActiva.saldo != null ? (
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">Saldo disponible</p>
+                  <p className="text-2xl font-bold">{formatCLP(entidadActiva.saldo)}</p>
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl bg-white/10 p-2.5">
+                  <p className="text-[10.5px] opacity-60">Ingresos este mes</p>
+                  <p className="mt-0.5 text-sm font-semibold text-ingreso">+{formatCLP(ingresosCuentaActivaMes)}</p>
+                </div>
+                <div className="rounded-xl bg-white/10 p-2.5">
+                  <p className="text-[10.5px] opacity-60">Gastos este mes</p>
+                  <p className="mt-0.5 text-sm font-semibold text-gasto">-{formatCLP(gastosCuentaActivaMes)}</p>
+                </div>
+              </div>
             </div>
           )}
 
           <Card>
-            <p className="mb-1 text-sm font-semibold text-gray-600 dark:text-gray-300">Movimientos</p>
+            <div className="mb-1 flex items-center justify-between">
+              <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Movimientos de esta cuenta</p>
+              {itemsActivos.length > 0 && (
+                <button onClick={exportarMovimientosCSV} className="shrink-0 text-xs font-semibold text-brand-from dark:text-white">
+                  Exportar
+                </button>
+              )}
+            </div>
             <p className="mb-3 text-xs capitalize text-gray-400 dark:text-gray-500">{nombreMes()}</p>
             {itemsActivos.length === 0 ? (
               <p className="py-2 text-sm text-gray-400 dark:text-gray-500">Sin movimientos este mes con esta cuenta.</p>

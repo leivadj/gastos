@@ -311,17 +311,12 @@ export default function AdminPage() {
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-bold text-gray-800 dark:text-white">Catálogo de marcas</h1>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            Bancos, tiendas, servicios, suscripciones y más — con su logo, para elegir al pagar o al crear un item.
-          </p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Administración</p>
+          <h1 className="text-lg font-bold text-gray-800 dark:text-white">Categorías y marcas</h1>
         </div>
-        <button
-          onClick={() => setMostrarForm((v) => !v)}
-          className="rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
-        >
-          {mostrarForm ? "Cancelar" : "+ Nueva"}
-        </button>
+        <span className="shrink-0 rounded-full bg-gray-100 px-3 py-1.5 text-[11px] font-semibold text-gray-500 dark:bg-white/10 dark:text-gray-400">
+          Solo visible para tu cuenta admin
+        </span>
       </div>
 
       {/* Banner general de error: antes cada acción (ícono, marca sugerida,
@@ -333,164 +328,28 @@ export default function AdminPage() {
         <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>
       )}
 
-      {mostrarForm && (
+      {/* Dos paneles lado a lado en escritorio (mockup PDF pág. 15,
+          "Categorías y marcas"): antes eran dos secciones apiladas con
+          grillas de tarjetas — mismo contenido y funciones, ahora en filas
+          de lista dentro de cada panel. */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
-              <input
-                required
-                value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-                placeholder="Ej: Banco Estado"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400">Tipo</label>
-              <select
-                value={tipo}
-                onChange={(e) => setTipo(e.target.value as TipoMarca)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-              >
-                {TIPOS.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400">Logo (imagen)</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
-                className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400">
-                O ícono (si no tienes un logo a mano)
-              </label>
-              <IconoPicker value={icono} onChange={setIcono} />
-            </div>
-            <button
-              type="submit"
-              disabled={guardando}
-              className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              {guardando ? "Guardando…" : "Guardar"}
-            </button>
-          </form>
-        </Card>
-      )}
-
-      {marcas.length === 0 && (
-        <p className="text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay marcas cargadas.</p>
-      )}
-
-      {TIPOS.map((t) => {
-        const delGrupo = marcas.filter((m) => m.tipo === t.value);
-        if (delGrupo.length === 0) return null;
-        return (
-          <div key={t.value} className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t.label}</p>
-            <div className="grid grid-cols-2 gap-3">
-              {delGrupo.map((m) => (
-                <Card key={m.id}>
-                  <div className="flex items-center gap-3">
-                    {m.logo_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={m.logo_url} alt={m.nombre} className="h-10 w-10 rounded-lg object-contain" />
-                    ) : m.icono ? (
-                      <span
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-lg text-white"
-                        style={{ backgroundColor: colorFor(m.nombre) }}
-                      >
-                        {m.icono}
-                      </span>
-                    ) : (
-                      <span
-                        className="flex h-10 w-10 items-center justify-center rounded-lg text-sm font-semibold text-white"
-                        style={{ backgroundColor: colorFor(m.nombre) }}
-                      >
-                        {m.nombre.charAt(0)}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{m.nombre}</p>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-2">
-                    <label className="cursor-pointer text-[11px] text-brand-from dark:text-white">
-                      {subiendoId === m.id ? "subiendo…" : m.logo_url ? "cambiar logo" : "+ subir logo"}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        disabled={subiendoId === m.id}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) cambiarLogo(m, file);
-                          e.target.value = "";
-                        }}
-                        className="hidden"
-                      />
-                    </label>
-                    <button
-                      onClick={() => setEditandoIconoMarca(editandoIconoMarca === m.id ? null : m.id)}
-                      className="text-[11px] text-brand-from dark:text-white"
-                    >
-                      cambiar ícono
-                    </button>
-                    <button
-                      onClick={() => eliminar(m)}
-                      className="text-[11px] text-gray-300 hover:text-red-400 dark:text-gray-600"
-                    >
-                      eliminar
-                    </button>
-                  </div>
-                  {editandoIconoMarca === m.id && (
-                    <div className="mt-2">
-                      <IconoPicker
-                        value={m.icono ?? ""}
-                        onChange={(v) => guardarIconoMarca(m.id, v)}
-                      />
-                      <button
-                        onClick={() => setEditandoIconoMarca(null)}
-                        className="mt-1 text-[11px] text-gray-400 dark:text-gray-500"
-                      >
-                        listo
-                      </button>
-                    </div>
-                  )}
-                </Card>
-              ))}
-            </div>
-          </div>
-        );
-      })}
-
-      <div className="space-y-2 pt-4">
-        <div className="flex items-center justify-between">
-          <div>
+          <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-bold text-gray-800 dark:text-white">Categorías</h2>
-            <p className="text-xs text-gray-400 dark:text-gray-500">
-              Nombre, tipo (para el desglose fijo/variable de Presupuesto y Reportes), ícono, y qué marcas de
-              arriba se ofrecen al usar esta categoría en un gasto/compra (ej: &quot;Supermercado&quot; → Jumbo, Líder...).
-            </p>
+            <button
+              onClick={() => setMostrarFormCategoria((v) => !v)}
+              className="shrink-0 rounded-full bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              {mostrarFormCategoria ? "Cancelar" : "+ Nueva categoría"}
+            </button>
           </div>
-          <button
-            onClick={() => setMostrarFormCategoria((v) => !v)}
-            className="shrink-0 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
-          >
-            {mostrarFormCategoria ? "Cancelar" : "+ Nueva"}
-          </button>
-        </div>
+          <p className="mb-3 text-[11px] text-gray-400 dark:text-gray-500">
+            Nombre, tipo (para el desglose fijo/variable de Presupuesto y Reportes), ícono, y qué marca sugerida se
+            ofrece al usar esta categoría en un gasto/compra.
+          </p>
 
-        {mostrarFormCategoria && (
-          <Card>
-            <form onSubmit={crearCategoria} className="space-y-3">
+          {mostrarFormCategoria && (
+            <form onSubmit={crearCategoria} className="mb-3 space-y-3 rounded-xl border border-gray-100 p-3 dark:border-white/10">
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
                 <input
@@ -524,100 +383,130 @@ export default function AdminPage() {
                 {guardandoCategoria ? "Guardando…" : "Guardar categoría"}
               </button>
             </form>
-          </Card>
-        )}
+          )}
 
-        <div className="grid grid-cols-2 gap-3">
-          {categorias.map((c) => (
-            <Card key={c.id}>
-              <div className="flex items-center gap-3">
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg text-white"
-                  style={{ backgroundColor: colorFor(c.nombre) }}
-                >
-                  {c.icono || c.nombre.charAt(0)}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{c.nombre}</p>
-                  <p className="text-[11px] text-gray-400 dark:text-gray-500">{c.tipo === "fijo" ? "Fijo" : "Variable"}</p>
-                </div>
-              </div>
-
-              {editandoDatosCat === c.id ? (
-                <div className="mt-2 space-y-2 border-t border-gray-50 pt-2 dark:border-white/10">
-                  <input
-                    value={nombreCatEdit}
-                    onChange={(e) => setNombreCatEdit(e.target.value)}
-                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
-                  />
-                  <select
-                    value={tipoCatEdit}
-                    onChange={(e) => setTipoCatEdit(e.target.value as "fijo" | "variable")}
-                    className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
-                  >
-                    <option value="variable">Variable</option>
-                    <option value="fijo">Fijo</option>
-                  </select>
+          {categorias.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay categorías.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-white/10">
+              {categorias.map((c) => (
+                <li key={c.id} className="py-2.5">
                   <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => guardarDatosCategoria(c.id)}
-                      className="text-[11px] font-semibold text-brand-from dark:text-white"
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base text-white"
+                      style={{ backgroundColor: colorFor(c.nombre) }}
                     >
-                      guardar
-                    </button>
-                    <button
-                      onClick={() => setEditandoDatosCat(null)}
-                      className="text-[11px] text-gray-400 dark:text-gray-500"
-                    >
-                      cancelar
-                    </button>
+                      {c.icono || c.nombre.charAt(0)}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{c.nombre}</p>
+                      <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">
+                        {c.tipo_marca_sugerido
+                          ? `Marca sugerida: ${TIPOS.find((t) => t.value === c.tipo_marca_sugerido)?.label ?? c.tipo_marca_sugerido}`
+                          : "Sin marca sugerida"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10.5px] font-semibold text-gray-500 dark:bg-white/10 dark:text-gray-400">
+                      {c.tipo === "fijo" ? "Fijo" : "Variable"}
+                    </span>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <button
+                        onClick={() => (editandoDatosCat === c.id ? setEditandoDatosCat(null) : iniciarEdicionCategoria(c))}
+                        aria-label="editar"
+                        className="text-brand-from dark:text-white"
+                      >
+                        ✎
+                      </button>
+                      <button onClick={() => eliminarCategoria(c)} aria-label="eliminar" className="text-gray-300 hover:text-red-400 dark:text-gray-600">
+                        🗑
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="mt-2 flex items-center gap-3">
-                  <button
-                    onClick={() => iniciarEdicionCategoria(c)}
-                    className="text-[11px] text-brand-from dark:text-white"
-                  >
-                    editar
-                  </button>
-                  <button
-                    onClick={() => setEditandoIconoCat(editandoIconoCat === c.id ? null : c.id)}
-                    className="text-[11px] text-brand-from dark:text-white"
-                  >
-                    cambiar ícono
-                  </button>
-                  <button
-                    onClick={() => eliminarCategoria(c)}
-                    className="text-[11px] text-gray-300 hover:text-red-400 dark:text-gray-600"
-                  >
-                    eliminar
-                  </button>
-                </div>
-              )}
 
-              {editandoIconoCat === c.id && (
-                <div className="mt-2">
-                  <IconoPicker
-                    value={c.icono ?? ""}
-                    onChange={(v) => guardarIconoCategoria(c.id, v)}
-                  />
-                  <button
-                    onClick={() => setEditandoIconoCat(null)}
-                    className="mt-1 text-[11px] text-gray-400 dark:text-gray-500"
-                  >
-                    listo
-                  </button>
-                </div>
-              )}
-              <div className="mt-2">
-                <label className="text-[11px] text-gray-400 dark:text-gray-500">Marcas sugeridas</label>
+                  {editandoDatosCat === c.id && (
+                    <div className="mt-2 space-y-2 rounded-lg bg-gray-50 p-2.5 dark:bg-white/5">
+                      <input
+                        value={nombreCatEdit}
+                        onChange={(e) => setNombreCatEdit(e.target.value)}
+                        className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      />
+                      <select
+                        value={tipoCatEdit}
+                        onChange={(e) => setTipoCatEdit(e.target.value as "fijo" | "variable")}
+                        className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      >
+                        <option value="variable">Variable</option>
+                        <option value="fijo">Fijo</option>
+                      </select>
+                      <div>
+                        <label className="text-[11px] text-gray-400 dark:text-gray-500">Marca sugerida</label>
+                        <select
+                          value={c.tipo_marca_sugerido ?? ""}
+                          onChange={(e) => guardarTipoSugerido(c.id, e.target.value)}
+                          className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                        >
+                          <option value="">— Ninguna —</option>
+                          {TIPOS.map((t) => (
+                            <option key={t.value} value={t.value}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-gray-400 dark:text-gray-500">Ícono</label>
+                        <IconoPicker value={c.icono ?? ""} onChange={(v) => guardarIconoCategoria(c.id, v)} />
+                      </div>
+                      <div className="flex items-center gap-3 pt-1">
+                        <button onClick={() => guardarDatosCategoria(c.id)} className="text-[11px] font-semibold text-brand-from dark:text-white">
+                          guardar
+                        </button>
+                        <button onClick={() => setEditandoDatosCat(null)} className="text-[11px] text-gray-400 dark:text-gray-500">
+                          cerrar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-bold text-gray-800 dark:text-white">Marcas</h2>
+            <button
+              onClick={() => setMostrarForm((v) => !v)}
+              className="shrink-0 rounded-full bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white"
+            >
+              {mostrarForm ? "Cancelar" : "+ Nueva marca"}
+            </button>
+          </div>
+          <p className="mb-3 text-[11px] text-gray-400 dark:text-gray-500">
+            Bancos, tiendas, servicios, suscripciones y más — con su logo, para elegir al pagar o al crear un item.
+            Se comparte entre todas las cuentas.
+          </p>
+
+          {mostrarForm && (
+            <form onSubmit={handleSubmit} className="mb-3 space-y-3 rounded-xl border border-gray-100 p-3 dark:border-white/10">
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Nombre</label>
+                <input
+                  required
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  placeholder="Ej: Banco Estado"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Tipo</label>
                 <select
-                  value={c.tipo_marca_sugerido ?? ""}
-                  onChange={(e) => guardarTipoSugerido(c.id, e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                  value={tipo}
+                  onChange={(e) => setTipo(e.target.value as TipoMarca)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
                 >
-                  <option value="">— Ninguna —</option>
                   {TIPOS.map((t) => (
                     <option key={t.value} value={t.value}>
                       {t.label}
@@ -625,12 +514,95 @@ export default function AdminPage() {
                   ))}
                 </select>
               </div>
-            </Card>
-          ))}
-          {categorias.length === 0 && (
-            <p className="col-span-2 text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay categorías.</p>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Logo (imagen)</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setArchivo(e.target.files?.[0] ?? null)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">O ícono (si no tienes un logo a mano)</label>
+                <IconoPicker value={icono} onChange={setIcono} />
+              </div>
+              <button
+                type="submit"
+                disabled={guardando}
+                className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {guardando ? "Guardando…" : "Guardar"}
+              </button>
+            </form>
           )}
-        </div>
+
+          {marcas.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay marcas cargadas.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-white/10">
+              {marcas.map((m) => (
+                <li key={m.id} className="py-2.5">
+                  <div className="flex items-center gap-3">
+                    {m.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={m.logo_url} alt={m.nombre} className="h-9 w-9 shrink-0 rounded-lg object-contain" />
+                    ) : (
+                      <span
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base text-white"
+                        style={{ backgroundColor: colorFor(m.nombre) }}
+                      >
+                        {m.icono || m.nombre.charAt(0)}
+                      </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{m.nombre}</p>
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500">{TIPOS.find((t) => t.value === m.tipo)?.label ?? m.tipo}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <label className="cursor-pointer text-brand-from dark:text-white" aria-label={m.logo_url ? "cambiar logo" : "subir logo"}>
+                        {subiendoId === m.id ? "…" : "🖼"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={subiendoId === m.id}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) cambiarLogo(m, file);
+                            e.target.value = "";
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                      <button
+                        onClick={() => setEditandoIconoMarca(editandoIconoMarca === m.id ? null : m.id)}
+                        aria-label="cambiar ícono"
+                        className="text-brand-from dark:text-white"
+                      >
+                        ✎
+                      </button>
+                      <button onClick={() => eliminar(m)} aria-label="eliminar" className="text-gray-300 hover:text-red-400 dark:text-gray-600">
+                        🗑
+                      </button>
+                    </div>
+                  </div>
+                  {editandoIconoMarca === m.id && (
+                    <div className="mt-2 rounded-lg bg-gray-50 p-2.5 dark:bg-white/5">
+                      <IconoPicker value={m.icono ?? ""} onChange={(v) => guardarIconoMarca(m.id, v)} />
+                      <button onClick={() => setEditandoIconoMarca(null)} className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                        listo
+                      </button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-3 text-[10.5px] text-gray-400 dark:text-gray-500">
+            El ícono con el marco (🖼) sube un logo; el lápiz (✎) edita el ícono. Solo cuentas admin pueden escribir en
+            este catálogo — se comparte entre todas las cuentas.
+          </p>
+        </Card>
       </div>
     </div>
   );

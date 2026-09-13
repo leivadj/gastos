@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
-import { diaDelMes, formatCLP, mesActualISO, nombreMes } from "@/lib/format";
+import { diaDelMes, formatCLP, mesActualISO, nombreMes, nombreMesCorto } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { CompraVigente, Entidad, GastoDiario, GastoFijo, Marca, Pago } from "@/lib/types";
+import { CompraVigente, Entidad, GastoDiario, GastoFijo, Marca, Pago, Transferencia } from "@/lib/types";
 
 type Tab = "pagos" | "intensidad";
 type Nivel = 0 | 1 | 2 | 3 | 4;
@@ -68,7 +68,12 @@ export default function CalendarioPagosPage() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [gastosDiarios, setGastosDiarios] = useState<GastoDiario[]>([]);
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [cargando, setCargando] = useState(true);
+  // Pestaña "Intensidad" — filtro de "Movimientos internos" (mockup PDF
+  // pág. 8): abonos de tarjeta ("Pago TC", transferencia hacia una tarjeta
+  // de crédito) vs. traspasos entre cuentas propias que no son tarjeta.
+  const [filtroInterno, setFiltroInterno] = useState<"pago_tc" | "entre_cuentas">("pago_tc");
   const [marcandoKey, setMarcandoKey] = useState<string | null>(null);
   const [montoIngresado, setMontoIngresado] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -82,13 +87,14 @@ export default function CalendarioPagosPage() {
   const mesActual = mesActualISO();
 
   async function cargarTodo() {
-    const [{ data: gf }, { data: c }, { data: e }, { data: m }, { data: pg }, { data: gd }] = await Promise.all([
+    const [{ data: gf }, { data: c }, { data: e }, { data: m }, { data: pg }, { data: gd }, { data: tr }] = await Promise.all([
       supabase.from("gastos_fijos").select("*").eq("activo", true),
       supabase.from("vista_cuotas_mes_actual").select("*"),
       supabase.from("entidades").select("*"),
       supabase.from("marcas").select("*"),
       supabase.from("pagos").select("*"),
       supabase.from("gastos_diarios").select("*"),
+      supabase.from("transferencias").select("*"),
     ]);
     setGastosFijos((gf as GastoFijo[]) ?? []);
     setCuotas((c as CompraVigente[]) ?? []);
@@ -96,6 +102,7 @@ export default function CalendarioPagosPage() {
     setMarcas((m as Marca[]) ?? []);
     setPagos((pg as Pago[]) ?? []);
     setGastosDiarios((gd as GastoDiario[]) ?? []);
+    setTransferencias((tr as Transferencia[]) ?? []);
     setCargando(false);
   }
 
@@ -214,6 +221,19 @@ export default function CalendarioPagosPage() {
   }, [gastosDiarios, pagos, inicioMesI, inicioMesSiguienteI]);
 
   const maxDelMes = Math.max(0, ...Object.values(gastoPorDia));
+
+  // "Movimientos internos" (mockup pág. 8) — traspasos entre cuentas propias
+  // del mes que se está mirando en Intensidad, usando la misma tabla
+  // `transferencias` que ya alimenta /tarjetas: no son gasto ni ingreso, por
+  // eso van aparte de "Vencimientos" y no suman al gasto del día.
+  const transferenciasDelMesI = useMemo(
+    () => transferencias.filter((t) => t.fecha >= inicioMesI && t.fecha < inicioMesSiguienteI),
+    [transferencias, inicioMesI, inicioMesSiguienteI]
+  );
+  const esPagoTC = (t: Transferencia) => entidadDe(t.cuenta_destino_id)?.tipo === "tarjeta_credito";
+  const movimientosInternos = transferenciasDelMesI
+    .filter((t) => (filtroInterno === "pago_tc" ? esPagoTC(t) : !esPagoTC(t)))
+    .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 
   function nivelDe(fechaISO: string): Nivel {
     const monto = gastoPorDia[fechaISO] ?? 0;
@@ -379,6 +399,60 @@ export default function CalendarioPagosPage() {
               ))}
               más
             </div>
+          </Card>
+
+          <Card>
+            <p className="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-200">Movimientos internos</p>
+            <div className="mb-3 inline-flex gap-1 rounded-2xl bg-gray-100 p-1 text-xs dark:bg-white/5">
+              {(
+                [
+                  { v: "pago_tc", label: "Pago TC" },
+                  { v: "entre_cuentas", label: "Entre cuentas" },
+                ] as { v: "pago_tc" | "entre_cuentas"; label: string }[]
+              ).map((f) => (
+                <button
+                  key={f.v}
+                  type="button"
+                  onClick={() => setFiltroInterno(f.v)}
+                  className={`rounded-xl px-3 py-1.5 font-semibold transition-colors ${
+                    filtroInterno === f.v
+                      ? "bg-white text-brand-from shadow-sm dark:bg-gray-800 dark:text-white dark:shadow-none"
+                      : "text-gray-500 dark:text-gray-500"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            {movimientosInternos.length === 0 ? (
+              <p className="py-1 text-sm text-gray-400 dark:text-gray-500">
+                Sin {filtroInterno === "pago_tc" ? "pagos de tarjeta" : "traspasos entre cuentas"} este mes.
+              </p>
+            ) : (
+              <ul className="divide-y divide-gray-100 dark:divide-white/10">
+                {movimientosInternos.map((t) => {
+                  const origen = entidadDe(t.cuenta_origen_id);
+                  const destino = entidadDe(t.cuenta_destino_id);
+                  const fechaCorta = `${diaDelMes(t.fecha)} ${nombreMesCorto(t.fecha)}`;
+                  return (
+                    <li key={t.id} className="flex items-center gap-3 py-2.5">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-sm dark:bg-white/10">
+                        ↔
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">
+                          {filtroInterno === "pago_tc" ? `Pago tarjeta ${destino?.nombre ?? "—"}` : `${origen?.nombre ?? "—"} → ${destino?.nombre ?? "—"}`}
+                        </p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500">
+                          {filtroInterno === "pago_tc" ? `Desde ${origen?.nombre ?? "—"}` : "Transferencia interna"} · {fechaCorta}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(t.monto)}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </Card>
 
           {diaSeleccionado && (
