@@ -14,6 +14,8 @@ import {
   Bar,
   XAxis,
   YAxis,
+  LineChart,
+  Line,
 } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
@@ -22,7 +24,16 @@ import { PersonaBreakdown } from "@/components/PersonaBreakdown";
 import { EVENTO_MOVIMIENTO_GUARDADO } from "@/components/MovimientoRapido";
 import { AvatarGroupHover } from "@/components/AvatarGroupHover";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
-import { diaDelMes, formatCLP, mesActualISO, nombreMes, primerDiaMesSiguiente } from "@/lib/format";
+import {
+  diaDelMes,
+  fechaLargaHoy,
+  formatCLP,
+  mesAbreviadoMayus,
+  mesActualISO,
+  nombreMes,
+  primerDiaMesSiguiente,
+  saludoHora,
+} from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { resumenGastosMes } from "@/lib/resumenGastos";
@@ -32,6 +43,8 @@ import {
   Entidad,
   GastoDiario,
   GastoFijo,
+  Grupo,
+  Ingreso,
   Marca,
   MetaAhorroProgreso,
   Pago,
@@ -90,41 +103,20 @@ function IconoComprometido({ className = "" }: { className?: string }) {
   );
 }
 
-function IconoCuentas({ className = "" }: { className?: string }) {
+function IconoBuscar({ className = "" }: { className?: string }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M3 8.5 12 3l9 5.5" />
-      <path d="M4.5 8v10.5a1 1 0 0 0 1 1H18a1 1 0 0 0 1-1V8" />
-      <path d="M9.5 19.5v-6h5v6" />
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <circle cx="11" cy="11" r="7.5" />
+      <path d="m20.5 20.5-4-4" />
     </svg>
   );
 }
 
-function IconoPromedio({ className = "" }: { className?: string }) {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M3.5 17.5 9 11l4 4 7.5-8.5" />
-      <path d="M3.5 20.5h17" />
-    </svg>
-  );
-}
-
-function IconoProximosPagos({ className = "" }: { className?: string }) {
+function IconoCampana({ className = "" }: { className?: string }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="3.5" y="4.5" width="17" height="16" rx="2" />
-      <path d="M3.5 9.5h17" />
-      <path d="M8 3v3M16 3v3" />
-    </svg>
-  );
-}
-
-function IconoMetas({ className = "" }: { className?: string }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <circle cx="12" cy="12" r="8.5" />
-      <circle cx="12" cy="12" r="4" />
-      <circle cx="12" cy="12" r="0.6" fill="currentColor" />
+      <path d="M6 10a6 6 0 1 1 12 0c0 4.5 1.5 6 1.5 6h-15S6 14.5 6 10Z" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
     </svg>
   );
 }
@@ -146,6 +138,8 @@ export default function DashboardPage() {
   const [repartoDiarios, setRepartoDiarios] = useState<RepartoGastoDiario[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [metas, setMetas] = useState<MetaAhorroProgreso[]>([]);
+  const [ingresosLista, setIngresosLista] = useState<Ingreso[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [ingresosMes, setIngresosMes] = useState(0);
   const [cargando, setCargando] = useState(true);
   const [personaSeleccionada, setPersonaSeleccionada] = useState<string | null>(null);
@@ -175,6 +169,7 @@ export default function DashboardPage() {
         { data: ing },
         { data: pg },
         { data: mt },
+        { data: gr },
       ] = await Promise.all([
         supabase.from("vista_cuotas_mes_actual").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -187,9 +182,10 @@ export default function DashboardPage() {
         supabase.from("vista_reparto_cuotas_mes").select("*"),
         supabase.from("vista_reparto_gastos_fijos").select("*"),
         supabase.from("vista_reparto_gastos_diarios").select("*"),
-        supabase.from("ingresos").select("monto").eq("mes", mesActualISO()),
+        supabase.from("ingresos").select("*").eq("mes", mesActualISO()),
         supabase.from("pagos").select("*"),
         supabase.from("vista_metas_ahorro_progreso").select("*").eq("activa", true).order("nombre"),
+        supabase.from("grupos").select("*"),
       ]);
       setCuotas((c as CompraVigente[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -202,9 +198,12 @@ export default function DashboardPage() {
       setRepartoCuotas((rc as RepartoCuota[]) ?? []);
       setRepartoGastos((rg as RepartoGastoFijo[]) ?? []);
       setRepartoDiarios((rd as RepartoGastoDiario[]) ?? []);
-      setIngresosMes((ing ?? []).reduce((acc, r: any) => acc + Number(r.monto), 0));
+      const ingresosDelMes = (ing as Ingreso[]) ?? [];
+      setIngresosLista(ingresosDelMes);
+      setIngresosMes(ingresosDelMes.reduce((acc, r) => acc + Number(r.monto), 0));
       setPagos((pg as Pago[]) ?? []);
       setMetas((mt as MetaAhorroProgreso[]) ?? []);
+      setGrupos((gr as Grupo[]) ?? []);
       setCargando(false);
     }
     cargar();
@@ -257,14 +256,6 @@ export default function DashboardPage() {
     .map((p) => ({ name: p.persona_nombre, total: Number(p.total), persona_id: p.persona_id }))
     .sort((a, b) => b.total - a.total);
 
-  // Saldo manual de las cuentas (ver Entidad.saldo) — se excluyen las
-  // tarjetas de crédito porque su "saldo" es deuda, no un activo.
-  const totalEnCuentas = entidades
-    .filter((e) => e.tipo !== "tarjeta_credito" && e.saldo != null)
-    .reduce((acc, e) => acc + Number(e.saldo), 0);
-
-  const gastoPromedioDiario = totalGastos / Math.max(1, hoyDia);
-
   // Mismo cálculo de "eventos" de vencimiento que /calendario-pagos (gasto
   // fijo con su día de pago + promedio móvil si es de monto variable, cuota
   // vigente con el día de su primera cuota), filtrado a los que todavía no
@@ -313,6 +304,109 @@ export default function DashboardPage() {
       return a.dia - b.dia;
     })
     .slice(0, 5);
+
+  // Cuentas próximas a vencer "esta semana" (dentro de los próximos 7 días
+  // desde hoy) — para el badge de la tarjeta "Cuentas próximas" del
+  // dashboard de escritorio.
+  const cuentasEstaSemana = proximosPagos.filter((ev) => ev.dia != null && ev.dia - hoyDia >= 0 && ev.dia - hoyDia <= 7).length;
+
+  // Tendencia diaria del "Balance del mes" (mini gráfico del hero de
+  // escritorio): mismo criterio que gastosYaPagados/comprometido de más
+  // arriba, pero recalculado día a día para dibujar la curva — no es un
+  // dato nuevo, es el mismo cálculo cortado en cada día del mes.
+  const tendenciaBalance = Array.from({ length: hoyDia }, (_, i) => {
+    const dia = i + 1;
+    let gastadoAlDia = gastosDiarios.filter((d) => diaDelMes(d.fecha) <= dia).reduce((acc, d) => acc + Number(d.monto), 0);
+    cuotas.forEach((c) => {
+      if (diaDelMes(c.fecha_primera_cuota) <= dia) gastadoAlDia += Number(c.monto_cuota);
+    });
+    gastosFijos.forEach((g) => {
+      if (g.dia_mes_pago == null || g.dia_mes_pago <= dia) gastadoAlDia += Number(g.monto_estimado);
+    });
+    return { dia, balance: ingresosMes - gastadoAlDia };
+  });
+
+  // "Movimientos recientes" del dashboard de escritorio: junta pagos de
+  // fijos/cuotas ya marcados como pagados (fecha exacta = fecha_pago) con
+  // los gastos diarios (fecha exacta) y los ingresos del mes (sin día
+  // exacto en la base — ver nota en calendario-pagos/page.tsx — así que se
+  // muestran aparte, arriba, sin fecha inventada).
+  const movimientosPagados = pagos
+    .filter((p) => p.mes === mesActualStr && p.pagado && p.fecha_pago)
+    .flatMap((p) => {
+      const ev = eventosPagos.find((e) => e.origen === p.origen && e.origenId === p.origen_id);
+      if (!ev) return [];
+      return [
+        {
+          key: `pago-${p.id}`,
+          descripcion: ev.descripcion,
+          detalle: ev.detalle ?? "Pago",
+          fecha: p.fecha_pago as string,
+          monto: p.monto_real != null ? Number(p.monto_real) : ev.monto,
+          esIngreso: false,
+          entidadId: ev.entidadId,
+          marcaId: ev.marcaId,
+          icono: ev.icono,
+        },
+      ];
+    });
+
+  const movimientosDiarios = gastosDiarios.map((d) => ({
+    key: `diario-${d.id}`,
+    descripcion: d.descripcion,
+    detalle: categoriaNombre(d.categoria_id),
+    fecha: d.fecha,
+    monto: Number(d.monto),
+    esIngreso: false,
+    entidadId: null as string | null,
+    marcaId: d.marca_id,
+    icono: categorias.find((c) => c.id === d.categoria_id)?.icono ?? null,
+  }));
+
+  const movimientosGasto = [...movimientosPagados, ...movimientosDiarios]
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .slice(0, 4);
+
+  const movimientosIngreso = ingresosLista.slice(0, 1).map((i) => ({
+    key: `ingreso-${i.id}`,
+    descripcion: i.descripcion || "Ingreso",
+    detalle: "Ingreso este mes",
+    fecha: null as string | null,
+    monto: Number(i.monto),
+    esIngreso: true,
+    entidadId: null as string | null,
+    marcaId: null as string | null,
+    icono: "💰",
+  }));
+
+  const movimientosRecientes = [...movimientosIngreso, ...movimientosGasto].slice(0, 5);
+
+  // Meta destacada del hero de "Metas de ahorro" en escritorio: la primera
+  // activa (mismo orden que /metas-ahorro). El resto sigue viviendo en esa
+  // pantalla — acá solo se destaca una, como en el mockup.
+  const metaDestacada = metas[0] ?? null;
+  const pctMetaDestacada = metaDestacada && metaDestacada.monto_objetivo > 0
+    ? Math.min(100, Math.round((metaDestacada.monto_actual / metaDestacada.monto_objetivo) * 100))
+    : 0;
+
+  // Reparto entre personas para la tarjeta "Grupo Hogar" de escritorio:
+  // % real de lo gastado este mes que le toca a cada una (vista
+  // vista_resumen_personas_mes, misma fuente que el gráfico de barras de
+  // "Cuánto le toca a cada persona"). Se oculta cuando solo hay una
+  // persona activa en la cuenta (mismo criterio "unicaPersona" que ya usan
+  // CuotasLista.tsx y MovimientoRapido.tsx).
+  const totalCompartido = dataPersonas.reduce((acc, p) => acc + p.total, 0);
+  const gruposConParticipantes = dataPersonas.map((p) => ({
+    ...p,
+    pct: totalCompartido > 0 ? Math.round((p.total / totalCompartido) * 100) : 0,
+  }));
+  const nombreGrupoHogar = grupos[0]?.nombre ?? "Grupo compartido";
+
+  // Cuántas tarjetas entran en la fila "Cuentas próximas / Meta / Grupo
+  // Hogar" del dashboard de escritorio — "Cuentas próximas" siempre va,
+  // las otras dos son condicionales (sin metas activas, o una sola
+  // persona en la cuenta) y el grid se acomoda solo.
+  const numTarjetasSecundarias = 1 + (metas[0] ? 1 : 0) + (personas.length > 1 ? 1 : 0);
 
   if (cargando) {
     return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
@@ -439,91 +533,6 @@ export default function DashboardPage() {
     </Card>
   );
 
-  const tarjetaPromedioDiario = (
-    <Card>
-      <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
-        <IconoPromedio className="text-gray-400 dark:text-gray-500" />
-        Gasto promedio diario
-      </p>
-      <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">{formatCLP(gastoPromedioDiario)}</p>
-      <p className="text-[11px] capitalize text-gray-400 dark:text-gray-500">en lo que va de {nombreMes()}</p>
-    </Card>
-  );
-
-  const tarjetaProximosPagos = (
-    <Card>
-      <div className="mb-1 flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300">
-          <IconoProximosPagos className="text-gray-400 dark:text-gray-500" />
-          Próximos pagos
-        </p>
-        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from dark:text-white">
-          Ver todos
-        </Link>
-      </div>
-      {proximosPagos.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">No hay pagos pendientes este mes.</p>
-      ) : (
-        <ul className="divide-y divide-gray-100 dark:divide-white/10">
-          {proximosPagos.map((ev) => {
-            const entidad = entidades.find((e) => e.id === ev.entidadId) ?? null;
-            const marca = marcas.find((m) => m.id === ev.marcaId) ?? resolverMarca(entidad, marcas);
-            return (
-              <li key={`${ev.origen}:${ev.origenId}`} className="flex items-center gap-3 py-2.5 text-sm">
-                <EntidadAvatar entidad={entidad} marca={marca} icono={ev.icono} className="h-8 w-8 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-gray-700 dark:text-gray-200">{ev.descripcion}</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">
-                    {ev.dia != null ? `Vence el ${ev.dia}` : "Sin día definido"}
-                    {ev.detalle ? ` · ${ev.detalle}` : ""}
-                  </p>
-                </div>
-                <p className="shrink-0 font-semibold text-gray-800 dark:text-gray-100">{formatCLP(ev.monto)}</p>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-
-  const tarjetaMetas = (
-    <Card>
-      <div className="mb-2 flex items-center justify-between">
-        <p className="flex items-center gap-1.5 text-sm font-semibold text-gray-600 dark:text-gray-300">
-          <IconoMetas className="text-gray-400 dark:text-gray-500" />
-          Metas de ahorro
-        </p>
-        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from dark:text-white">
-          Ver todas
-        </Link>
-      </div>
-      {metas.length === 0 ? (
-        <p className="text-sm text-gray-400 dark:text-gray-500">Todavía no tienes metas de ahorro activas.</p>
-      ) : (
-        <ul className="space-y-3">
-          {metas.slice(0, 3).map((m) => {
-            const pct = m.monto_objetivo > 0 ? Math.min(100, Math.round((m.monto_actual / m.monto_objetivo) * 100)) : 0;
-            return (
-              <li key={m.meta_id}>
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-medium text-gray-700 dark:text-gray-200">
-                    {m.icono ? `${m.icono} ` : ""}
-                    {m.nombre}
-                  </span>
-                  <span className="text-gray-400 dark:text-gray-500">{pct}%</span>
-                </div>
-                <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
-                  <div className="h-full bg-brand-gradient" style={{ width: `${pct}%` }} />
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </Card>
-  );
-
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
   const tabsResumen: { id: typeof tabResumen; label: string }[] = [
@@ -626,119 +635,254 @@ export default function DashboardPage() {
       {tabResumen === "presupuesto" && <PresupuestoContenido ocultarTitulo />}
     </div>
   ) : (
-    // ---- Layout de escritorio (navegador en PC/tablet) ----
+    // ---- Layout de escritorio: rediseño v2 completo (calcado del mockup
+    // "Inicio" de escritorio, no solo un cambio de paleta — ver
+    // claude/mockup-v2-decisiones.md). Las tarjetas de detalle que antes
+    // vivían acá completas (categoría, fijo/variable, promedio diario,
+    // cuotas activas, lista de metas, barra por persona) siguen
+    // disponibles en sus propias pantallas (/reportes, /metas-ahorro,
+    // /movimientos, /grupos): Inicio ahora es solo el vistazo rápido, tal
+    // como lo muestra el mockup.
     <div className="space-y-6 pb-10">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Resumen general</h1>
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            Así van tus finanzas en <span className="capitalize">{nombreMes()}</span> 👋
-          </p>
+          <p className="text-sm text-gray-400 dark:text-gray-500">{fechaLargaHoy()}</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Inicio</h1>
         </div>
-        <AvatarGroupHover className="flex -space-x-2">
-          {personas.slice(0, 6).map((p, i) => (
-            <span
-              key={p.id}
-              title={p.nombre}
-              className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white shadow-sm"
-              style={{ background: AVATAR_COLORES[i % AVATAR_COLORES.length] }}
-            >
-              {p.nombre.charAt(0).toUpperCase()}
-            </span>
-          ))}
-        </AvatarGroupHover>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/movimientos"
+            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500"
+          >
+            <IconoBuscar />
+            Buscar movimiento
+          </Link>
+          <button
+            type="button"
+            aria-label="Notificaciones"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500"
+          >
+            <IconoCampana />
+          </button>
+        </div>
       </div>
 
-      {/* Fila de KPIs: "Disponible" queda como tarjeta grande (mismo
-          contenido que el hero mobile: ingresos/gastos/comprometido
-          adentro) para que siga siendo el número principal, y las otras 3
-          quedan como tarjetas simples de un dato cada una. */}
-      <div className="grid grid-cols-5 gap-4">
-        <div className="col-span-2 rounded-2xl bg-brand-gradient p-5 text-white">
-          <p className="flex items-center gap-1.5 text-sm opacity-85">
-            <IconoDisponible className="text-white" />
-            Disponible este mes
-          </p>
-          <p className="mt-1 text-3xl font-bold tracking-tight">
-            <ContadorOdometro texto={formatCLP(disponible)} />
-          </p>
-          <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-            <div className="rounded-xl bg-white/15 p-2.5">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">
-                <IconoIngresos className="text-white" />
-                Ingresos
-              </p>
-              <p className="text-sm font-semibold">
-                <ContadorOdometro texto={formatCLP(ingresosMes)} />
-              </p>
+      {/* Hero a sangre completa: saludo + credencial de fecha, mes actual,
+          y el balance del mes junto a ingresos/gastos/comprometido + una
+          curva chica de cómo bajó el balance en lo que va del mes (mismo
+          cálculo día a día que gastosYaPagados/comprometido, no es un dato
+          nuevo). */}
+      <div className="rounded-3xl bg-brand-gradient p-6 text-white">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-2xl bg-white/15">
+              <span className="text-lg font-bold leading-none">{new Date().getDate()}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide opacity-70">{mesAbreviadoMayus()}</span>
             </div>
-            <div className="rounded-xl bg-white/15 p-2.5">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">
-                <IconoGastos className="text-white" />
-                Gastos
+            <div>
+              <p className="text-lg font-bold">
+                {saludoHora()}, {personas.find((p) => p.es_self)?.nombre.split(" ")[0] ?? "de vuelta"}
               </p>
-              <p className="text-sm font-semibold">
-                <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
-              </p>
-            </div>
-            <div className="rounded-xl bg-white/15 p-2.5">
-              <p className="flex items-center gap-1 text-[11px] opacity-85">
-                <IconoComprometido className="text-white" />
-                Comprometido
-              </p>
-              <p className="text-sm font-semibold">
-                <ContadorOdometro texto={formatCLP(comprometido)} />
+              <p className="text-sm opacity-70">
+                Llevas gastado el {ingresosMes > 0 ? Math.min(999, Math.round((totalGastos / ingresosMes) * 100)) : 0}% de tus
+                ingresos de <span className="capitalize">{nombreMes()}</span>.
               </p>
             </div>
           </div>
+          <span className="rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium capitalize">{nombreMes()}</span>
         </div>
 
-        <Card>
-          <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
-            <IconoCuentas className="text-gray-400 dark:text-gray-500" />
-            Total en cuentas
-          </p>
-          <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">
-            <ContadorOdometro texto={formatCLP(totalEnCuentas)} />
-          </p>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500">saldo de tus cuentas</p>
-        </Card>
-
-        <Card>
-          <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
-            <IconoGastos className="text-gray-400 dark:text-gray-500" />
-            Gastos este mes
-          </p>
-          <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">
-            <ContadorOdometro texto={formatCLP(gastosYaPagados)} />
-          </p>
-        </Card>
-
-        <Card>
-          <p className="flex items-center gap-1 text-xs font-medium text-gray-400 dark:text-gray-500">
-            <IconoComprometido className="text-gray-400 dark:text-gray-500" />
-            Comprometido
-          </p>
-          <p className="mt-1 text-2xl font-bold text-gray-800 dark:text-white">
-            <ContadorOdometro texto={formatCLP(comprometido)} />
-          </p>
-          <p className="text-[11px] text-gray-400 dark:text-gray-500">vence más adelante este mes</p>
-        </Card>
+        <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-white/10 pt-5">
+          <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
+            <div>
+              <p className="text-sm opacity-70">Balance del mes</p>
+              <p className="text-3xl font-bold tracking-tight">
+                <ContadorOdometro texto={formatCLP(disponible)} />
+              </p>
+            </div>
+            <div>
+              <p className="flex items-center gap-1 text-xs opacity-70">
+                <IconoIngresos className="text-white" />
+                Ingresos
+              </p>
+              <p className="text-base font-semibold">+{formatCLP(ingresosMes)}</p>
+            </div>
+            <div>
+              <p className="flex items-center gap-1 text-xs opacity-70">
+                <IconoGastos className="text-white" />
+                Gastos
+              </p>
+              <p className="text-base font-semibold">-{formatCLP(gastosYaPagados)}</p>
+            </div>
+            <div>
+              <p className="flex items-center gap-1 text-xs opacity-70">
+                <IconoComprometido className="text-white" />
+                Comprometido cuotas
+              </p>
+              <p className="text-base font-semibold">{formatCLP(comprometido)}</p>
+            </div>
+          </div>
+          {tendenciaBalance.length > 1 && (
+            <div className="h-12 w-32 shrink-0 opacity-90">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={tendenciaBalance}>
+                  <Line type="monotone" dataKey="balance" stroke="#ffffff" strokeWidth={2} dot={false} isAnimationActive={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {tarjetaCategoria}
-        {tarjetaFijoVariable}
-        {tarjetaPromedioDiario}
+      <div
+        className={`grid grid-cols-1 gap-4 ${
+          numTarjetasSecundarias === 3 ? "md:grid-cols-3" : numTarjetasSecundarias === 2 ? "md:grid-cols-2" : ""
+        }`}
+      >
+        <Card>
+          <div className="mb-1 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Cuentas próximas</p>
+            {cuentasEstaSemana > 0 && (
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-500 dark:bg-white/10 dark:text-gray-300">
+                {cuentasEstaSemana} esta semana
+              </span>
+            )}
+          </div>
+          {proximosPagos.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500">No hay pagos pendientes este mes.</p>
+          ) : (
+            <ul className="divide-y divide-gray-100 dark:divide-white/10">
+              {proximosPagos.slice(0, 3).map((ev) => (
+                <li key={`${ev.origen}:${ev.origenId}`} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <p className="truncate font-medium text-gray-700 dark:text-gray-200">{ev.descripcion}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      {ev.dia != null ? `Vence el ${ev.dia}` : "Sin día definido"}
+                    </p>
+                  </div>
+                  <p className="shrink-0 font-semibold text-gray-800 dark:text-gray-100">{formatCLP(ev.monto)}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Link href="/calendario-pagos" className="mt-2 inline-block text-xs font-semibold text-brand-from dark:text-white">
+            Ver todas →
+          </Link>
+        </Card>
+
+        {metaDestacada && (
+          <Card className="flex flex-col items-center text-center">
+            <p className="mb-3 self-start text-sm font-semibold text-gray-600 dark:text-gray-300">
+              Meta: {metaDestacada.icono ? `${metaDestacada.icono} ` : ""}
+              {metaDestacada.nombre}
+            </p>
+            <div className="relative flex h-28 w-28 items-center justify-center">
+              <svg viewBox="0 0 100 100" className="h-28 w-28 -rotate-90">
+                <circle cx="50" cy="50" r="42" fill="none" strokeWidth="9" className="stroke-gray-100 dark:stroke-white/10" />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="42"
+                  fill="none"
+                  strokeWidth="9"
+                  strokeLinecap="round"
+                  className="stroke-gray-800 dark:stroke-white"
+                  strokeDasharray={2 * Math.PI * 42}
+                  strokeDashoffset={2 * Math.PI * 42 * (1 - pctMetaDestacada / 100)}
+                />
+              </svg>
+              <span className="absolute text-xl font-bold text-gray-800 dark:text-white">{pctMetaDestacada}%</span>
+            </div>
+            <div className="mt-3 flex w-full items-center justify-between text-xs">
+              <div className="text-left">
+                <p className="text-gray-400 dark:text-gray-500">Ahorrado</p>
+                <p className="font-semibold text-gray-800 dark:text-white">{formatCLP(metaDestacada.monto_actual)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-400 dark:text-gray-500">Meta</p>
+                <p className="font-semibold text-gray-800 dark:text-white">{formatCLP(metaDestacada.monto_objetivo)}</p>
+              </div>
+            </div>
+            {metas.length > 1 && (
+              <Link href="/metas-ahorro" className="mt-2 self-start text-xs font-semibold text-brand-from dark:text-white">
+                Ver todas →
+              </Link>
+            )}
+          </Card>
+        )}
+
+        {personas.length > 1 && (
+          <Card>
+            <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">{nombreGrupoHogar}</p>
+            <AvatarGroupHover className="flex -space-x-2">
+              {personas.slice(0, 4).map((p, i) => (
+                <span
+                  key={p.id}
+                  title={p.nombre}
+                  onClick={() => setPersonaSeleccionada(p.id)}
+                  className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-white text-xs font-bold text-white dark:border-gray-900"
+                  style={{ background: AVATAR_COLORES[i % AVATAR_COLORES.length] }}
+                >
+                  {p.nombre.charAt(0).toUpperCase()}
+                </span>
+              ))}
+            </AvatarGroupHover>
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {gruposConParticipantes.length > 0
+                ? gruposConParticipantes.map((p) => `${p.name} ${p.pct}%`).join(" · ")
+                : "Sin gastos compartidos todavía."}
+            </p>
+            <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">Gasto compartido este mes</p>
+            <p className="text-lg font-bold text-gray-800 dark:text-white">{formatCLP(totalCompartido)}</p>
+            <div className="mt-2 flex h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+              {gruposConParticipantes.map((p, i) => (
+                <div key={p.persona_id} style={{ width: `${p.pct}%`, background: AVATAR_COLORES[i % AVATAR_COLORES.length] }} />
+              ))}
+            </div>
+          </Card>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        {tarjetaProximosPagos}
-        {tarjetaCuotas}
-        {tarjetaMetas}
-      </div>
-
-      {tarjetaPersonas}
+      <Card>
+        <div className="mb-1 flex items-center justify-between">
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Movimientos recientes</p>
+          <Link href="/movimientos" className="text-xs font-semibold text-brand-from dark:text-white">
+            Ver todos →
+          </Link>
+        </div>
+        {movimientosRecientes.length === 0 ? (
+          <p className="text-sm text-gray-400 dark:text-gray-500">Todavía no hay movimientos este mes.</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-white/10">
+            {movimientosRecientes.map((m) => {
+              const entidad = entidades.find((e) => e.id === m.entidadId) ?? null;
+              const marca = marcas.find((mm) => mm.id === m.marcaId) ?? resolverMarca(entidad, marcas);
+              return (
+                <li key={m.key} className="flex items-center gap-3 py-2.5 text-sm">
+                  <EntidadAvatar
+                    entidad={entidad}
+                    marca={marca}
+                    icono={m.icono}
+                    nombreFallback={m.descripcion}
+                    className="h-9 w-9 shrink-0"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-gray-700 dark:text-gray-200">{m.descripcion}</p>
+                    <p className="truncate text-xs text-gray-400 dark:text-gray-500">
+                      {m.detalle}
+                      {m.fecha ? ` · ${diaDelMes(m.fecha)} ${mesAbreviadoMayus().toLowerCase()}` : ""}
+                    </p>
+                  </div>
+                  <p className={`shrink-0 font-semibold ${m.esIngreso ? "text-ingreso" : "text-gasto"}`}>
+                    {m.esIngreso ? "+" : "-"}
+                    {formatCLP(m.monto)}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
     </div>
   );
 
