@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { TarjetasCarousel } from "@/components/TarjetasCarousel";
@@ -430,7 +431,9 @@ export default function TarjetasPage() {
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400">Elegir del catálogo (opcional)</label>
               <div className="mt-1 grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-8">
-                {marcas.map((m) => (
+                {marcas
+                  .filter((m) => m.tipo === "banco" || m.tipo === "casa_comercial" || m.tipo === "caja_compensacion")
+                  .map((m) => (
                   <button
                     type="button"
                     key={m.id}
@@ -661,10 +664,31 @@ export default function TarjetasPage() {
         </>
       )}
 
-      {mostrarDetalle && entidadActiva && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={() => setMostrarDetalle(false)}>
+      {mostrarDetalle && entidadActiva && createPortal(
+        // createPortal: se monta como hijo directo de <body>, así la hoja
+        // siempre queda fija sobre el viewport actual sin importar el
+        // scroll o el contenedor donde React la haya insertado en el árbol
+        // (antes quedaba encajonada/desplazada por el layout de escritorio
+        // con overflow-y-auto que envuelve el contenido, ver AuthGate.tsx).
+        // "100vh" en el celular incluye el área que queda tapada por la
+        // barra de direcciones/el home indicator cuando están visibles —
+        // eso hacía que esta hoja (anclada abajo con items-end) se dibujara
+        // más alta que el área realmente visible, empujando su parte de
+        // arriba (donde vive el botón ✕, sticky) por encima de lo que se
+        // ve, y dejando un hueco en blanco abajo una vez el navegador
+        // recalculaba. "dvh" (dynamic viewport height) sigue el tamaño
+        // REAL visible en cada momento, así que la hoja completa (header +
+        // botón cerrar) siempre cabe en pantalla. Mismo motivo por el que
+        // se agrega "px-0 sm:px-4" al fondo: en el celular (angosto) la
+        // hoja debe cubrir el ancho completo de borde a borde; recién en
+        // sm: (ya se ve como modal centrado) tiene sentido dejarle aire a
+        // los costados.
+        <div
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4"
+          onClick={() => setMostrarDetalle(false)}
+        >
           <div
-            className="max-h-[90vh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
+            className="max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 shadow-2xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header sticky: antes se desplazaba junto con el resto del
@@ -686,7 +710,7 @@ export default function TarjetasPage() {
               </button>
             </div>
 
-            <div className="space-y-4 p-5 pt-0">
+            <div className="space-y-4 p-5 pb-[max(env(safe-area-inset-bottom),1.25rem)] pt-0">
               {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null ? (
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-white/50">Cupo disponible</p>
@@ -765,7 +789,8 @@ export default function TarjetasPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

@@ -35,7 +35,20 @@ function IconoCampana({ className = "" }: { className?: string }) {
 // verdad (categoría, cuenta, etc. — ese formulario completo no se duplica
 // acá). Un punto rojo en la campana avisa que hay algo pendiente sin tener
 // que abrir el panel.
-export function NotificacionesBell({ buttonClassName = "" }: { buttonClassName?: string }) {
+export function NotificacionesBell({
+  buttonClassName = "",
+  alinear = "derecha",
+}: {
+  buttonClassName?: string;
+  // En Inicio (mobile) la campana vive pegada al borde IZQUIERDO del
+  // header — con el panel anclado a la derecha del botón ("right-0", como
+  // en escritorio, donde la campana sí está a la derecha) el panel de 320px
+  // se dibujaba hacia la izquierda del botón y se salía del borde de la
+  // pantalla (los botones "Descartar" quedaban cortados). "izquierda"
+  // ancla el panel al borde IZQUIERDO del botón en vez de al derecho, para
+  // que se despliegue hacia la derecha (donde sí hay espacio).
+  alinear?: "izquierda" | "derecha";
+}) {
   const [pendientes, setPendientes] = useState<SugerenciaCorreo[]>([]);
   const [abierto, setAbierto] = useState(false);
   const [descartando, setDescartando] = useState<string | null>(null);
@@ -87,7 +100,11 @@ export function NotificacionesBell({ buttonClassName = "" }: { buttonClassName?:
       </button>
 
       {abierto && (
-        <div className="absolute right-0 top-full z-40 mt-2 w-80 max-w-[85vw] rounded-2xl border border-gray-100 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-gray-900">
+        <div
+          className={`absolute top-full z-40 mt-2 w-80 max-w-[85vw] rounded-2xl border border-gray-100 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-gray-900 ${
+            alinear === "izquierda" ? "left-0" : "right-0"
+          }`}
+        >
           <div className="flex items-center justify-between px-1 pb-2">
             <p className="text-sm font-bold text-gray-800 dark:text-white">Sugerencias</p>
             <Link href="/sugerencias" onClick={() => setAbierto(false)} className="text-xs font-semibold text-brand-from dark:text-white">

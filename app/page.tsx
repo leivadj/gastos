@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { IngresosContenido } from "@/components/IngresosContenido";
@@ -187,6 +188,10 @@ export default function DashboardPage() {
   const [editandoPresupuestoId, setEditandoPresupuestoId] = useState<string | null>(null);
   const [editandoPresupuestoMonto, setEditandoPresupuestoMonto] = useState("");
   const [guardandoPresupuesto, setGuardandoPresupuesto] = useState(false);
+  // Día seleccionado en "Actividad del mes" (Feature G-2, pedido de Felipe:
+  // "me gustaría hacer clic en un día y me muestre los movimientos de ese
+  // día") — abre una hoja con lo que ocurrió ese día. null = cerrada.
+  const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
   // Mes que se está viendo en Inicio — antes "Septiembre de 2026" era un
   // rótulo fijo sin forma de navegar a meses anteriores; ahora es un
   // MesRef con flechas ‹ › junto al nombre del mes (mobile y escritorio).
@@ -565,6 +570,78 @@ export default function DashboardPage() {
   gastosDiarios.forEach((d) => diasConMovimiento.add(diaDelMes(d.fecha)));
   transferencias.filter((t) => t.fecha.slice(0, 7) === refMesTexto).forEach((t) => diasConMovimiento.add(diaDelMes(t.fecha)));
 
+  // Movimientos de un día puntual del calendario de actividad (Feature
+  // G-2): mismo criterio que diasConMovimiento de arriba para decidir "qué
+  // pasó ese día" — cuotas/fijos por su día de cargo, diarios/transferencias
+  // por su fecha real.
+  type MovimientoDia = {
+    key: string;
+    descripcion: string;
+    detalle: string;
+    monto: number;
+    icono: string | null;
+    marcaId: string | null;
+    entidadId: string | null;
+  };
+  function movimientosDelDia(dia: number): MovimientoDia[] {
+    const items: MovimientoDia[] = [];
+    cuotas.forEach((c) => {
+      if (diaDelMes(c.fecha_primera_cuota) === dia) {
+        items.push({
+          key: `cuota-${c.compra_id}`,
+          descripcion: c.descripcion,
+          detalle: `Cuota ${c.cuota_actual} de ${c.n_cuotas}`,
+          monto: Number(c.monto_cuota),
+          icono: c.icono,
+          marcaId: c.marca_id,
+          entidadId: c.entidad_id,
+        });
+      }
+    });
+    gastosFijos.forEach((g) => {
+      if (g.dia_mes_pago === dia) {
+        items.push({
+          key: `fijo-${g.id}`,
+          descripcion: g.descripcion,
+          detalle: categoriaNombre(g.categoria_id),
+          monto: Number(g.monto_estimado),
+          icono: g.icono,
+          marcaId: g.marca_id,
+          entidadId: g.entidad_id,
+        });
+      }
+    });
+    gastosDiarios.forEach((d) => {
+      if (diaDelMes(d.fecha) === dia) {
+        items.push({
+          key: `diario-${d.id}`,
+          descripcion: d.descripcion,
+          detalle: categoriaNombre(d.categoria_id),
+          monto: Number(d.monto),
+          icono: categorias.find((c) => c.id === d.categoria_id)?.icono ?? null,
+          marcaId: d.marca_id,
+          entidadId: null,
+        });
+      }
+    });
+    transferencias
+      .filter((t) => t.fecha.slice(0, 7) === refMesTexto && diaDelMes(t.fecha) === dia)
+      .forEach((t) => {
+        items.push({
+          key: `transferencia-${t.id}`,
+          descripcion: `${entidades.find((e) => e.id === t.cuenta_origen_id)?.nombre ?? "Efectivo"} → ${
+            entidades.find((e) => e.id === t.cuenta_destino_id)?.nombre ?? "Efectivo"
+          }`,
+          detalle: t.notas || "Transferencia entre tus cuentas",
+          monto: Number(t.monto),
+          icono: "⇄",
+          marcaId: null,
+          entidadId: null,
+        });
+      });
+    return items;
+  }
+
   if (cargando) {
     return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
   }
@@ -770,19 +847,22 @@ export default function DashboardPage() {
           const tieneMovimiento = dia != null && diasConMovimiento.has(dia);
           return (
             <div key={i} className="flex items-center justify-center py-0.5">
-              <span
+              <button
+                type="button"
+                disabled={dia == null || !tieneMovimiento}
+                onClick={() => dia != null && setDiaSeleccionado(dia)}
                 className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
                   dia == null
-                    ? ""
+                    ? "cursor-default"
                     : esHoy
                     ? "bg-gray-800 font-bold text-white dark:bg-white dark:text-black"
                     : tieneMovimiento
-                    ? "bg-brand-gradient/15 font-semibold text-gray-800 dark:bg-white/15 dark:text-white"
-                    : "text-gray-300 dark:text-gray-600"
+                    ? "bg-brand-gradient/15 font-semibold text-gray-800 active:scale-90 dark:bg-white/15 dark:text-white"
+                    : "cursor-default text-gray-300 dark:text-gray-600"
                 }`}
               >
                 {dia ?? ""}
-              </span>
+              </button>
             </div>
           );
         })}
@@ -790,6 +870,73 @@ export default function DashboardPage() {
       <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">Los días marcados tuvieron algún movimiento.</p>
     </Card>
   );
+
+  // Hoja "Movimientos de ese día" (Feature G-2): se abre al hacer clic en un
+  // día marcado del calendario de arriba. createPortal para que quede fija
+  // sobre el viewport sin importar dónde esté montada en el árbol (mismo
+  // motivo que en /tarjetas y /movimientos, ver esos archivos).
+  const hojaDiaSeleccionado =
+    diaSeleccionado != null &&
+    typeof document !== "undefined" &&
+    createPortal(
+      (() => {
+        const items = movimientosDelDia(diaSeleccionado);
+        const totalDia = items.reduce((acc, it) => acc + it.monto, 0);
+        const fechaDia = `${refIso.slice(0, 7)}-${String(diaSeleccionado).padStart(2, "0")}`;
+        return (
+          <div
+            className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4"
+            onClick={() => setDiaSeleccionado(null)}
+          >
+            <div
+              className="max-h-[85dvh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 shadow-2xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 flex items-start justify-between gap-2 rounded-t-3xl bg-white p-5 pb-3 dark:bg-[#111113]">
+                <div className="min-w-0">
+                  <p className="truncate text-base font-bold capitalize">
+                    Día {diaSeleccionado} de {nombreMes(fechaDia)}
+                  </p>
+                  <p className="text-xs text-gray-400 dark:text-white/50">
+                    {items.length} movimiento{items.length === 1 ? "" : "s"} · {formatCLP(totalDia)}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setDiaSeleccionado(null)}
+                  aria-label="Cerrar"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-1 p-5 pb-[max(env(safe-area-inset-bottom),1.25rem)] pt-0">
+                {items.length === 0 ? (
+                  <p className="py-2 text-sm text-gray-400 dark:text-white/40">Sin movimientos este día.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100 dark:divide-white/10">
+                    {items.map((it) => {
+                      const entidad = entidades.find((e) => e.id === it.entidadId) ?? null;
+                      const marca = marcas.find((m) => m.id === it.marcaId) ?? resolverMarca(entidad, marcas);
+                      return (
+                        <li key={it.key} className="flex items-center gap-3 py-2.5">
+                          <EntidadAvatar entidad={entidad} marca={marca} icono={it.icono} nombreFallback={it.descripcion} className="h-9 w-9" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{it.descripcion}</p>
+                            <p className="truncate text-xs text-gray-400 dark:text-white/50">{it.detalle}</p>
+                          </div>
+                          <p className="shrink-0 text-sm font-semibold text-gasto">-{formatCLP(it.monto)}</p>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })(),
+      document.body
+    );
 
   // ---- Layout mobile (app instalada / pantalla angosta) ----
 
@@ -867,7 +1014,10 @@ export default function DashboardPage() {
   const contenido = esMobile ? (
     <div className="space-y-4 pb-10">
       <div className="flex items-center justify-between">
-        <NotificacionesBell buttonClassName="h-10 w-10 rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300" />
+        <NotificacionesBell
+          buttonClassName="h-10 w-10 rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300"
+          alinear="izquierda"
+        />
         <div className="flex items-center gap-0.5 rounded-full bg-gray-100 pl-1 pr-1 dark:bg-white/10">
           <button
             type="button"
@@ -1207,6 +1357,7 @@ export default function DashboardPage() {
           onClose={() => setPersonaSeleccionada(null)}
         />
       )}
+      {hojaDiaSeleccionado}
     </>
   );
 }

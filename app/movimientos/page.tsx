@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { DividirGastoSheet, ItemADividir } from "@/components/DividirGastoSheet";
@@ -536,10 +537,23 @@ export default function MovimientosPage() {
           ? entidadDe(m.entidadId)?.nombre ?? "Efectivo"
           : "Efectivo";
         const participantes = m.origenId ? participantesPorItem[m.origenId] ?? [] : [];
-        return (
-          <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 backdrop-blur-sm sm:items-center" onClick={() => setDetalleAbierto(null)}>
+        // createPortal: este detalle se renderiza como hijo directo de
+        // <body>, no del listado de movimientos — así, sin importar en qué
+        // parte del scroll de la página esté montado este componente (el
+        // botón "Ver todas"/las filas viven adentro del <Card> con el
+        // listado), la hoja SIEMPRE se dibuja fija sobre el viewport actual
+        // en vez de aparecer en el punto del documento donde React la
+        // insertó (lo que antes obligaba a bajar el scroll de toda la
+        // página hasta el final para verla). "dvh" en vez de "vh" evita que
+        // la barra de direcciones del celular la deje más alta de lo que
+        // realmente se ve.
+        return createPortal(
+          <div
+            className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4"
+            onClick={() => setDetalleAbierto(null)}
+          >
             <div
-              className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
+              className="max-h-[85dvh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 shadow-2xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sticky top-0 z-10 flex items-start justify-between gap-2 rounded-t-3xl bg-white p-5 pb-3 dark:bg-[#111113]">
@@ -556,7 +570,7 @@ export default function MovimientosPage() {
                 </button>
               </div>
 
-              <div className="space-y-3 p-5 pt-0">
+              <div className="space-y-3 p-5 pb-[max(env(safe-area-inset-bottom),1.25rem)] pt-0">
                 <p
                   className={`text-3xl font-bold ${
                     esTransferencia ? "text-gray-700 dark:text-gray-200" : esIngreso ? "text-ingreso" : "text-gasto"
@@ -618,7 +632,8 @@ export default function MovimientosPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         );
       })()}
     </div>

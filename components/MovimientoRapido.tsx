@@ -9,6 +9,25 @@ import { colorFor } from "@/lib/avatarColor";
 import { mensajeError } from "@/lib/supabaseError";
 import { Categoria, Entidad, Grupo, Marca, Participante, Persona } from "@/lib/types";
 
+const ETIQUETA_TIPO_ENTIDAD: Record<Entidad["tipo"], string> = {
+  efectivo: "Efectivo",
+  tarjeta_credito: "Crédito",
+  tarjeta_debito: "Débito",
+  linea_credito: "Línea de crédito",
+  credito_hipotecario: "Hipotecario",
+  transferencia: "Transferencia",
+};
+
+// Resta `meses` meses a una fecha ISO ("YYYY-MM-DD"), preservando el día.
+// Se usa para reconstruir fecha_primera_cuota cuando la compra que se está
+// ingresando ya lleva cuotas pagadas (ver "N° de cuota actual" más abajo):
+// si hoy es la cuota 3, la primera cuota fue hace 2 meses.
+function restarMeses(fechaISO: string, meses: number): string {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const fecha = new Date(y, m - 1 - meses, d);
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+}
+
 // Avisa a cualquier pantalla que esté escuchando (dashboard, /gastos,
 // /ingresos...) que se guardó un movimiento rápido, para que refresque sus
 // datos sin que el usuario tenga que recargar la página a mano.
@@ -153,6 +172,7 @@ export function FormMovimiento({
   const activas = personas;
   const [tipoPago, setTipoPago] = useState<TipoPago>("normal");
   const [numeroCuotas, setNumeroCuotas] = useState("2");
+  const [cuotaInicial, setCuotaInicial] = useState("1");
   const [compartir, setCompartir] = useState(false);
   const [participantesManual, setParticipantesManual] = useState<Participante[]>([]);
   const [personaIngresoId, setPersonaIngresoId] = useState(unicaPersona?.id ?? "");
@@ -179,6 +199,20 @@ export function FormMovimiento({
     if (!id) return "Efectivo · sin tarjeta";
     return entidades.find((e) => e.id === id)?.nombre ?? "Efectivo · sin tarjeta";
   }
+
+  // Cuando hay dos cuentas con el mismo nombre (ej. dos "Banco Estado", una
+  // débito y otra crédito), Felipe no podía distinguirlas en "Pagar con" —
+  // se agrega el tipo entre paréntesis solo para esos nombres repetidos.
+  const nombresRepetidos = new Set(
+    Object.entries(
+      entidades.reduce<Record<string, number>>((acc, e) => {
+        acc[e.nombre] = (acc[e.nombre] ?? 0) + 1;
+        return acc;
+      }, {})
+    )
+      .filter(([, count]) => count > 1)
+      .map(([nombre]) => nombre)
+  );
 
   function iconoCuenta() {
     return (
@@ -241,7 +275,12 @@ export function FormMovimiento({
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
                 {iconoCuenta()}
               </span>
-              <span className="min-w-0 flex-1 truncate">{e.nombre}</span>
+              <span className="min-w-0 flex-1 truncate">
+                {e.nombre}
+                {nombresRepetidos.has(e.nombre) && (
+                  <span className="text-gray-400 dark:text-gray-500"> ({ETIQUETA_TIPO_ENTIDAD[e.tipo]})</span>
+                )}
+              </span>
               {valor === e.id && (
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
                   <path d="m4 12 5 5L20 6" />
@@ -317,11 +356,17 @@ export function FormMovimiento({
       return;
     }
 
+    const nCuotas = tipoPago === "cuotas" ? Math.max(1, Number(numeroCuotas) || 1) : 1;
+    // Si ya se venían pagando cuotas antes de registrar esta compra (ej. se
+    // está ingresando ahora pero ya va en la cuota 3), la primera cuota fue
+    // (N-1) meses antes de la fecha elegida — así cuotaActualEn() la sitúa
+    // correctamente en el mes en curso sin tener que reeditar nada después.
+    const cuotaInicialClamp = tipoPago === "cuotas" ? Math.min(Math.max(1, Number(cuotaInicial) || 1), nCuotas) : 1;
     const payload = {
       descripcion: descripcionFinal,
       monto_total: Number(monto),
-      n_cuotas: tipoPago === "cuotas" ? Math.max(1, Number(numeroCuotas) || 1) : 1,
-      fecha_primera_cuota: fecha,
+      n_cuotas: nCuotas,
+      fecha_primera_cuota: cuotaInicialClamp > 1 ? restarMeses(fecha, cuotaInicialClamp - 1) : fecha,
       entidad_id: entidadId || null,
       categoria_id: categoriaId || null,
       marca_id: marcaId || null,
@@ -444,6 +489,66 @@ export function FormMovimiento({
             }`}
           />
         </div>
+
+        {!modoTransferencia && tipo === "gasto" && (
+          <>
+            <p className="mb-2 mt-4 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Tipo de pago</p>
+            <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-xs dark:bg-white/10">
+              {(
+                [
+                  { key: "normal", label: "Normal" },
+                  { key: "recurrente", label: "Recurrente" },
+                  { key: "cuotas", label: "Cuotas" },
+                ] as { key: TipoPago; label: string }[]
+              ).map((op) => (
+                <button
+                  key={op.key}
+                  type="button"
+                  onClick={() => setTipoPago(op.key)}
+                  className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
+                    tipoPago === op.key ? "bg-white text-gray-800 shadow-sm dark:bg-[#F2F2F0] dark:text-black" : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+              {tipoPago === "normal" && "Un solo pago, no se repite."}
+              {tipoPago === "recurrente" && "Se repite todos los meses (arriendo, suscripción, etc.)."}
+              {tipoPago === "cuotas" && "Compra en cuotas — indica cuántas cuotas."}
+            </p>
+            {tipoPago === "cuotas" && (
+              <div className="mt-2 flex gap-2">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min={2}
+                    required
+                    value={numeroCuotas}
+                    onChange={(e) => setNumeroCuotas(e.target.value)}
+                    placeholder="N° de cuotas"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium dark:border-white/10 dark:bg-white/5"
+                  />
+                  <p className="mt-1 px-1 text-[10.5px] text-gray-400 dark:text-gray-500">N° de cuotas</p>
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, Number(numeroCuotas) || 1)}
+                    required
+                    value={cuotaInicial}
+                    onChange={(e) => setCuotaInicial(e.target.value)}
+                    placeholder="N° de cuota actual"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium dark:border-white/10 dark:bg-white/5"
+                  />
+                  <p className="mt-1 px-1 text-[10.5px] text-gray-400 dark:text-gray-500">Va en la cuota N°</p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
         <input
           value={descripcion}
@@ -580,48 +685,6 @@ export function FormMovimiento({
               ))}
             </select>
           </div>
-        )}
-
-        {!modoTransferencia && tipo === "gasto" && (
-          <>
-            <p className="mb-2 mt-4 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Tipo de pago</p>
-            <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-xs dark:bg-white/10">
-              {(
-                [
-                  { key: "normal", label: "Normal" },
-                  { key: "recurrente", label: "Recurrente" },
-                  { key: "cuotas", label: "Cuotas" },
-                ] as { key: TipoPago; label: string }[]
-              ).map((op) => (
-                <button
-                  key={op.key}
-                  type="button"
-                  onClick={() => setTipoPago(op.key)}
-                  className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
-                    tipoPago === op.key ? "bg-white text-gray-800 shadow-sm dark:bg-[#F2F2F0] dark:text-black" : "text-gray-500 dark:text-gray-400"
-                  }`}
-                >
-                  {op.label}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
-              {tipoPago === "normal" && "Un solo pago, no se repite."}
-              {tipoPago === "recurrente" && "Se repite todos los meses (arriendo, suscripción, etc.)."}
-              {tipoPago === "cuotas" && "Compra en cuotas — indica cuántas cuotas."}
-            </p>
-            {tipoPago === "cuotas" && (
-              <input
-                type="number"
-                min={2}
-                required
-                value={numeroCuotas}
-                onChange={(e) => setNumeroCuotas(e.target.value)}
-                placeholder="N° de cuotas"
-                className="mt-2 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium dark:border-white/10 dark:bg-white/5"
-              />
-            )}
-          </>
         )}
 
         {!modoTransferencia && tipo === "gasto" && activas.length > 1 && (
