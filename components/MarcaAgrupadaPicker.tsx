@@ -76,7 +76,7 @@ export function MarcaAgrupadaPicker({
           type="button"
           onClick={() => onChange("")}
           className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-            value === "" ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+            value === "" ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
           }`}
           style={{ width: 64 }}
         >
@@ -100,7 +100,7 @@ export function MarcaAgrupadaPicker({
                   key={m.id}
                   onClick={() => onChange(m.id === value ? "" : m.id)}
                   className={`flex shrink-0 flex-col items-center gap-1 rounded-lg border p-2 ${
-                    value === m.id ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+                    value === m.id ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
                   }`}
                   style={{ width: 64 }}
                 >
@@ -119,7 +119,7 @@ export function MarcaAgrupadaPicker({
         <button
           type="button"
           onClick={abrirAgregar}
-          className="text-[11px] font-medium text-brand-from dark:text-pink-400"
+          className="text-[11px] font-medium text-brand-from dark:text-white"
         >
           + Agregar marca nueva
         </button>
@@ -135,7 +135,7 @@ export function MarcaAgrupadaPicker({
                 onClick={() => setTipoNueva(grupo.tipo)}
                 className={`rounded-full border px-2.5 py-1 text-[11px] font-medium ${
                   tipoNueva === grupo.tipo
-                    ? "border-brand-from bg-purple-50 text-brand-from dark:bg-white/10 dark:text-white"
+                    ? "border-brand-from bg-gray-50 text-brand-from dark:bg-white/10 dark:text-white"
                     : "border-gray-200 text-gray-500 dark:border-white/10 dark:text-gray-400"
                 }`}
               >

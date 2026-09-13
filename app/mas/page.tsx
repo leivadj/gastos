@@ -61,7 +61,7 @@ export default function MasPage() {
               i !== items.length - 1 ? "border-b border-gray-50 dark:border-white/10" : ""
             }`}
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-purple-50 text-brand-from dark:bg-white/10 dark:text-white">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gray-50 text-brand-from dark:bg-white/10 dark:text-white">
               {item.icon(true)}
             </span>
             <span className="flex-1 text-[15px] font-medium text-gray-700 dark:text-gray-200">{item.label}</span>

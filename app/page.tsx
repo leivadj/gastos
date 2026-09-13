@@ -368,7 +368,7 @@ export default function DashboardPage() {
   const tarjetaFijoVariable = totalGastos > 0 && (
     <Card>
       <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Fijo vs. variable</p>
-      <div className="h-2.5 w-full overflow-hidden rounded-full bg-pink-100 dark:bg-pink-950/50">
+      <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10/50">
         <div className="h-full bg-brand-gradient" style={{ width: `${pctFijo}%` }} />
       </div>
       <div className="mt-2 flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
@@ -377,7 +377,7 @@ export default function DashboardPage() {
           Fijo · {formatCLP(totalTipoFijo)}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-pink-200 dark:bg-pink-800" />
+          <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" />
           Variable · {formatCLP(totalTipoVariable)}
         </span>
       </div>
@@ -454,7 +454,7 @@ export default function DashboardPage() {
           <IconoProximosPagos className="text-gray-400 dark:text-gray-500" />
           Próximos pagos
         </p>
-        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from dark:text-pink-400">
+        <Link href="/calendario-pagos" className="text-xs font-semibold text-brand-from dark:text-white">
           Ver todos
         </Link>
       </div>
@@ -491,7 +491,7 @@ export default function DashboardPage() {
           <IconoMetas className="text-gray-400 dark:text-gray-500" />
           Metas de ahorro
         </p>
-        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from dark:text-pink-400">
+        <Link href="/metas-ahorro" className="text-xs font-semibold text-brand-from dark:text-white">
           Ver todas
         </Link>
       </div>

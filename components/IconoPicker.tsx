@@ -20,7 +20,7 @@ export function IconoPicker({
           type="button"
           onClick={() => onChange("")}
           className={`flex h-9 w-9 items-center justify-center rounded-lg border text-xs text-gray-400 dark:text-gray-500 ${
-            value === "" ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+            value === "" ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
           }`}
         >
           —
@@ -31,7 +31,7 @@ export function IconoPicker({
             key={emoji}
             onClick={() => onChange(emoji === value ? "" : emoji)}
             className={`flex h-9 w-9 items-center justify-center rounded-lg border text-lg ${
-              value === emoji ? "border-brand-from bg-purple-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
+              value === emoji ? "border-brand-from bg-gray-50 dark:bg-white/10" : "border-gray-200 dark:border-white/10"
             }`}
           >
             {emoji}

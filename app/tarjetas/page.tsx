@@ -381,7 +381,7 @@ export default function TarjetasPage() {
                     key={m.id}
                     onClick={() => elegirMarca(m.id === marcaId ? "" : m.id)}
                     className={`flex flex-col items-center gap-1 rounded-lg border p-2 ${
-                      marcaId === m.id ? "border-brand-from bg-purple-50 dark:bg-white/10 dark:text-white" : "border-gray-200 dark:border-white/10"
+                      marcaId === m.id ? "border-brand-from bg-gray-50 dark:bg-white/10 dark:text-white" : "border-gray-200 dark:border-white/10"
                     }`}
                   >
                     {m.logo_url ? (
@@ -415,7 +415,7 @@ export default function TarjetasPage() {
                 placeholder="Ej: Falabella"
               />
               {marcaAutodetectada && (
-                <p className="mt-1 text-[11px] text-emerald-600">
+                <p className="mt-1 text-[11px] text-black dark:text-white">
                   ✓ Coincide con &quot;{marcaDe(marcaId)?.nombre}&quot; del catálogo — se usará su logo.
                 </p>
               )}
@@ -501,7 +501,7 @@ export default function TarjetasPage() {
                   />
                 </label>
                 {colorHex && (
-                  <button type="button" onClick={() => setColorHex(null)} className="text-[11px] text-brand-from dark:text-pink-400">
+                  <button type="button" onClick={() => setColorHex(null)} className="text-[11px] text-brand-from dark:text-white">
                     usar color automático
                   </button>
                 )}
@@ -565,7 +565,7 @@ export default function TarjetasPage() {
                   {entidadActiva.nombre} <span className="font-normal text-gray-400 dark:text-gray-500">· {TIPO_LABEL[entidadActiva.tipo]}</span>
                 </p>
                 <div className="flex shrink-0 items-center gap-3">
-                  <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from dark:text-pink-400">
+                  <button onClick={() => iniciarEdicion(entidadActiva)} className="text-xs text-brand-from dark:text-white">
                     editar
                   </button>
                   <button onClick={() => eliminar(entidadActiva.id)} className="text-xs text-gray-300 hover:text-red-400 dark:text-gray-600">
@@ -598,7 +598,7 @@ export default function TarjetasPage() {
                         {it.categoria} · {it.detalle}
                       </p>
                     </div>
-                    <p className={`shrink-0 text-sm font-semibold ${it.signo === 1 ? "text-emerald-600" : "text-rose-500"}`}>
+                    <p className={`shrink-0 text-sm font-semibold ${it.signo === 1 ? "text-ingreso" : "text-gasto"}`}>
                       {it.signo === 1 ? "+" : "-"}
                       {formatCLP(it.monto)}
                     </p>

@@ -297,7 +297,7 @@ export default function GruposPage() {
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-3">
-                <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from dark:text-pink-400">
+                <button onClick={() => iniciarEdicion(g)} className="text-xs text-brand-from dark:text-white">
                   editar
                 </button>
                 <button onClick={() => eliminar(g.id)} className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400">

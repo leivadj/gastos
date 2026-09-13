@@ -184,7 +184,7 @@ export function PerfilPropioCard() {
               <button
                 type="submit"
                 disabled={guardandoPerfil}
-                className="shrink-0 text-xs font-semibold text-brand-from dark:text-pink-400 disabled:opacity-60"
+                className="shrink-0 text-xs font-semibold text-brand-from dark:text-white disabled:opacity-60"
               >
                 Guardar
               </button>
@@ -195,7 +195,7 @@ export function PerfilPropioCard() {
           ) : (
             <div className="flex items-center gap-2">
               <p className="truncate font-semibold text-gray-800 dark:text-white">{perfilPropio.nombre}</p>
-              <button onClick={iniciarEdicionPerfil} className="shrink-0 text-xs text-brand-from dark:text-pink-400">
+              <button onClick={iniciarEdicionPerfil} className="shrink-0 text-xs text-brand-from dark:text-white">
                 editar
               </button>
             </div>

@@ -82,7 +82,7 @@ function GastosContenido() {
       {tab !== "diarios" && (
         <Link
           href="/calendario-pagos"
-          className="flex items-center justify-between rounded-2xl bg-purple-50 px-4 py-3 text-sm font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+          className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-brand-from dark:bg-white/10 dark:text-white"
         >
           Ver calendario de pagos
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

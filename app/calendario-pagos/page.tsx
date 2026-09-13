@@ -195,7 +195,7 @@ export default function CalendarioPagosPage() {
                 key={i}
                 className={`flex h-11 w-11 flex-col items-center justify-center rounded-xl text-[13px] font-semibold ${
                   celda.delMes ? "text-gray-700 dark:text-gray-200" : "text-gray-300 dark:text-gray-600"
-                } ${esHoy ? "border-[1.5px] border-brand-from text-brand-from dark:text-pink-400" : ""}`}
+                } ${esHoy ? "border-[1.5px] border-brand-from text-brand-from dark:text-white" : ""}`}
               >
                 {celda.numero}
                 {(tieneFijo || tieneCuota) && (
@@ -293,7 +293,7 @@ export default function CalendarioPagosPage() {
                         deshacer
                       </button>
                     ) : (
-                      <button onClick={() => abrirMarcarPagado(ev)} className="text-xs font-semibold text-brand-from dark:text-pink-400">
+                      <button onClick={() => abrirMarcarPagado(ev)} className="text-xs font-semibold text-brand-from dark:text-white">
                         Marcar como pagado
                       </button>
                     )}

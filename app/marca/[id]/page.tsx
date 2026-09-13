@@ -418,7 +418,7 @@ export default function MarcaDetallePage({ params }: { params: { id: string } })
   if (noEncontrada || !marca) {
     return (
       <div className="space-y-3 pb-10">
-        <button onClick={() => router.back()} className="text-xs text-brand-from dark:text-pink-400">
+        <button onClick={() => router.back()} className="text-xs text-brand-from dark:text-white">
           ‹ Volver
         </button>
         <p className="text-center text-sm text-gray-400 dark:text-gray-500">No se encontró esta marca.</p>
@@ -428,7 +428,7 @@ export default function MarcaDetallePage({ params }: { params: { id: string } })
 
   return (
     <div className="space-y-4 pb-10">
-      <button onClick={() => router.back()} className="text-xs text-brand-from dark:text-pink-400">
+      <button onClick={() => router.back()} className="text-xs text-brand-from dark:text-white">
         ‹ Volver
       </button>
 
@@ -534,7 +534,7 @@ export default function MarcaDetallePage({ params }: { params: { id: string } })
                   </p>
                 </div>
                 {nCuotas && montoCuota && (
-                  <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
+                  <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                     Total aproximado: {formatCLP(Number(nCuotas) * Number(montoCuota))}
                   </p>
                 )}
@@ -615,7 +615,7 @@ export default function MarcaDetallePage({ params }: { params: { id: string } })
             </div>
 
             {grupoId ? (
-              <p className="rounded-lg bg-purple-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
+              <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
                 El reparto lo define el grupo &quot;{grupoDe(grupoId)?.nombre}&quot;.
               </p>
             ) : unicaPersona ? null : (
@@ -700,7 +700,7 @@ export default function MarcaDetallePage({ params }: { params: { id: string } })
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <p className="text-sm font-semibold text-gray-800 dark:text-white">{formatCLP(it.monto)}</p>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => iniciarEdicion(it)} className="text-[11px] text-brand-from dark:text-pink-400">
+                    <button onClick={() => iniciarEdicion(it)} className="text-[11px] text-brand-from dark:text-white">
                       editar
                     </button>
                     <button onClick={() => eliminarItem(it)} className="text-[11px] text-gray-300 dark:text-gray-600 hover:text-red-400">

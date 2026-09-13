@@ -77,7 +77,7 @@ export default function ServiciosBasicosPage() {
         <Card>
           <p className="text-sm text-gray-400 dark:text-gray-500">
             Todavía no tienes gastos fijos marcados como &quot;monto variable&quot;. Puedes hacerlo en la pestaña{" "}
-            <Link href="/gastos?tab=variables" className="font-semibold text-brand-from dark:text-pink-400">
+            <Link href="/gastos?tab=variables" className="font-semibold text-brand-from dark:text-white">
               Variables
             </Link>{" "}
             de Gastos.
@@ -134,7 +134,7 @@ export default function ServiciosBasicosPage() {
                     ))}
                   </div>
                 ) : (
-                  <Link href="/calendario-pagos" className="text-[11px] font-semibold text-brand-from dark:text-pink-400">
+                  <Link href="/calendario-pagos" className="text-[11px] font-semibold text-brand-from dark:text-white">
                     Registrar pago →
                   </Link>
                 )}

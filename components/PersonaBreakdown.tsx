@@ -221,7 +221,7 @@ export function PersonaBreakdown({
         </button>
       </div>
 
-      <p className="mt-3 text-2xl font-bold text-brand-from dark:text-pink-400">{formatCLP(total)}</p>
+      <p className="mt-3 text-2xl font-bold text-brand-from dark:text-white">{formatCLP(total)}</p>
       <p className="text-xs text-gray-400 dark:text-gray-500">Total que le corresponde este mes</p>
 
       {personaId && ingresosPersona && (
@@ -234,7 +234,7 @@ export function PersonaBreakdown({
                   setAgregandoIngreso((v) => !v);
                   setErrorIngreso("");
                 }}
-                className="text-xs font-medium text-brand-from dark:text-pink-400"
+                className="text-xs font-medium text-brand-from dark:text-white"
               >
                 {agregandoIngreso ? "cancelar" : "+ Agregar"}
               </button>
