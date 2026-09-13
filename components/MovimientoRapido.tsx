@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
+import { CategoriaPicker } from "@/components/CategoriaPicker";
 import { EntidadPicker } from "@/components/EntidadPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
@@ -358,24 +359,43 @@ function FormGasto({
           />
         </div>
         <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
-          <select
-            value={categoriaId}
-            onChange={(e) => {
-              const nueva = categorias.find((c) => c.id === e.target.value) ?? null;
-              if (nueva?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
-              setCategoriaId(e.target.value);
-            }}
+          <label className="text-xs text-gray-500 dark:text-gray-400">Descripción (opcional)</label>
+          <input
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+            placeholder={marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Ej: Supermercado"}
             className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          >
-            <option value="">—</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.icono ? `${c.icono} ` : ""}
-                {c.nombre}
-              </option>
-            ))}
-          </select>
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
+          <input
+            required
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+          />
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Cuenta</label>
+          <div className="mt-1">
+            <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} onCatalogoActualizado={onCatalogoActualizado} />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
+          <div className="mt-1">
+            <CategoriaPicker
+              categorias={categorias}
+              value={categoriaId}
+              onChange={(id) => {
+                const nueva = categorias.find((c) => c.id === id) ?? null;
+                if (nueva?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
+                setCategoriaId(id);
+              }}
+            />
+          </div>
         </div>
         {categoriaSeleccionada?.tipo_marca_sugerido && (
           <div>
@@ -391,34 +411,9 @@ function FormGasto({
             </div>
           </div>
         )}
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Descripción (opcional)</label>
-          <input
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder={marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Ej: Supermercado"}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Cuenta</label>
-          <div className="mt-1">
-            <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} onCatalogoActualizado={onCatalogoActualizado} />
-          </div>
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
-          <input
-            required
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
         {personas.length > 1 && (
           <div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">Asignar a</label>
+            <label className="text-xs text-gray-500 dark:text-gray-400">Asignar a · {grupos[0]?.nombre ?? "Grupo compartido"}</label>
             <select
               value={grupoId}
               onChange={(e) => setGrupoId(e.target.value)}
