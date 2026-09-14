@@ -215,15 +215,29 @@ export default function ReportesPage() {
     return repartoEfectivo(itemParticipantes.filter((ip) => ip.origen === origen && ip.origen_id === origenId));
   }
 
-  // Reparto final de un ítem: grupo si tiene, si no su propio reparto, si no
-  // 100% para quien es dueño de la cuenta (gasto personal, sin compartir).
+  // Reparto final de un ítem: su propio reparto en item_participantes si lo
+  // tiene, si no el del grupo (en vivo — solo aplica hoy a gastos_diarios,
+  // que no pasan `origen` acá, ver más abajo), si no 100% para quien es
+  // dueño de la cuenta (gasto personal, sin compartir).
+  //
+  // ANTES el orden era al revés (grupo primero): un ítem con `grupo_id` se
+  // resolvía SIEMPRE en vivo contra el % actual del grupo, así que cambiar el
+  // % de Grupo Hogar hoy recalculaba TODOS los meses pasados con el nuevo %.
+  // Desde migration_33_compromisos_fundacion.sql, guardar una compra/gasto
+  // fijo con grupo CONGELA el % efectivo de ese momento en
+  // item_participantes (además de conservar `grupo_id`, para filtrar "esto es
+  // de Hogar") — por eso ahora se mira primero item_participantes: un mes ya
+  // guardado deja de moverse si el % del grupo cambia después. La rama de
+  // grupo en vivo queda como respaldo (compatibilidad con datos que, por
+  // algún motivo, no tengan snapshot) y como el camino real para
+  // gastos_diarios, que no pasan por item_participantes.
   function repartoFinal(grupoId: string | null, origen: OrigenItem | null, origenId: string): { persona_id: string; persona_nombre: string; pct: number }[] {
-    if (grupoId) {
-      const r = repartoDeGrupo(grupoId);
-      if (r.length > 0) return r;
-    }
     if (origen) {
       const r = repartoDeItem(origen, origenId);
+      if (r.length > 0) return r;
+    }
+    if (grupoId) {
+      const r = repartoDeGrupo(grupoId);
       if (r.length > 0) return r;
     }
     return personaSelf ? [{ persona_id: personaSelf.id, persona_nombre: personaSelf.nombre, pct: 100 }] : [];

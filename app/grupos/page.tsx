@@ -39,6 +39,11 @@ export default function GruposPage() {
 
   const [nombre, setNombre] = useState("");
   const [icono, setIcono] = useState("");
+  // Marca este grupo como "el" Grupo Hogar (ver migration_33) — a lo más uno
+  // por cuenta. Lo usa el módulo Compromisos para saber cuáles gastos son de
+  // Hogar, a diferencia de cualquier otro grupo de reparto (ej. uno para
+  // dividir Falabella con alguien).
+  const [esPrincipal, setEsPrincipal] = useState(false);
   const [participantes, setParticipantes] = useState<Participante[]>([]);
   // Categorías que usan el reparto de ESTE grupo por defecto (ver
   // migration_26_reparto_por_categoria.sql) — el formulario de gastos
@@ -78,6 +83,7 @@ export default function GruposPage() {
     setEditandoId(null);
     setNombre("");
     setIcono("");
+    setEsPrincipal(false);
     setParticipantes([]);
     setCategoriasElegidas([]);
     setError("");
@@ -87,6 +93,7 @@ export default function GruposPage() {
     setEditandoId(g.id);
     setNombre(g.nombre);
     setIcono(g.icono ?? "");
+    setEsPrincipal(g.es_principal);
     setParticipantes(
       (participantesPorGrupo[g.id] ?? []).map((row) => ({ persona_id: row.persona_id, porcentaje: row.porcentaje }))
     );
@@ -143,7 +150,14 @@ export default function GruposPage() {
     setError("");
     setGuardando(true);
     try {
-      const payload = { nombre, icono: icono || null };
+      // Solo puede haber un Grupo Hogar por cuenta (índice único parcial en
+      // la base) — si se marca este, primero se desmarca cualquier otro que
+      // lo tuviera, así no choca con el que se está por guardar.
+      if (esPrincipal) {
+        const { error: clearError } = await supabase.from("grupos").update({ es_principal: false }).eq("es_principal", true);
+        if (clearError) throw clearError;
+      }
+      const payload = { nombre, icono: icono || null, es_principal: esPrincipal };
       let grupoId = editandoId;
       if (editandoId) {
         const { error: updError } = await supabase.from("grupos").update(payload).eq("id", editandoId);
@@ -231,6 +245,19 @@ export default function GruposPage() {
                 <IconoPicker value={icono} onChange={setIcono} />
               </div>
             </div>
+            <label className="flex items-center gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-sm dark:bg-white/5">
+              <input
+                type="checkbox"
+                checked={esPrincipal}
+                onChange={(e) => setEsPrincipal(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-brand-from dark:border-white/20"
+              />
+              <span className="text-gray-700 dark:text-gray-200">Este es el Grupo Hogar</span>
+            </label>
+            <p className="-mt-2 text-[11px] text-gray-400 dark:text-gray-500">
+              Lo usa Compromisos para saber cuáles gastos son de Hogar. Solo puede haber uno — marcarlo acá desmarca
+              cualquier otro grupo que lo tuviera.
+            </p>
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400">Personas que se hacen cargo</label>
               <p className="mb-1 text-[11px] text-gray-400 dark:text-gray-500">
@@ -287,7 +314,14 @@ export default function GruposPage() {
               <div className="flex min-w-0 items-start gap-3">
                 <EntidadAvatar icono={g.icono} nombreFallback={g.nombre} className="h-9 w-9" />
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-gray-800 dark:text-white">{g.nombre}</p>
+                  <p className="truncate font-semibold text-gray-800 dark:text-white">
+                    {g.nombre}
+                    {g.es_principal && (
+                      <span className="ml-1.5 rounded-full bg-brand-gradient px-2 py-0.5 text-[10px] font-semibold text-white align-middle">
+                        Hogar
+                      </span>
+                    )}
+                  </p>
                   <p className="truncate text-xs text-gray-400 dark:text-gray-500">{resumenReparto(g)}</p>
                   {categoriasDeGrupo(g).length > 0 && (
                     <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">

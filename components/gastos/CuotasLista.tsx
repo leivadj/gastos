@@ -15,7 +15,8 @@ import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { diaDelMes, formatCLP } from "@/lib/format";
 import { fechaPrimeraCuotaDesde } from "@/lib/cuotas";
 import { resolverMarca } from "@/lib/resolverMarca";
-import { Categoria, CategoriaGrupoPreferido, CompraVigente, Entidad, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
+import { resolverPorcentajesEfectivos } from "@/lib/reparto";
+import { Categoria, CategoriaGrupoPreferido, CompraVigente, Entidad, Grupo, GrupoParticipante, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
 
 // Pestañas "Normal" y "Cuotas" de /gastos — antes una sola pantalla
 // (/compras) sin distinguir compras de un solo pago de compras en cuotas
@@ -35,6 +36,12 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // Reparto de cada grupo (para congelarlo en item_participantes al guardar
+  // un ítem con grupo — ver migration_33_compromisos_fundacion.sql). Ya no se
+  // deja que el reparto de un ítem con grupo se resuelva en vivo contra el
+  // grupo: se copia una vez, al guardar, así un cambio de % más adelante no
+  // mueve retroactivamente lo que ya está cargado.
+  const [grupoParticipantesTodos, setGrupoParticipantesTodos] = useState<GrupoParticipante[]>([]);
   // "Esta categoría usa este grupo por defecto" (ver Grupos y
   // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
   const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
@@ -72,7 +79,7 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
   const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargarTodo() {
-    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: cgp }, { data: ip }] =
+    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: gp }, { data: cgp }, { data: ip }] =
       await Promise.all([
         supabase.from("vista_cuotas_vigentes").select("*").order("cuota_actual", { ascending: true }),
         supabase.from("entidades").select("*").order("nombre"),
@@ -80,6 +87,7 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
         supabase.from("categorias").select("*").order("nombre"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
+        supabase.from("grupo_participantes").select("*"),
         supabase.from("categoria_grupo_preferido").select("*"),
         supabase.from("item_participantes").select("*").eq("origen", "compra"),
       ]);
@@ -89,6 +97,7 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
+    setGrupoParticipantesTodos((gp as GrupoParticipante[]) ?? []);
     const mapaPreferido: Record<string, string> = {};
     ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
       mapaPreferido[row.categoria_id] = row.grupo_id;
@@ -158,6 +167,24 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
     setMostrarForm(true);
   }
 
+  // Filas a grabar en item_participantes para esta compra: si tiene grupo,
+  // se CONGELA el % efectivo del grupo tal cual está ahora mismo (en vez de
+  // dejar que el reparto de este ítem se resuelva en vivo contra el grupo
+  // para siempre) — así, si el % del grupo cambia más adelante, este ítem ya
+  // guardado no se mueve. grupo_id se sigue guardando en la compra (permite
+  // filtrar "esto es de tal grupo" y que la UI lo siga precargando al
+  // editar), pero el reparto real ya no depende de él.
+  function participantesAGuardar(): Participante[] {
+    if (grupoId) {
+      const idsActivos = new Set(personas.map((p) => p.id));
+      return resolverPorcentajesEfectivos(
+        grupoParticipantesTodos.filter((gp) => gp.grupo_id === grupoId),
+        idsActivos
+      ).map((p) => ({ persona_id: p.persona_id, porcentaje: p.porcentaje }));
+    }
+    return participantes;
+  }
+
   async function guardarParticipantes(compraId: string) {
     const { error: delError } = await supabase
       .from("item_participantes")
@@ -165,9 +192,10 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
       .eq("origen", "compra")
       .eq("origen_id", compraId);
     if (delError) throw delError;
-    if (!grupoId && participantes.length > 0) {
+    const aGuardar = participantesAGuardar();
+    if (aGuardar.length > 0) {
       const { error: insError } = await supabase.from("item_participantes").insert(
-        participantes.map((p) => ({ origen: "compra", origen_id: compraId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+        aGuardar.map((p) => ({ origen: "compra", origen_id: compraId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
       );
       if (insError) throw insError;
     }

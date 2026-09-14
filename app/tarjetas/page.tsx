@@ -7,7 +7,7 @@ import { Card } from "@/components/Card";
 import { TarjetasCarousel } from "@/components/TarjetasCarousel";
 import { TarjetaVisual, TIPO_LABEL } from "@/components/TarjetaVisual";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
-import { Categoria, CompraVigente, Entidad, GastoFijo, Marca, Transferencia } from "@/lib/types";
+import { Categoria, CompraVigente, Entidad, GastoFijo, Marca, Persona, Transferencia } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { formatCLP, mesActualISO, nombreMes } from "@/lib/format";
@@ -46,6 +46,7 @@ const TIPOS: { value: Entidad["tipo"]; label: string }[] = [
 export default function TarjetasPage() {
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [personas, setPersonas] = useState<Persona[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuotas, setCuotas] = useState<CompraVigente[]>([]);
   const [gastosFijos, setGastosFijos] = useState<GastoFijo[]>([]);
@@ -71,6 +72,10 @@ export default function TarjetasPage() {
   const [saldo, setSaldo] = useState("");
   const [cupo, setCupo] = useState("");
   const [ultimosDigitos, setUltimosDigitos] = useState("");
+  // De quién es esta tarjeta/cuenta (opcional) — lo usa Compromisos para
+  // agrupar los gastos hechos con tarjetas de otras personas. Ver
+  // migration_33_compromisos_fundacion.sql.
+  const [titularId, setTitularId] = useState("");
   const [colorHex, setColorHex] = useState<string | null>(null);
   const [imagenFondoUrl, setImagenFondoUrl] = useState<string | null>(null);
   const [archivoFondo, setArchivoFondo] = useState<File | null>(null);
@@ -78,18 +83,20 @@ export default function TarjetasPage() {
   const [subiendoFondo, setSubiendoFondo] = useState(false);
 
   async function cargarTodo() {
-    const [{ data: e }, { data: m }, { data: cat }, { data: c }, { data: gf }, { data: t }] = await Promise.all([
+    const [{ data: e }, { data: m }, { data: cat }, { data: c }, { data: gf }, { data: t }, { data: p }] = await Promise.all([
       supabase.from("entidades").select("*").order("nombre"),
       supabase.from("marcas").select("*").order("nombre"),
       supabase.from("categorias").select("*"),
       supabase.from("vista_cuotas_mes_actual").select("*"),
       supabase.from("gastos_fijos").select("*").eq("activo", true),
       supabase.from("transferencias").select("*"),
+      supabase.from("personas").select("*").eq("activo", true).order("nombre"),
     ]);
     const listaEntidades = (e as Entidad[]) ?? [];
     setEntidades(listaEntidades);
     setMarcas((m as Marca[]) ?? []);
     setCategorias((cat as Categoria[]) ?? []);
+    setPersonas((p as Persona[]) ?? []);
     setCuotas((c as CompraVigente[]) ?? []);
     setGastosFijos((gf as GastoFijo[]) ?? []);
     setTransferencias((t as Transferencia[]) ?? []);
@@ -190,6 +197,7 @@ export default function TarjetasPage() {
     setSaldo("");
     setCupo("");
     setUltimosDigitos("");
+    setTitularId("");
     setColorHex(null);
     setImagenFondoUrl(null);
     onElegirArchivo(null);
@@ -205,6 +213,7 @@ export default function TarjetasPage() {
     setSaldo(e.saldo != null ? String(e.saldo) : "");
     setCupo(e.cupo != null ? String(e.cupo) : "");
     setUltimosDigitos(e.ultimos_digitos ?? "");
+    setTitularId(e.titular_persona_id ?? "");
     setColorHex(e.color_hex ?? null);
     setImagenFondoUrl(e.imagen_fondo_url ?? null);
     onElegirArchivo(null);
@@ -242,6 +251,7 @@ export default function TarjetasPage() {
         saldo: saldo.trim() === "" ? null : Number(saldo),
         cupo: cupo.trim() === "" ? null : Number(cupo),
         ultimos_digitos: ultimosDigitos.trim() === "" ? null : ultimosDigitos.trim(),
+        titular_persona_id: titularId || null,
         color_hex: colorHex || null,
         imagen_fondo_url: fondoUrlFinal,
       };
@@ -525,6 +535,28 @@ export default function TarjetasPage() {
                 Para reconocerla de un vistazo (se muestra como &quot;•••• {ultimosDigitos || "1234"}&quot;).
               </p>
             </div>
+            {personas.length > 0 && (
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Titular (opcional)</label>
+                <select
+                  value={titularId}
+                  onChange={(e) => setTitularId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                >
+                  <option value="">Sin titular asignado</option>
+                  {personas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  De quién es esta tarjeta/cuenta — no tiene que ser quien finalmente pague cada gasto (eso se define
+                  en &quot;Asignar a&quot; al cargar cada movimiento). Lo usa Compromisos para agrupar por tarjeta de
+                  terceros.
+                </p>
+              </div>
+            )}
             {tipo === "tarjeta_credito" && (
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400">Cupo (límite de crédito, opcional)</label>
@@ -560,6 +592,7 @@ export default function TarjetasPage() {
                     saldo: saldo.trim() === "" ? null : Number(saldo),
                     cupo: cupo.trim() === "" ? null : Number(cupo),
                     ultimos_digitos: ultimosDigitos.trim() === "" ? null : ultimosDigitos.trim(),
+                    titular_persona_id: titularId || null,
                     color_hex: colorHex,
                     imagen_fondo_url: previewFondo ?? imagenFondoUrl,
                   }}
@@ -723,6 +756,8 @@ export default function TarjetasPage() {
                 <p className="text-xs text-gray-400 dark:text-white/50">
                   {TIPO_LABEL[entidadActiva.tipo]}
                   {entidadActiva.ultimos_digitos && ` · •••• ${entidadActiva.ultimos_digitos}`}
+                  {entidadActiva.titular_persona_id &&
+                    ` · Titular: ${personas.find((p) => p.id === entidadActiva.titular_persona_id)?.nombre ?? "?"}`}
                 </p>
               </div>
               <button

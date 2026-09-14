@@ -14,7 +14,8 @@ import { formatCLP, mesActualISO } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, CategoriaGrupoPreferido, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
+import { resolverPorcentajesEfectivos } from "@/lib/reparto";
+import { Categoria, CategoriaGrupoPreferido, Entidad, GastoFijo, Grupo, GrupoParticipante, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
 
 // Pestaña "Recurrente" de /gastos: gastos_fijos, sin filtrar por tipo_monto
 // — Felipe pidió que /gastos tenga solo 3 categorías (Normal/Recurrente/
@@ -33,6 +34,12 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // Reparto de cada grupo (para congelarlo en item_participantes al guardar
+  // un ítem con grupo — ver migration_33_compromisos_fundacion.sql). Ya no se
+  // deja que el reparto de un ítem con grupo se resuelva en vivo contra el
+  // grupo: se copia una vez, al guardar, así un cambio de % más adelante no
+  // mueve retroactivamente lo que ya está cargado.
+  const [grupoParticipantesTodos, setGrupoParticipantesTodos] = useState<GrupoParticipante[]>([]);
   // "Esta categoría usa este grupo por defecto" (ver Grupos y
   // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
   const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
@@ -65,7 +72,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
   const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargarTodo() {
-    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: cgp }, { data: ip }, { data: pg }] =
+    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: gp }, { data: cgp }, { data: ip }, { data: pg }] =
       await Promise.all([
         supabase.from("gastos_fijos").select("*").eq("activo", true).order("descripcion"),
         supabase.from("entidades").select("*").order("nombre"),
@@ -73,6 +80,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
         supabase.from("categorias").select("*").order("nombre"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
+        supabase.from("grupo_participantes").select("*"),
         supabase.from("categoria_grupo_preferido").select("*"),
         supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
         supabase.from("pagos").select("*").eq("origen", "gasto_fijo"),
@@ -83,6 +91,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
+    setGrupoParticipantesTodos((gp as GrupoParticipante[]) ?? []);
     const mapaPreferido: Record<string, string> = {};
     ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
       mapaPreferido[row.categoria_id] = row.grupo_id;
@@ -153,6 +162,20 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
     setMostrarForm(true);
   }
 
+  // Ver el mismo helper en CuotasLista.tsx: si el gasto tiene grupo, se
+  // CONGELA el % efectivo del grupo tal cual está ahora (en vez de dejar que
+  // se resuelva en vivo contra el grupo para siempre).
+  function participantesAGuardar(): Participante[] {
+    if (grupoId) {
+      const idsActivos = new Set(personas.map((p) => p.id));
+      return resolverPorcentajesEfectivos(
+        grupoParticipantesTodos.filter((gp) => gp.grupo_id === grupoId),
+        idsActivos
+      ).map((p) => ({ persona_id: p.persona_id, porcentaje: p.porcentaje }));
+    }
+    return participantes;
+  }
+
   async function guardarParticipantes(gastoId: string) {
     const { error: delError } = await supabase
       .from("item_participantes")
@@ -160,9 +183,10 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
       .eq("origen", "gasto_fijo")
       .eq("origen_id", gastoId);
     if (delError) throw delError;
-    if (!grupoId && participantes.length > 0) {
+    const aGuardar = participantesAGuardar();
+    if (aGuardar.length > 0) {
       const { error: insError } = await supabase.from("item_participantes").insert(
-        participantes.map((p) => ({ origen: "gasto_fijo", origen_id: gastoId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+        aGuardar.map((p) => ({ origen: "gasto_fijo", origen_id: gastoId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
       );
       if (insError) throw insError;
     }

@@ -48,6 +48,11 @@ export interface Entidad {
   // (ej. "•••• 5344") — opcional, texto (no número: puede empezar con "0").
   // Ver migration_32_ultimos_digitos.sql.
   ultimos_digitos: string | null;
+  // De quién es esta tarjeta/cuenta (el titular no necesariamente es quien
+  // debe asumir el gasto — eso lo define "Asignar a" en cada movimiento). null
+  // = sin titular asignado (no se agrupa bajo nadie en Compromisos). Ver
+  // migration_33_compromisos_fundacion.sql.
+  titular_persona_id: string | null;
 }
 
 export type TipoMarca =
@@ -87,6 +92,11 @@ export interface Grupo {
   id: string;
   nombre: string;
   icono: string | null;
+  // Marca el grupo que representa a "Hogar" en Compromisos — a lo más uno por
+  // cuenta (índice único parcial). false para cualquier otro grupo de reparto
+  // que el usuario cree (ej. uno para dividir Falabella con alguien). Ver
+  // migration_33_compromisos_fundacion.sql.
+  es_principal: boolean;
 }
 
 // Persona participante de un grupo o de un item suelto, con su % (o null =
