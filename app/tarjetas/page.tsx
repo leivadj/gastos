@@ -77,6 +77,10 @@ export default function TarjetasPage() {
   // migration_33_compromisos_fundacion.sql.
   const [titularId, setTitularId] = useState("");
   const [colorHex, setColorHex] = useState<string | null>(null);
+  // Color del texto/íconos superpuestos (opcional) — para tarjetas con fondo
+  // muy claro donde el blanco de siempre no se alcanza a leer. Ver
+  // migration_35_color_texto_tarjeta.sql.
+  const [colorTexto, setColorTexto] = useState<string | null>(null);
   const [imagenFondoUrl, setImagenFondoUrl] = useState<string | null>(null);
   const [archivoFondo, setArchivoFondo] = useState<File | null>(null);
   const [previewFondo, setPreviewFondo] = useState<string | null>(null);
@@ -199,6 +203,7 @@ export default function TarjetasPage() {
     setUltimosDigitos("");
     setTitularId("");
     setColorHex(null);
+    setColorTexto(null);
     setImagenFondoUrl(null);
     onElegirArchivo(null);
     setError("");
@@ -215,6 +220,7 @@ export default function TarjetasPage() {
     setUltimosDigitos(e.ultimos_digitos ?? "");
     setTitularId(e.titular_persona_id ?? "");
     setColorHex(e.color_hex ?? null);
+    setColorTexto(e.color_texto ?? null);
     setImagenFondoUrl(e.imagen_fondo_url ?? null);
     onElegirArchivo(null);
     setMostrarForm(true);
@@ -253,6 +259,7 @@ export default function TarjetasPage() {
         ultimos_digitos: ultimosDigitos.trim() === "" ? null : ultimosDigitos.trim(),
         titular_persona_id: titularId || null,
         color_hex: colorHex || null,
+        color_texto: colorTexto || null,
         imagen_fondo_url: fondoUrlFinal,
       };
       const { error: dbError } = editandoId
@@ -594,6 +601,7 @@ export default function TarjetasPage() {
                     ultimos_digitos: ultimosDigitos.trim() === "" ? null : ultimosDigitos.trim(),
                     titular_persona_id: titularId || null,
                     color_hex: colorHex,
+                    color_texto: colorTexto,
                     imagen_fondo_url: previewFondo ?? imagenFondoUrl,
                   }}
                   marca={marcaDe(marcaId)}
@@ -615,6 +623,21 @@ export default function TarjetasPage() {
                 {colorHex && (
                   <button type="button" onClick={() => setColorHex(null)} className="text-[11px] text-brand-from dark:text-white">
                     usar color automático
+                  </button>
+                )}
+
+                <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                  Color de texto
+                  <input
+                    type="color"
+                    value={colorTexto || "#ffffff"}
+                    onChange={(e) => setColorTexto(e.target.value)}
+                    className="h-8 w-10 cursor-pointer rounded border border-gray-200 bg-white p-0.5 dark:border-white/10 dark:bg-gray-800"
+                  />
+                </label>
+                {colorTexto && (
+                  <button type="button" onClick={() => setColorTexto(null)} className="text-[11px] text-brand-from dark:text-white">
+                    usar blanco
                   </button>
                 )}
 

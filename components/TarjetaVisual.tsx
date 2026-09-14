@@ -54,11 +54,16 @@ export function TarjetaVisual({
         backgroundPosition: "center",
       }
     : { backgroundImage: gradienteTarjeta(colorBase) };
+  // Color de texto opcional (migration_35) — por defecto blanco (clase
+  // text-white de abajo); si el usuario eligió uno (tarjetas/imágenes muy
+  // claras donde el blanco no se lee), el inline style gana por
+  // especificidad y lo reemplaza en toda la cara de la tarjeta.
+  const estiloTexto = entidad.color_texto ? { color: entidad.color_texto } : undefined;
 
   return (
     <div
       className={`relative flex aspect-[8/5] w-full shrink-0 flex-col justify-between overflow-hidden rounded-2xl p-5 text-white shadow-lg ${className}`}
-      style={estiloFondo}
+      style={{ ...estiloFondo, ...estiloTexto }}
     >
       {/* Con imagen de fondo propia (ej. una foto/diseño real de la tarjeta),
           no superponemos overlay oscuro, nombre/tipo ni el logo de la marca

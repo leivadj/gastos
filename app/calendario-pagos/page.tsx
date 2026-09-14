@@ -677,7 +677,7 @@ export default function CalendarioPagosPage() {
 
       <div>
         <p className="mb-2 px-1 text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Vencimientos de este mes</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="divide-y divide-gray-100 overflow-hidden rounded-2xl border border-gray-100 bg-white dark:divide-white/10 dark:border-white/10 dark:bg-neutral-900">
           {eventos.map((ev) => {
             const key = `${ev.origen}:${ev.origenId}`;
             const pago = pagoDe(ev);
@@ -685,11 +685,15 @@ export default function CalendarioPagosPage() {
             const vencido = !pagado && ev.dia != null && ev.dia < hoyDia;
             const marca = marcaDe(ev.marcaId) ?? marcaDeEntidad(ev.entidadId);
             return (
-              <Card key={key}>
-                <div className="flex items-start gap-3">
-                  <EntidadAvatar entidad={entidadDe(ev.entidadId)} marca={marca} icono={ev.icono} className="h-9 w-9" />
+              // Un rectángulo horizontal por vencimiento (antes: grid de
+              // tarjetas cuadradas de a 1-3 por fila) — todo el detalle y
+              // "Marcar como pagado" quedan en la misma línea, sin tener que
+              // escanear una grilla para comparar montos/fechas.
+              <div key={key} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <EntidadAvatar entidad={entidadDe(ev.entidadId)} marca={marca} icono={ev.icono} className="h-9 w-9 shrink-0" />
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-gray-800 dark:text-white">
+                    <p className="truncate font-semibold text-gray-800 dark:text-white">
                       {ev.descripcion}
                       {ev.detalle ? ` · ${ev.detalle}` : ""}
                     </p>
@@ -698,6 +702,9 @@ export default function CalendarioPagosPage() {
                       {vencido ? " · vencido" : ""}
                     </p>
                   </div>
+                </div>
+
+                <div className="flex shrink-0 items-center justify-between gap-4 sm:justify-end sm:gap-6">
                   <div className="text-right">
                     <p className="font-semibold text-gray-800 dark:text-white">
                       {ev.esPromedio && <span className="mr-0.5 font-normal text-gray-400 dark:text-gray-500">~</span>}
@@ -711,54 +718,50 @@ export default function CalendarioPagosPage() {
                       <p className="text-[11px] text-gray-300 dark:text-gray-600">Pendiente</p>
                     )}
                   </div>
-                </div>
 
-                {marcandoKey === key ? (
-                  <div className="mt-3 flex items-center gap-2 border-t border-gray-50 dark:border-white/10 pt-3">
-                    <input
-                      type="number"
-                      min={0}
-                      autoFocus
-                      value={montoIngresado}
-                      onChange={(e) => setMontoIngresado(e.target.value)}
-                      className="w-full rounded-lg border border-gray-200 dark:border-white/10 dark:bg-white/5 dark:text-white px-3 py-1.5 text-sm"
-                    />
-                    <button
-                      onClick={() => confirmarPago(ev)}
-                      disabled={guardando}
-                      className="shrink-0 rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
-                    >
-                      Confirmar
-                    </button>
-                    <button
-                      onClick={() => setMarcandoKey(null)}
-                      className="shrink-0 rounded-lg bg-gray-50 dark:bg-white/5 px-3 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-3 flex justify-end border-t border-gray-50 dark:border-white/10 pt-3">
-                    {pagado ? (
+                  {marcandoKey === key ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        autoFocus
+                        value={montoIngresado}
+                        onChange={(e) => setMontoIngresado(e.target.value)}
+                        className="w-28 rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                      />
                       <button
-                        onClick={() => pago && deshacerPago(pago)}
+                        onClick={() => confirmarPago(ev)}
                         disabled={guardando}
-                        className="text-xs text-gray-300 dark:text-gray-600 hover:text-red-400"
+                        className="shrink-0 rounded-lg bg-brand-gradient px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-60"
                       >
-                        deshacer
+                        Confirmar
                       </button>
-                    ) : (
-                      <button onClick={() => abrirMarcarPagado(ev)} className="text-xs font-semibold text-brand-from dark:text-white">
-                        Marcar como pagado
+                      <button
+                        onClick={() => setMarcandoKey(null)}
+                        className="shrink-0 rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-semibold text-gray-400 dark:bg-white/5 dark:text-gray-500"
+                      >
+                        Cancelar
                       </button>
-                    )}
-                  </div>
-                )}
-              </Card>
+                    </div>
+                  ) : pagado ? (
+                    <button
+                      onClick={() => pago && deshacerPago(pago)}
+                      disabled={guardando}
+                      className="shrink-0 text-xs text-gray-300 hover:text-red-400 dark:text-gray-600"
+                    >
+                      deshacer
+                    </button>
+                  ) : (
+                    <button onClick={() => abrirMarcarPagado(ev)} className="shrink-0 text-xs font-semibold text-brand-from dark:text-white">
+                      Marcar como pagado
+                    </button>
+                  )}
+                </div>
+              </div>
             );
           })}
           {eventos.length === 0 && (
-            <p className="text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay gastos fijos ni cuotas vigentes.</p>
+            <p className="p-4 text-center text-sm text-gray-400 dark:text-gray-500">Todavía no hay gastos fijos ni cuotas vigentes.</p>
           )}
         </div>
       </div>

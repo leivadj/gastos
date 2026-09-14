@@ -352,7 +352,13 @@ export function DesktopSidebar() {
             aria-label={item.label}
             className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl transition ${
               active
-                ? "bg-brand-gradient text-white"
+                ? // Mockup: el ítem activo del rail se ve con los colores
+                  // invertidos respecto al fondo de la página (cuadro
+                  // blanco/ícono negro en modo oscuro, cuadro negro/ícono
+                  // blanco en modo claro) — no el degradado de marca, que
+                  // solo se usa en botones de acción (+, Guardar, etc.).
+                  // Mismo patrón que ya usa el avatar de perfil más abajo.
+                  "bg-gray-800 text-white dark:bg-white dark:text-black"
                 : "text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
             }`}
           >
@@ -369,7 +375,7 @@ export function DesktopSidebar() {
           onClick={() => setMasAbierto((v) => !v)}
           className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl transition ${
             ITEMS_MAS.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
-              ? "bg-brand-gradient text-white"
+              ? "bg-gray-800 text-white dark:bg-white dark:text-black"
               : "text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
           }`}
         >

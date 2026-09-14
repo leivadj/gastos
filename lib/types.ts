@@ -37,6 +37,11 @@ export interface Entidad {
   // tarjeta que el usuario sube (ej. una captura del diseño de su banco) —
   // si existe, se usa como fondo en vez del degradado.
   color_hex: string | null;
+  // Color hex opcional para el texto/íconos superpuestos en la cara de la
+  // tarjeta — null = blanco (el de siempre). Ver
+  // migration_35_color_texto_tarjeta.sql. Pensado para tarjetas con
+  // color/imagen de fondo muy claros donde el texto blanco no se lee.
+  color_texto: string | null;
   imagen_fondo_url: string | null;
   // Saldo actual, editado a mano por el usuario (null = todavía no lo puso).
   saldo: number | null;

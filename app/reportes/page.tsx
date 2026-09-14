@@ -366,6 +366,16 @@ export default function ReportesPage() {
     if (entidad) return resolverMarca(entidad, marcas);
     return marcaDe(f.marcaId);
   }
+  // Nombre de la entidad/tienda donde se generó el gasto (a pedido de
+  // Felipe, reemplaza a la categoría como columna principal de "dónde" en
+  // la tabla): primero la cuenta/tarjeta con la que se pagó (ej. "Banco
+  // Estado", o una tarjeta de casa comercial como "Falabella"), si no tiene
+  // entidad asociada (ej. gastos diarios) la marca/comercio del ítem (ej.
+  // "Jumbo"), y solo si no hay ninguna de las dos, la categoría — igual que
+  // antes.
+  function entidadOTiendaDe(f: FilaReporte): string {
+    return entidadDe(f.entidadId)?.nombre ?? marcaDeFila(f)?.nombre ?? categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría";
+  }
 
   const filasFiltradas = filasReporte.filter((f) => {
     if (categoriaFiltro && f.categoriaId !== categoriaFiltro) return false;
@@ -388,11 +398,11 @@ export default function ReportesPage() {
 
   function exportarExcel() {
     const filas = [
-      ["Fecha", "Descripción", "Categoría", "Persona", "Detalle", "Monto"],
+      ["Fecha", "Descripción", "Entidad", "Persona", "Detalle", "Monto"],
       ...filasFiltradas.map((f) => [
         f.fechaLabel,
         f.reparto.length > 1 ? `${f.descripcion} · ${Math.round(f.reparto.find((r) => r.persona_id === personaFiltro)?.pct ?? 0)}% de ${formatCLP(f.monto)}` : f.descripcion,
-        categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría",
+        entidadOTiendaDe(f),
         personaFiltro ? personaDe(personaFiltro)?.nombre ?? "" : f.reparto.map((r) => r.persona_nombre).join(" / "),
         f.detalle + (f.pagado ? "" : " · pendiente"),
         String(montoMostrado(f)),
@@ -419,7 +429,7 @@ export default function ReportesPage() {
             : f.descripcion;
         const persona = personaFiltro ? personaDe(personaFiltro)?.nombre ?? "" : f.reparto.map((r) => r.persona_nombre).join(" / ");
         const detalle = f.detalle + (f.pagado ? "" : ` <span style="color:#c0392b">· pendiente</span>`);
-        return `<tr><td>${f.fechaLabel}</td><td>${desc}</td><td>${categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría"}</td><td>${persona}</td><td>${detalle}</td><td style="text-align:right">${formatCLP(montoMostrado(f))}</td></tr>`;
+        return `<tr><td>${f.fechaLabel}</td><td>${desc}</td><td>${entidadOTiendaDe(f)}</td><td>${persona}</td><td>${detalle}</td><td style="text-align:right">${formatCLP(montoMostrado(f))}</td></tr>`;
       })
       .join("");
     ventana.document.write(`<!doctype html><html><head><title>Reporte ${nombreMesLargoCap}</title><meta charset="utf-8"/><style>
@@ -434,7 +444,7 @@ export default function ReportesPage() {
       <h1>Generar reporte</h1>
       <p>${nombreMesLargoCap}${personaFiltro ? " · Persona: " + (personaDe(personaFiltro)?.nombre ?? "") : ""}${categoriaFiltro ? " · " + (categoriaDe(categoriaFiltro)?.nombre ?? "") : ""}</p>
       <table>
-        <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Persona</th><th>Detalle</th><th style="text-align:right">Monto</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Descripción</th><th>Entidad</th><th>Persona</th><th>Detalle</th><th style="text-align:right">Monto</th></tr></thead>
         <tbody>${filasHtml}</tbody>
         <tfoot><tr><td colspan="5">Total filtrado</td><td style="text-align:right">${formatCLP(totalFiltrado)}</td></tr></tfoot>
       </table>
@@ -626,7 +636,7 @@ export default function ReportesPage() {
               <tr className="border-b border-gray-100 text-left text-[10.5px] font-semibold uppercase tracking-wide text-gray-400 dark:border-white/10 dark:text-gray-500">
                 <th className="px-4 py-2.5">Fecha</th>
                 <th className="px-4 py-2.5">Descripción</th>
-                <th className="px-4 py-2.5">Categoría</th>
+                <th className="px-4 py-2.5">Entidad</th>
                 <th className="px-4 py-2.5">Persona</th>
                 <th className="px-4 py-2.5">Detalle</th>
                 <th className="px-4 py-2.5 text-right">Monto</th>
@@ -656,13 +666,10 @@ export default function ReportesPage() {
                               </span>
                             )}
                           </p>
-                          {entidadDe(f.entidadId) && (
-                            <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">{entidadDe(f.entidadId)?.nombre}</p>
-                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">{categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría"}</td>
+                    <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">{entidadOTiendaDe(f)}</td>
                     <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">
                       {personaFiltro ? personaDe(personaFiltro)?.nombre : f.reparto.map((r) => r.persona_nombre).join(" / ")}
                     </td>

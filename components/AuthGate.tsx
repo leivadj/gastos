@@ -21,7 +21,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // contenedor mobile (max-w-3xl del layout esMobile de más arriba),
   // para que no se vean como una versión angosta de celular estirada
   // en medio de una pantalla grande.
-  const anchoDesktop = pathname === "/" ? "max-w-6xl" : "max-w-4xl";
+  // /reportes es la excepción: es una tabla de datos (fecha/descripción/
+  // entidad/persona/detalle/monto) que con max-w-4xl quedaba con columnas
+  // cortadas o apretadas en escritorio (Felipe lo reportó) — usa el ancho
+  // completo disponible en vez del ancho "moderado" del resto de páginas.
+  const anchoDesktop = pathname === "/" ? "max-w-6xl" : pathname.startsWith("/reportes") ? "max-w-none" : "max-w-4xl";
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
