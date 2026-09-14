@@ -129,10 +129,6 @@ export default function ReportesPage() {
     cargar();
   }, []);
 
-  if (cargando) {
-    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
-  }
-
   const hoyISO = mesActualISO();
   const meses = ultimosMeses(N_MESES);
 
@@ -304,6 +300,12 @@ export default function ReportesPage() {
     return filas.sort((a, b) => b.diaOrden - a.diaOrden);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compras, gastosFijos, gastosDiarios, pagos, grupoParticipantes, itemParticipantes, personas, rangoRef, refIso, refMesTexto]);
+
+  // El return condicional va DESPUÉS de todos los hooks — ver el mismo fix y
+  // la misma explicación en app/compromisos/page.tsx.
+  if (cargando) {
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
+  }
 
   const categoriaDe = (id: string | null) => categorias.find((c) => c.id === id) ?? null;
   const personaDe = (id: string) => personas.find((p) => p.id === id) ?? null;

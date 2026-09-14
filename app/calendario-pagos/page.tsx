@@ -124,10 +124,6 @@ export default function CalendarioPagosPage() {
     cargarTodo();
   }, []);
 
-  if (cargando) {
-    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
-  }
-
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
   const marcaDe = (id: string | null) => marcas.find((m) => m.id === id) ?? null;
   const marcaDeEntidad = (id: string | null) => resolverMarca(entidadDe(id), marcas);
@@ -288,6 +284,13 @@ export default function CalendarioPagosPage() {
     () => transferencias.filter((t) => t.fecha >= inicioMesI && t.fecha < inicioMesSiguienteI),
     [transferencias, inicioMesI, inicioMesSiguienteI]
   );
+
+  // El return condicional va DESPUÉS de todos los hooks — ver el mismo fix y
+  // la misma explicación en app/compromisos/page.tsx.
+  if (cargando) {
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
+  }
+
   const esPagoTC = (t: Transferencia) => entidadDe(t.cuenta_destino_id)?.tipo === "tarjeta_credito";
   const movimientosInternos = transferenciasDelMesI
     .filter((t) => (filtroInterno === "pago_tc" ? esPagoTC(t) : !esPagoTC(t)))
