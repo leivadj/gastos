@@ -20,6 +20,7 @@ const HREFS_HERRAMIENTAS_ANTERIORES = [
   "/salud",
   "/ingresos",
   "/grupos",
+  "/compromisos",
   "/personas",
   "/sugerencias",
   "/gastos",
@@ -83,8 +84,8 @@ export default function MasPage() {
         {herramientasAbiertas && (
           <div className="border-t border-gray-50 dark:border-white/10">
             <p className="px-5 pt-3 text-[11px] text-gray-400 dark:text-gray-500">
-              Metas, auto, salud, ingresos, grupos, personas, sugerencias, gastos, calendario de pagos, movimientos y
-              reportes{esAdminUsuario ? " y ajustes" : ""}.
+              Metas, auto, salud, ingresos, grupos, compromisos, personas, sugerencias, gastos, calendario de pagos,
+              movimientos y reportes{esAdminUsuario ? " y ajustes" : ""}.
             </p>
             {itemsAnteriores.map((item, i) => (
               <Link

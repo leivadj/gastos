@@ -22,6 +22,7 @@ const RUTAS_MAS = [
   "/auto",
   "/salud",
   "/grupos",
+  "/compromisos",
   "/personas",
   "/sugerencias",
   "/admin",

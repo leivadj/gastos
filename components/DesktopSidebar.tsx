@@ -201,6 +201,19 @@ const ITEMS_MAS: ItemRail[] = [
       </svg>
     ),
   },
+  {
+    key: "compromisos",
+    href: "/compromisos",
+    label: "Compromisos",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="3" y="7" width="18" height="13" rx="2.2" />
+        <path d="M3 11h18" strokeLinecap="round" />
+        <path d="M7 15.5h4" strokeLinecap="round" />
+        <path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" strokeLinecap="round" />
+      </svg>
+    ),
+  },
 ];
 
 const ITEM_PERSONAS: ItemRail = {
