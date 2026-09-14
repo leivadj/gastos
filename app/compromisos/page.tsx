@@ -127,10 +127,6 @@ export default function CompromisosPage() {
     cargar();
   }, []);
 
-  if (cargando) {
-    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
-  }
-
   const refIso = isoDelMes(rangoRef);
   const nombreMesLargo = new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric" }).format(
     new Date(rangoRef.year, rangoRef.month, 1)
@@ -216,6 +212,16 @@ export default function CompromisosPage() {
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compras, gastosFijos, pagos, itemParticipantes, grupoParticipantes, personas, rangoRef, refIso]);
+
+  // El return condicional va DESPUÉS de todos los hooks (useState/useEffect/
+  // useMemo de arriba) — nunca antes de un hook, porque eso viola las Rules
+  // of Hooks (React lanza "Rendered more/fewer hooks than expected" en
+  // cuanto `cargando` cambia de true a false, que es exactamente el bug que
+  // producía el "Application error: a client-side exception has occurred"
+  // en /compromisos).
+  if (cargando) {
+    return <p className="py-10 text-center text-gray-400 dark:text-gray-500">Cargando…</p>;
+  }
 
   const categoriaDe = (id: string | null) => categorias.find((c) => c.id === id) ?? null;
   const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
