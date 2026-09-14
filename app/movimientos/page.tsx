@@ -366,7 +366,7 @@ export default function MovimientosPage() {
         </p>
       </div>
 
-      <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 dark:border-white/10 dark:bg-gray-900">
+      <div className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 dark:border-white/10 dark:bg-neutral-900">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="shrink-0 text-gray-400 dark:text-gray-500">
           <circle cx="11" cy="11" r="7" />
           <path d="m21 21-4.3-4.3" />

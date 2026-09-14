@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { resolverMarca } from "@/lib/resolverMarca";
 import {
   cuotaActualEn,
   esMismoMes,
@@ -18,12 +20,14 @@ import { promedioMovil } from "@/lib/promedioMovil";
 import {
   Categoria,
   Compra,
+  Entidad,
   GastoDiario,
   GastoFijo,
   Grupo,
   GrupoParticipante,
   Ingreso,
   ItemParticipante,
+  Marca,
   OrigenItem,
   Pago,
   Persona,
@@ -76,6 +80,18 @@ type FilaReporte = {
   fechaLabel: string;
   descripcion: string;
   categoriaId: string | null;
+  // Para el ícono/logo de la fila (mismo criterio que /compromisos y
+  // /calendario-pagos): entidadId es el medio de pago (compras/gastos
+  // fijos); los diarios no tienen medio de pago, así que van con
+  // entidadId null y marcaId propio (el comercio/servicio, ej. "Netflix").
+  entidadId: string | null;
+  marcaId: string | null;
+  icono: string | null;
+  // "Cuota 2 de 3" / "Gasto fijo" / "Gasto diario" — el mismo detalle que
+  // ya muestra /compromisos, para no tener que adivinar de dónde sale el
+  // monto.
+  detalle: string;
+  pagado: boolean;
   monto: number;
   reparto: { persona_id: string; persona_nombre: string; pct: number; monto: number }[];
 };
@@ -87,6 +103,8 @@ export default function ReportesPage() {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [entidades, setEntidades] = useState<Entidad[]>([]);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [grupoParticipantes, setGrupoParticipantes] = useState<GrupoParticipante[]>([]);
@@ -100,7 +118,7 @@ export default function ReportesPage() {
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: c }, { data: gf }, { data: gd }, { data: pg }, { data: ing }, { data: cat }, { data: p }, { data: gr }, { data: gp }, { data: ipC }, { data: ipG }] =
+      const [{ data: c }, { data: gf }, { data: gd }, { data: pg }, { data: ing }, { data: cat }, { data: ent }, { data: mar }, { data: p }, { data: gr }, { data: gp }, { data: ipC }, { data: ipG }] =
         await Promise.all([
           supabase.from("compras").select("*"),
           supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -108,6 +126,8 @@ export default function ReportesPage() {
           supabase.from("pagos").select("*"),
           supabase.from("ingresos").select("*"),
           supabase.from("categorias").select("*"),
+          supabase.from("entidades").select("*"),
+          supabase.from("marcas").select("*"),
           supabase.from("personas").select("*").eq("activo", true),
           supabase.from("grupos").select("*").order("nombre"),
           supabase.from("grupo_participantes").select("*"),
@@ -120,6 +140,8 @@ export default function ReportesPage() {
       setPagos((pg as Pago[]) ?? []);
       setIngresos((ing as Ingreso[]) ?? []);
       setCategorias((cat as Categoria[]) ?? []);
+      setEntidades((ent as Entidad[]) ?? []);
+      setMarcas((mar as Marca[]) ?? []);
       setPersonas((p as Persona[]) ?? []);
       setGrupos((gr as Grupo[]) ?? []);
       setGrupoParticipantes((gp as GrupoParticipante[]) ?? []);
@@ -135,6 +157,13 @@ export default function ReportesPage() {
   function pagoReal(origen: "compra" | "gasto_fijo", origenId: string, mesIso: string) {
     return pagos.find((p) => p.origen === origen && p.origen_id === origenId && p.mes === mesIso && p.monto_real != null)
       ?.monto_real;
+  }
+
+  // Estado pagado/pendiente de esta fila en el mes del reporte (mismo dato
+  // que ya usa /calendario-pagos) — se muestra como detalle en la tabla,
+  // igual que en /compromisos.
+  function pagadoEn(origen: OrigenItem, origenId: string, mesIso: string): boolean {
+    return pagos.find((p) => p.origen === origen && p.origen_id === origenId && p.mes === mesIso)?.pagado ?? false;
   }
 
   // Gasto total del mes de referencia: cuotas vigentes ESE mes (con su
@@ -260,6 +289,11 @@ export default function ReportesPage() {
         fechaLabel: `${dia} ${nombreMesCorto(refIso)}`,
         descripcion: c.descripcion,
         categoriaId: c.categoria_id,
+        entidadId: c.entidad_id,
+        marcaId: c.marca_id,
+        icono: c.icono,
+        detalle: `Cuota ${cuotaActual} de ${c.n_cuotas}`,
+        pagado: pagadoEn("compra", c.id, refIso),
         monto,
         reparto: reparto.map((r) => ({ ...r, monto: Math.round((monto * r.pct) / 100) })),
       });
@@ -278,6 +312,11 @@ export default function ReportesPage() {
         fechaLabel: `${dia} ${nombreMesCorto(refIso)}`,
         descripcion: g.descripcion,
         categoriaId: g.categoria_id,
+        entidadId: g.entidad_id,
+        marcaId: g.marca_id,
+        icono: g.icono,
+        detalle: "Gasto fijo",
+        pagado: pagadoEn("gasto_fijo", g.id, refIso),
         monto,
         reparto: reparto.map((r) => ({ ...r, monto: Math.round((monto * r.pct) / 100) })),
       });
@@ -293,6 +332,14 @@ export default function ReportesPage() {
           fechaLabel: `${dia} ${nombreMesCorto(refIso)}`,
           descripcion: d.descripcion,
           categoriaId: d.categoria_id,
+          // Los diarios no tienen medio de pago (entidad) propio — solo
+          // marca (comercio/servicio, ej. "Netflix") — y no tienen estado
+          // pagado/pendiente (ya ocurrieron al cargarlos).
+          entidadId: null,
+          marcaId: d.marca_id,
+          icono: null,
+          detalle: "Gasto diario",
+          pagado: true,
           monto: Number(d.monto),
           reparto: reparto.map((r) => ({ ...r, monto: Math.round((Number(d.monto) * r.pct) / 100) })),
         });
@@ -309,6 +356,16 @@ export default function ReportesPage() {
 
   const categoriaDe = (id: string | null) => categorias.find((c) => c.id === id) ?? null;
   const personaDe = (id: string) => personas.find((p) => p.id === id) ?? null;
+  const entidadDe = (id: string | null) => entidades.find((e) => e.id === id) ?? null;
+  const marcaDe = (id: string | null) => marcas.find((m) => m.id === id) ?? null;
+  // Marca a mostrar en el ícono de la fila: la de la entidad (medio de
+  // pago) si tiene una vinculada, si no la propia del ítem (ej. diarios,
+  // que solo tienen marca_id) — mismo criterio que /calendario-pagos.
+  function marcaDeFila(f: FilaReporte): Marca | null {
+    const entidad = entidadDe(f.entidadId);
+    if (entidad) return resolverMarca(entidad, marcas);
+    return marcaDe(f.marcaId);
+  }
 
   const filasFiltradas = filasReporte.filter((f) => {
     if (categoriaFiltro && f.categoriaId !== categoriaFiltro) return false;
@@ -331,12 +388,13 @@ export default function ReportesPage() {
 
   function exportarExcel() {
     const filas = [
-      ["Fecha", "Descripción", "Categoría", "Persona", "Monto"],
+      ["Fecha", "Descripción", "Categoría", "Persona", "Detalle", "Monto"],
       ...filasFiltradas.map((f) => [
         f.fechaLabel,
         f.reparto.length > 1 ? `${f.descripcion} · ${Math.round(f.reparto.find((r) => r.persona_id === personaFiltro)?.pct ?? 0)}% de ${formatCLP(f.monto)}` : f.descripcion,
         categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría",
         personaFiltro ? personaDe(personaFiltro)?.nombre ?? "" : f.reparto.map((r) => r.persona_nombre).join(" / "),
+        f.detalle + (f.pagado ? "" : " · pendiente"),
         String(montoMostrado(f)),
       ]),
     ];
@@ -360,7 +418,8 @@ export default function ReportesPage() {
             ? `${f.descripcion} <span style="color:#999">· ${Math.round(f.reparto.find((r) => r.persona_id === personaFiltro)?.pct ?? 0)}% de ${formatCLP(f.monto)}</span>`
             : f.descripcion;
         const persona = personaFiltro ? personaDe(personaFiltro)?.nombre ?? "" : f.reparto.map((r) => r.persona_nombre).join(" / ");
-        return `<tr><td>${f.fechaLabel}</td><td>${desc}</td><td>${categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría"}</td><td>${persona}</td><td style="text-align:right">${formatCLP(montoMostrado(f))}</td></tr>`;
+        const detalle = f.detalle + (f.pagado ? "" : ` <span style="color:#c0392b">· pendiente</span>`);
+        return `<tr><td>${f.fechaLabel}</td><td>${desc}</td><td>${categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría"}</td><td>${persona}</td><td>${detalle}</td><td style="text-align:right">${formatCLP(montoMostrado(f))}</td></tr>`;
       })
       .join("");
     ventana.document.write(`<!doctype html><html><head><title>Reporte ${nombreMesLargoCap}</title><meta charset="utf-8"/><style>
@@ -375,9 +434,9 @@ export default function ReportesPage() {
       <h1>Generar reporte</h1>
       <p>${nombreMesLargoCap}${personaFiltro ? " · Persona: " + (personaDe(personaFiltro)?.nombre ?? "") : ""}${categoriaFiltro ? " · " + (categoriaDe(categoriaFiltro)?.nombre ?? "") : ""}</p>
       <table>
-        <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Persona</th><th style="text-align:right">Monto</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Persona</th><th>Detalle</th><th style="text-align:right">Monto</th></tr></thead>
         <tbody>${filasHtml}</tbody>
-        <tfoot><tr><td colspan="4">Total filtrado</td><td style="text-align:right">${formatCLP(totalFiltrado)}</td></tr></tfoot>
+        <tfoot><tr><td colspan="5">Total filtrado</td><td style="text-align:right">${formatCLP(totalFiltrado)}</td></tr></tfoot>
       </table>
     </body></html>`);
     ventana.document.close();
@@ -569,13 +628,14 @@ export default function ReportesPage() {
                 <th className="px-4 py-2.5">Descripción</th>
                 <th className="px-4 py-2.5">Categoría</th>
                 <th className="px-4 py-2.5">Persona</th>
+                <th className="px-4 py-2.5">Detalle</th>
                 <th className="px-4 py-2.5 text-right">Monto</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-white/10">
               {filasFiltradas.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
+                  <td colSpan={6} className="px-4 py-8 text-center text-gray-400 dark:text-gray-500">
                     Sin movimientos para este filtro.
                   </td>
                 </tr>
@@ -584,17 +644,33 @@ export default function ReportesPage() {
                   <tr key={f.key} className="text-gray-700 dark:text-gray-200">
                     <td className="whitespace-nowrap px-4 py-2.5 text-gray-400 dark:text-gray-500">{f.fechaLabel}</td>
                     <td className="px-4 py-2.5">
-                      {f.descripcion}
-                      {f.reparto.length > 1 && (
-                        <span className="text-gray-400 dark:text-gray-500">
-                          {" "}
-                          · {Math.round(f.reparto.find((r) => r.persona_id === personaFiltro)?.pct ?? f.reparto[0].pct)}% de {formatCLP(f.monto)}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2.5">
+                        <EntidadAvatar entidad={entidadDe(f.entidadId)} marca={marcaDeFila(f)} icono={f.icono} nombreFallback={f.descripcion} className="h-7 w-7 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="truncate">
+                            {f.descripcion}
+                            {f.reparto.length > 1 && (
+                              <span className="text-gray-400 dark:text-gray-500">
+                                {" "}
+                                · {Math.round(f.reparto.find((r) => r.persona_id === personaFiltro)?.pct ?? f.reparto[0].pct)}% de {formatCLP(f.monto)}
+                              </span>
+                            )}
+                          </p>
+                          {entidadDe(f.entidadId) && (
+                            <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">{entidadDe(f.entidadId)?.nombre}</p>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">{categoriaDe(f.categoriaId)?.nombre ?? "Sin categoría"}</td>
                     <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">
                       {personaFiltro ? personaDe(personaFiltro)?.nombre : f.reparto.map((r) => r.persona_nombre).join(" / ")}
+                    </td>
+                    <td className="px-4 py-2.5 text-gray-500 dark:text-gray-400">
+                      <span className="whitespace-nowrap">
+                        {f.detalle}
+                        {!f.pagado && <span className="ml-1 text-gasto">· pendiente</span>}
+                      </span>
                     </td>
                     <td className="px-4 py-2.5 text-right font-semibold text-gray-800 dark:text-white">{formatCLP(montoMostrado(f))}</td>
                   </tr>

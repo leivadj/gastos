@@ -498,7 +498,7 @@ export default function CalendarioPagosPage() {
                   >
                     {celda.numero}
                     {tieneIngreso && (
-                      <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-white bg-ingreso dark:border-gray-900" />
+                      <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full border border-white bg-ingreso dark:border-neutral-900" />
                     )}
                   </button>
                 );

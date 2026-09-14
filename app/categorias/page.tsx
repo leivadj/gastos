@@ -51,7 +51,7 @@ export default function CategoriasPage() {
               <Link
                 key={c.id}
                 href={`/categoria/${c.id}`}
-                className="flex flex-col items-center gap-1.5 rounded-2xl border border-gray-100 bg-white py-3 text-center dark:border-white/10 dark:bg-gray-900"
+                className="flex flex-col items-center gap-1.5 rounded-2xl border border-gray-100 bg-white py-3 text-center dark:border-white/10 dark:bg-neutral-900"
               >
                 <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gray-50 text-xl dark:bg-white/10">
                   {c.icono || "•"}

@@ -20,7 +20,7 @@ export function Card({
   onClick?: () => void;
 }) {
   return (
-    <div className={`rounded-2xl bg-white p-5 shadow-sm dark:bg-gray-900 dark:shadow-none ${className}`} onClick={onClick}>
+    <div className={`rounded-2xl bg-white p-5 shadow-sm dark:bg-neutral-900 dark:shadow-none ${className}`} onClick={onClick}>
       {children}
     </div>
   );

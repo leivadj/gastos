@@ -53,7 +53,7 @@ export default function MasPage() {
 
       <PerfilPropioCard />
 
-      <div className="overflow-hidden rounded-3xl border border-dashed border-gray-200 bg-white dark:border-white/15 dark:bg-gray-900">
+      <div className="overflow-hidden rounded-3xl border border-dashed border-gray-200 bg-white dark:border-white/15 dark:bg-neutral-900">
         <button
           type="button"
           onClick={() => setHerramientasAbiertas((v) => !v)}

@@ -245,7 +245,7 @@ export function FormMovimiento({
         onClick={() => setSelectorAbierto(null)}
       >
         <div
-          className="max-h-[70vh] w-full overflow-y-auto rounded-t-3xl border border-gray-100 bg-white p-1.5 pb-[max(env(safe-area-inset-bottom),0.375rem)] shadow-2xl dark:border-white/10 dark:bg-gray-900 sm:max-w-sm sm:rounded-3xl"
+          className="max-h-[70vh] w-full overflow-y-auto rounded-t-3xl border border-gray-100 bg-white p-1.5 pb-[max(env(safe-area-inset-bottom),0.375rem)] shadow-2xl dark:border-white/10 dark:bg-neutral-900 sm:max-w-sm sm:rounded-3xl"
           onClick={(e) => e.stopPropagation()}
         >
           <p className="px-3 pb-1.5 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Pagar con</p>

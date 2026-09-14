@@ -60,21 +60,34 @@ export function TarjetaVisual({
       className={`relative flex aspect-[8/5] w-full shrink-0 flex-col justify-between overflow-hidden rounded-2xl p-5 text-white shadow-lg ${className}`}
       style={estiloFondo}
     >
-      {entidad.imagen_fondo_url && <div className="absolute inset-0 bg-black/30" />}
+      {/* Con imagen de fondo propia (ej. una foto/diseño real de la tarjeta),
+          no superponemos overlay oscuro, nombre/tipo ni el logo de la marca
+          — la imagen ya transmite esa información y duplicarla se veía
+          repetido (ej. "Banco Falabella" escrito encima de una tarjeta que
+          ya dice "Banco Falabella"). Sin imagen, seguimos generando la cara
+          de la tarjeta a partir del color + estos datos, como antes. */}
 
       <div className="relative flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-base font-bold leading-tight drop-shadow-sm">{entidad.nombre}</p>
-          <p className="text-[11px] opacity-85">{TIPO_LABEL[entidad.tipo]}</p>
-          {entidad.saldo != null && (
-            <p className="mt-1 text-xl font-bold tracking-tight drop-shadow-sm">{formatCLP(entidad.saldo)}</p>
-          )}
-        </div>
-        {marca?.logo_url && (
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/90 p-1.5 shadow-sm">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={marca.logo_url} alt="" className="h-full w-full object-contain" />
-          </span>
+        {entidad.imagen_fondo_url ? (
+          entidad.saldo != null && (
+            <p className="text-xl font-bold tracking-tight drop-shadow-sm">{formatCLP(entidad.saldo)}</p>
+          )
+        ) : (
+          <>
+            <div className="min-w-0">
+              <p className="truncate text-base font-bold leading-tight drop-shadow-sm">{entidad.nombre}</p>
+              <p className="text-[11px] opacity-85">{TIPO_LABEL[entidad.tipo]}</p>
+              {entidad.saldo != null && (
+                <p className="mt-1 text-xl font-bold tracking-tight drop-shadow-sm">{formatCLP(entidad.saldo)}</p>
+              )}
+            </div>
+            {marca?.logo_url && (
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/90 p-1.5 shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={marca.logo_url} alt="" className="h-full w-full object-contain" />
+              </span>
+            )}
+          </>
         )}
       </div>
 

@@ -382,7 +382,7 @@ export function DesktopSidebar() {
         </button>
 
         {masAbierto && (
-          <div className="absolute bottom-0 left-full z-40 ml-2 w-52 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-2xl dark:border-white/10 dark:bg-gray-900">
+          <div className="absolute bottom-0 left-full z-40 ml-2 w-52 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-2xl dark:border-white/10 dark:bg-neutral-900">
             {ITEMS_MAS.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
               return (

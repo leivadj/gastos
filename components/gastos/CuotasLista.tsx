@@ -298,7 +298,7 @@ export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
 
       <Link
         href="/tarjetas"
-        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm dark:bg-gray-900 dark:shadow-none"
+        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm dark:bg-neutral-900 dark:shadow-none"
       >
         <span className="text-gray-600 dark:text-gray-300">Gestionar tus tarjetas y cuentas</span>
         <span className="text-brand-from dark:text-white">→</span>

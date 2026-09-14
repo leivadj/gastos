@@ -395,7 +395,7 @@ export function PersonaBreakdown({
     >
       <div
         data-open={abierto}
-        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-gray-900 dark:shadow-none sm:max-w-lg sm:rounded-2xl"
+        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-neutral-900 dark:shadow-none sm:max-w-lg sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {contenido}

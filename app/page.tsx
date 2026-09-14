@@ -1077,7 +1077,7 @@ export default function DashboardPage() {
               const q = busquedaInicio.trim();
               router.push(q ? `/movimientos?buscar=${encodeURIComponent(q)}` : "/movimientos");
             }}
-            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500"
+            className="flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-400 dark:border-white/10 dark:bg-neutral-900 dark:text-gray-500"
           >
             <IconoBuscar />
             <input
@@ -1087,7 +1087,7 @@ export default function DashboardPage() {
               className="w-40 bg-transparent text-gray-700 outline-none placeholder:text-gray-400 dark:text-gray-200 dark:placeholder:text-gray-500"
             />
           </form>
-          <NotificacionesBell buttonClassName="h-10 w-10 shrink-0 rounded-full border border-gray-200 bg-white text-gray-400 dark:border-white/10 dark:bg-gray-900 dark:text-gray-500" />
+          <NotificacionesBell buttonClassName="h-10 w-10 shrink-0 rounded-full border border-gray-200 bg-white text-gray-400 dark:border-white/10 dark:bg-neutral-900 dark:text-gray-500" />
         </div>
       </div>
 

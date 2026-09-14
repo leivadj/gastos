@@ -101,7 +101,7 @@ export function NotificacionesBell({
 
       {abierto && (
         <div
-          className={`absolute top-full z-40 mt-2 w-80 max-w-[85vw] rounded-2xl border border-gray-100 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-gray-900 ${
+          className={`absolute top-full z-40 mt-2 w-80 max-w-[85vw] rounded-2xl border border-gray-100 bg-white p-3 shadow-2xl dark:border-white/10 dark:bg-neutral-900 ${
             alinear === "izquierda" ? "left-0" : "right-0"
           }`}
         >
