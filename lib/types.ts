@@ -18,6 +18,11 @@ export interface Categoria {
   // "Supermercado" -> "supermercado", así se ofrecen Jumbo/Líder/etc.).
   // null = no se sugiere ninguna.
   tipo_marca_sugerido: TipoMarca | null;
+  // migration_36_color_categoria.sql. Color propio de la categoría (ej. en
+  // las barras verticales de "Presupuesto por categoría" y los anillos de
+  // Presupuesto). null = se usa el color determinístico por nombre de
+  // lib/avatarColor.ts (colorFor), no un valor elegido a mano.
+  color: string | null;
 }
 
 export interface Entidad {

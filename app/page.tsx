@@ -37,6 +37,7 @@ import { resolverMarca } from "@/lib/resolverMarca";
 import { resumenGastosMes } from "@/lib/resumenGastos";
 import { cuotaActualEn, esMismoMes, isoDelMes, mesAnterior, mesRefActual, mesSiguiente, MesRef } from "@/lib/cuotasHistoricas";
 import { NivelGasto, estiloNivelGasto, nivelDeGasto } from "@/lib/nivelGasto";
+import { colorCategoria } from "@/lib/colorCategoria";
 import {
   Categoria,
   Compra,
@@ -739,18 +740,23 @@ export default function DashboardPage() {
     </Card>
   );
 
-  // Tarjeta "Presupuesto por categoría" (Feature G, rediseñada ronda 5):
-  // antes era una lista de barras horizontales de progreso; ahora es un
-  // gráfico de barras verticales (una por categoría) con una línea punteada
-  // marcando el presupuesto asignado — pedido explícito del usuario, calcado
-  // de una captura real de Not Pato. Cada barra se escala en su PROPIO
-  // contenedor (denom = máximo entre gastado y presupuesto, +15% de aire)
-  // porque los presupuestos de distintas categorías pueden ser de montos muy
-  // distintos (ej. $40.000 en Comida vs. $550.000 en Hogar) y no tendría
-  // sentido compararlos en una sola escala común. Debajo del gráfico se
-  // mantiene la lista compacta con los montos exactos y los mismos
-  // controles de editar/quitar de siempre, y el mini form de agregar no
-  // cambia.
+  // Tarjeta "Presupuesto por categoría" (Feature G, rediseñada rondas 5 y
+  // 6): gráfico de barras verticales (una por categoría) con una línea
+  // punteada marcando el presupuesto asignado — pedido explícito del
+  // usuario, calcado de una captura real de Not Pato. Cada barra se escala
+  // en su PROPIO contenedor (denom = máximo entre gastado y presupuesto,
+  // +15% de aire) porque los presupuestos de distintas categorías pueden ser
+  // de montos muy distintos (ej. $40.000 en Comida vs. $550.000 en Hogar) y
+  // no tendría sentido compararlos en una sola escala común.
+  //
+  // Ronda 6: el color de la barra ahora es el color PROPIO de la categoría
+  // (colorCategoria(), ver lib/colorCategoria.ts) en vez de un color binario
+  // gastado/excedido — y si te pasas del presupuesto, ya NO se recolorea la
+  // barra completa: solo el tramo que queda POR ENCIMA de la línea punteada
+  // (el excedente) cambia a rojo (bg-gasto), el resto sigue con el color de
+  // la categoría. Debajo del gráfico se mantiene la lista compacta con los
+  // montos exactos y los mismos controles de editar/quitar de siempre, y el
+  // mini form de agregar no cambia.
   const tarjetaPresupuestoCategorias = (
     <Card>
       <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Presupuesto por categoría</p>
@@ -767,6 +773,13 @@ export default function DashboardPage() {
               const denom = Math.max(gastado, presupuesto.monto_mensual) * 1.15;
               const barPct = denom > 0 ? Math.min(100, (gastado / denom) * 100) : 0;
               const lineaPct = denom > 0 ? Math.min(100, (presupuesto.monto_mensual / denom) * 100) : 0;
+              // Tramo base (hasta la línea de presupuesto, o hasta lo
+              // gastado si todavía no la alcanza) con el color propio de la
+              // categoría, y tramo de excedente (si sobrepasado) desde la
+              // línea hasta el tope de la barra, en rojo.
+              const colorBase = colorCategoria(categoria);
+              const alturaBase = Math.min(barPct, lineaPct);
+              const alturaExcedente = sobrepasado ? barPct - lineaPct : 0;
               return (
                 <div
                   key={categoria.id}
@@ -779,11 +792,15 @@ export default function DashboardPage() {
                       style={{ bottom: `${lineaPct}%` }}
                     />
                     <div
-                      className={`absolute inset-x-0 bottom-0 rounded-full transition-[height] ${
-                        sobrepasado ? "bg-gasto" : "bg-brand-gradient"
-                      }`}
-                      style={{ height: `${barPct}%` }}
+                      className="absolute inset-x-0 bottom-0 rounded-full transition-[height]"
+                      style={{ height: `${alturaBase}%`, backgroundColor: colorBase }}
                     />
+                    {sobrepasado && (
+                      <div
+                        className="absolute inset-x-0 bg-gasto transition-[height]"
+                        style={{ height: `${alturaExcedente}%`, bottom: `${lineaPct}%` }}
+                      />
+                    )}
                   </div>
                   <span className="max-w-full truncate text-sm leading-none">{categoria.icono || "🏷️"}</span>
                   <span className="max-w-full truncate text-[10px] font-semibold text-gray-500 dark:text-gray-400">
@@ -795,7 +812,7 @@ export default function DashboardPage() {
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-gray-400 dark:text-gray-500">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-brand-gradient" /> Gastado
+              <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" /> Color propio por categoría
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-0 w-3 border-t-2 border-dashed border-gray-400 dark:border-gray-400/60" /> Presupuesto

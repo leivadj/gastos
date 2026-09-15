@@ -10,6 +10,39 @@ import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { IconoPicker } from "@/components/IconoPicker";
 import { mensajeError } from "@/lib/supabaseError";
 
+// Paleta de colores propios de categoría (ronda 6 del rediseño, ver
+// migration_36_color_categoria.sql) — vivos y distinguibles a propósito
+// (a diferencia de la paleta gris de lib/avatarColor.ts, pensada para
+// logos/avatares de respaldo), calcada de una captura real de Not Pato
+// donde cada categoría tiene su propio color reconocible de un vistazo.
+const PALETA_COLOR_CATEGORIA = [
+  "#E2584B", // rojo
+  "#E8935A", // naranjo
+  "#E0C54A", // amarillo
+  "#5DCB86", // verde
+  "#4FB6C7", // celeste
+  "#5B8DEF", // azul
+  "#9B7FE0", // morado
+  "#D46FB3", // rosado
+];
+
+function SelectorColorCategoria({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {PALETA_COLOR_CATEGORIA.map((c) => (
+        <button
+          key={c}
+          type="button"
+          onClick={() => onChange(value === c ? "" : c)}
+          aria-label={`Color ${c}`}
+          className={`h-7 w-7 rounded-full transition ${value === c ? "ring-2 ring-offset-2 ring-gray-800 dark:ring-white dark:ring-offset-neutral-900" : ""}`}
+          style={{ backgroundColor: c }}
+        />
+      ))}
+    </div>
+  );
+}
+
 // A diferencia de personas/grupos/entidades (que son POR CUENTA), el
 // catálogo de marcas es compartido entre todas las cuentas a propósito —
 // por eso "nombre" es único en TODA la tabla, sin owner_id. Si ya existe
@@ -89,6 +122,7 @@ export default function AdminPage() {
   const [nombreCategoria, setNombreCategoria] = useState("");
   const [tipoCategoria, setTipoCategoria] = useState<"fijo" | "variable">("variable");
   const [iconoCategoria, setIconoCategoria] = useState("");
+  const [colorCategoria, setColorCategoria] = useState("");
   const [editandoDatosCat, setEditandoDatosCat] = useState<string | null>(null);
   const [nombreCatEdit, setNombreCatEdit] = useState("");
   const [tipoCatEdit, setTipoCatEdit] = useState<"fijo" | "variable">("variable");
@@ -125,6 +159,18 @@ export default function AdminPage() {
       .eq("id", id);
     if (dbError) {
       setError(dbError.message || "No se pudo guardar el ícono de la categoría.");
+      return;
+    }
+    cargarCategorias();
+  }
+
+  async function guardarColorCategoria(id: string, color: string) {
+    const { error: dbError } = await supabase
+      .from("categorias")
+      .update({ color: color || null })
+      .eq("id", id);
+    if (dbError) {
+      setError(dbError.message || "No se pudo guardar el color de la categoría.");
       return;
     }
     cargarCategorias();
@@ -246,12 +292,14 @@ export default function AdminPage() {
         nombre: nombreCategoria,
         tipo: tipoCategoria,
         icono: iconoCategoria || null,
+        color: colorCategoria || null,
       });
       if (insertError) throw insertError;
       setMostrarFormCategoria(false);
       setNombreCategoria("");
       setTipoCategoria("variable");
       setIconoCategoria("");
+      setColorCategoria("");
       cargarCategorias();
     } catch (err) {
       setError(traducirErrorCategoria(err, nombreCategoria, "guardar"));
@@ -375,6 +423,12 @@ export default function AdminPage() {
                 <label className="text-xs text-gray-500 dark:text-gray-400">Ícono (opcional)</label>
                 <IconoPicker value={iconoCategoria} onChange={setIconoCategoria} />
               </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Color (opcional — si no eliges uno, se usa un color fijo por nombre)</label>
+                <div className="mt-1">
+                  <SelectorColorCategoria value={colorCategoria} onChange={setColorCategoria} />
+                </div>
+              </div>
               <button
                 type="submit"
                 disabled={guardandoCategoria}
@@ -394,7 +448,7 @@ export default function AdminPage() {
                   <div className="flex items-center gap-3">
                     <span
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-base text-white"
-                      style={{ backgroundColor: colorFor(c.nombre) }}
+                      style={{ backgroundColor: c.color || colorFor(c.nombre) }}
                     >
                       {c.icono || c.nombre.charAt(0)}
                     </span>
@@ -456,6 +510,10 @@ export default function AdminPage() {
                       <div>
                         <label className="text-[11px] text-gray-400 dark:text-gray-500">Ícono</label>
                         <IconoPicker value={c.icono ?? ""} onChange={(v) => guardarIconoCategoria(c.id, v)} />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-gray-400 dark:text-gray-500">Color</label>
+                        <SelectorColorCategoria value={c.color ?? ""} onChange={(v) => guardarColorCategoria(c.id, v)} />
                       </div>
                       <div className="flex items-center gap-3 pt-1">
                         <button onClick={() => guardarDatosCategoria(c.id)} className="text-[11px] font-semibold text-brand-from dark:text-white">

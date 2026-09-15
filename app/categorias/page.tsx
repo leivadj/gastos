@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { colorCategoria } from "@/lib/colorCategoria";
 import { Categoria } from "@/lib/types";
 
 // Pantalla "Categorías" del mockup móvil: solo lectura (grid de
@@ -53,7 +54,10 @@ export default function CategoriasPage() {
                 href={`/categoria/${c.id}`}
                 className="flex flex-col items-center gap-1.5 rounded-2xl border border-gray-100 bg-white py-3 text-center dark:border-white/10 dark:bg-neutral-900"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gray-50 text-xl dark:bg-white/10">
+                <span
+                  className="flex h-11 w-11 items-center justify-center rounded-2xl text-xl"
+                  style={{ backgroundColor: `${colorCategoria(c)}26` }}
+                >
                   {c.icono || "•"}
                 </span>
                 <span className="truncate px-1 text-[11px] font-medium text-gray-600 dark:text-gray-300" style={{ maxWidth: 70 }}>

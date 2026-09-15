@@ -4,7 +4,6 @@ import Link from "next/link";
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { NotificacionesPush } from "@/components/NotificacionesPush";
 import { PersonaAvatar } from "@/components/PersonaAvatar";
 import { ContadorOdometro } from "@/components/ContadorOdometro";
@@ -12,65 +11,82 @@ import { subirImagenPropia } from "@/lib/subirImagen";
 import { mensajeError } from "@/lib/supabaseError";
 import { formatCLP, mesActualISO } from "@/lib/format";
 import { Ingreso, Persona, ResumenPersonaMes } from "@/lib/types";
+import { PreferenciaTema, useTheme } from "@/lib/theme";
 
-// Fila deshabilitada para algo que el mockup muestra pero que hoy no es
-// una función real de la app (ver el comentario donde se usa, más abajo).
-function FilaProximamente({ titulo, descripcion }: { titulo: string; descripcion: string }) {
+// Fila genérica de lista (ronda 6 del rediseño, "Mi perfil"): ícono a la
+// izquierda, título + subtítulo, y a la derecha una flecha ">" para entrar
+// (o el control que se pase en `right`, ej. un switch o un valor). Mismo
+// estilo en todas las listas nuevas (Integraciones/Configuración/
+// Apariencia) — calcado de las capturas de referencia que mandó el
+// usuario (una app de terceros, "Not Pato"): cada fila entra a algo o abre
+// una hoja inferior, nunca navega "hacia el lado".
+function IconoFlecha({ className = "shrink-0 text-gray-300 dark:text-gray-600" }: { className?: string }) {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-dashed border-gray-200 px-3 py-2 opacity-60 dark:border-white/10">
-      <div className="min-w-0 pr-2">
-        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">{titulo}</p>
-        <p className="truncate text-[10.5px] text-gray-400 dark:text-gray-500">{descripcion}</p>
-      </div>
-      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-500">
-        Próximamente
-      </span>
-    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="m9 6 6 6-6 6" />
+    </svg>
   );
 }
 
-// Variante clickeable de FilaProximamente — para "Reglas de
-// categorización" (única función de las 4 sin respaldo real que además
-// tiene una pantalla de demostración construida, ver
-// app/reglas-categorizacion/page.tsx), a diferencia de las otras 3
-// (Cartola consolidado/Integraciones/Suscripción Premium) que son solo una
-// fila deshabilitada sin nada detrás.
-function FilaProximamenteConDemo({ titulo, descripcion, href }: { titulo: string; descripcion: string; href: string }) {
-  return (
-    <Link
-      href={href}
-      className="flex items-center justify-between rounded-lg border border-dashed border-gray-200 px-3 py-2 dark:border-white/10"
-    >
-      <div className="min-w-0 pr-2">
-        <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">{titulo}</p>
-        <p className="truncate text-[10.5px] text-gray-400 dark:text-gray-500">{descripcion}</p>
+function FilaLista({
+  titulo,
+  subtitulo,
+  href,
+  onClick,
+  right,
+  disabled = false,
+}: {
+  titulo: string;
+  subtitulo?: string;
+  href?: string;
+  onClick?: () => void;
+  right?: ReactNode;
+  disabled?: boolean;
+}) {
+  const contenido = (
+    <>
+      <div className="min-w-0 flex-1">
+        <p className={`text-sm font-medium ${disabled ? "text-gray-400 dark:text-gray-500" : "text-gray-700 dark:text-gray-200"}`}>{titulo}</p>
+        {subtitulo && <p className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-gray-500">{subtitulo}</p>}
       </div>
-      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-500">
-        Próximamente
-      </span>
-    </Link>
+      {right !== undefined ? (
+        right
+      ) : disabled ? (
+        <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-500">
+          Próximamente
+        </span>
+      ) : (
+        <IconoFlecha />
+      )}
+    </>
   );
-}
-
-// Otra variante clickeable — para "Inicio del mes" y "Balance", que en vez
-// de llevar a una pantalla nueva abren una hoja (bottom sheet) de
-// demostración calcada de Sheets.dc.html (ver los dos componentes de más
-// abajo). Un <button> en vez de <Link> porque no navega, solo abre el sheet.
-function FilaProximamenteConSheet({ titulo, descripcion, onClick }: { titulo: string; descripcion: string; onClick: () => void }) {
+  const clase = "flex w-full items-center gap-3 py-3 text-left";
+  if (href && !disabled) {
+    return (
+      <Link href={href} className={clase}>
+        {contenido}
+      </Link>
+    );
+  }
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="flex w-full items-center justify-between rounded-lg border border-dashed border-gray-200 px-3 py-2 text-left dark:border-white/10"
-    >
-      <div className="min-w-0 pr-2">
-        <p className="text-xs font-semibold text-gray-600 dark:text-gray-300">{titulo}</p>
-        <p className="truncate text-[10.5px] text-gray-400 dark:text-gray-500">{descripcion}</p>
-      </div>
-      <span className="shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-400 dark:bg-white/10 dark:text-gray-500">
-        Próximamente
-      </span>
+    <button type="button" onClick={disabled ? undefined : onClick} disabled={disabled} className={`${clase} ${disabled ? "cursor-default" : ""}`}>
+      {contenido}
     </button>
+  );
+}
+
+// Grupo de filas con título (Integraciones/Configuración/Apariencia) — una
+// sola tarjeta con separadores finos entre filas, calcado de las capturas
+// de referencia (en vez del recuadro punteado individual de antes, que
+// seguía usándose solo para las filas sueltas "Próximamente").
+function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{titulo}</p>
+      <div className="divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white px-4 dark:divide-white/10 dark:border-white/10 dark:bg-neutral-900">
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -170,6 +186,61 @@ function SheetBalanceDemo({ onClose }: { onClose: () => void }) {
   );
 }
 
+// "Seleccionar Tema" (ronda 6, calcado de la captura de referencia) — a
+// diferencia de las hojas de arriba, ESTA sí es real: usa el mismo
+// ThemeProvider de siempre (lib/theme.tsx), solo que ahora vive en una hoja
+// inferior con las 3 opciones en vez del selector "pill" chico (que se
+// mantiene igual en el pie del Sidebar de escritorio, ver ThemeToggle.tsx).
+const OPCIONES_TEMA: { value: PreferenciaTema; label: string }[] = [
+  { value: "light", label: "Claro" },
+  { value: "dark", label: "Oscuro" },
+  { value: "system", label: "Automático" },
+];
+
+function SheetTema({ onClose }: { onClose: () => void }) {
+  const { preferencia, setPreferencia } = useTheme();
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
+      <div
+        className="w-full max-w-sm rounded-t-3xl bg-[#111113] p-5 pb-7 text-white sm:rounded-3xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between">
+          <h2 className="text-base font-bold">Seleccionar tema</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10">
+            ✕
+          </button>
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          {OPCIONES_TEMA.map((o) => {
+            const activo = preferencia === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => {
+                  setPreferencia(o.value);
+                  onClose();
+                }}
+                className={`flex flex-col items-center gap-2 rounded-2xl border-2 p-3 ${
+                  activo ? "border-white" : "border-white/10"
+                }`}
+              >
+                <span
+                  className={`h-14 w-10 rounded-lg ${
+                    o.value === "dark" ? "bg-black" : o.value === "light" ? "bg-white" : "bg-gradient-to-r from-white to-black"
+                  }`}
+                />
+                <span className="text-xs font-semibold">{o.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Adivina un nombre a partir del correo (ej. "leiva.dj@gmail.com" -> "Leiva
 // Dj") para no dejar el perfil sin nombre al crearlo solo — se puede
 // cambiar al toque desde "editar".
@@ -218,7 +289,9 @@ export function PerfilPropioCard() {
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorPerfil, setErrorPerfil] = useState("");
-  const [sheetAbierto, setSheetAbierto] = useState<"inicio_mes" | "balance" | null>(null);
+  const [sheetAbierto, setSheetAbierto] = useState<"inicio_mes" | "balance" | "tema" | null>(null);
+  const [mostrarEliminarCuenta, setMostrarEliminarCuenta] = useState(false);
+  const { preferencia } = useTheme();
   const intentoCrearPerfil = useRef(false);
 
   async function cargar() {
@@ -311,7 +384,10 @@ export function PerfilPropioCard() {
 
   if (!perfilPropio) return null;
 
+  const labelTema = OPCIONES_TEMA.find((o) => o.value === preferencia)?.label ?? "Automático";
+
   return (
+    <div className="space-y-4">
     <Card>
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Tu perfil</p>
       <div className="flex items-center gap-3">
@@ -393,65 +469,86 @@ export function PerfilPropioCard() {
           Ver mis tarjetas
         </Link>
       </div>
+    </Card>
 
-      {/* Estas 3 filas están en el mockup pero no son funciones que existan
-          hoy (unir cuentas en un PDF, conectar cuentas bancarias de
-          verdad, cobro de una suscripción) — Felipe pidió dejarlas
-          visibles en su lugar del mockup, marcadas "Próximamente" en vez
-          de ocultarlas o simular que ya funcionan. */}
-      <div className="mt-3 space-y-2">
-        <FilaProximamente titulo="Cartola consolidado" descripcion="Une todas tus cuentas en un solo PDF" />
-        <FilaProximamente titulo="Integraciones" descripcion="Conectar tus cuentas bancarias automáticamente" />
-        <FilaProximamente titulo="Suscripción Premium" descripcion="Funciones extra con una suscripción paga" />
+      {/* Ronda 6 del rediseño — "Mi perfil" reorganizado en secciones,
+          calcado de las capturas de referencia que mandó el usuario (una
+          app de terceros, "Not Pato"): Perfil financiero/Cartola sueltas,
+          luego Integraciones/Configuración/Apariencia agrupadas con flecha
+          para entrar, terminando en Cerrar sesión/Eliminar cuenta. Se
+          quedaron afuera a propósito los ítems tachados en las capturas
+          (WhatsApp, Suscripción/"Not Pato Pro", Moneda, Tono de voz, Face
+          ID, y toda la sección Soporte — ayuda, calificar, reseña,
+          términos) porque son de la app de referencia, no de esta. */}
+      <div className="divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white px-4 dark:divide-white/10 dark:border-white/10 dark:bg-neutral-900">
+        <FilaLista
+          titulo="Perfil financiero"
+          subtitulo="Activa tu perfil ingresando tu sueldo en “editar”"
+          disabled
+        />
+        <FilaLista titulo="Cartola consolidado" subtitulo="Une todas tus cuentas en un solo PDF" disabled />
       </div>
 
-      <p className="mb-1 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-        Configuración
-      </p>
+      <Seccion titulo="Integraciones">
+        <FilaLista titulo="Mis tarjetas" subtitulo="Ver y administrar tus cuentas" href="/tarjetas" />
+        <FilaLista titulo="Conectar banco" subtitulo="Conectar tus cuentas bancarias automáticamente" disabled />
+        <FilaLista titulo="Apple Pay" subtitulo="Registrar pagos hechos con Apple Pay" disabled />
+      </Seccion>
 
-      <div className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2">
-        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Tema</span>
-        <ThemeToggle />
-      </div>
-
-      <NotificacionesPush />
-
-      <div className="mt-2 space-y-2">
-        <FilaProximamenteConSheet
-          titulo="Inicio del mes"
-          descripcion="Elegir qué día del mes empieza tu ciclo (hoy siempre es el día 1)"
-          onClick={() => setSheetAbierto("inicio_mes")}
-        />
-        <FilaProximamenteConSheet
-          titulo="Balance"
-          descripcion="Elegir qué cuentas suman al balance (hoy suma todas)"
-          onClick={() => setSheetAbierto("balance")}
-        />
-        <FilaProximamenteConDemo
+      <Seccion titulo="Configuración">
+        <FilaLista titulo="Categorías" href="/categorias" />
+        <FilaLista titulo="Presupuestos" subtitulo="Presupuesto mensual por categoría" href="/presupuesto" />
+        <FilaLista
           titulo="Reglas de categorización"
-          descripcion="Aprende de tu correo qué categoría va con cada comercio"
+          subtitulo="Aprende de tu correo qué categoría va con cada comercio"
           href="/reglas-categorizacion"
         />
-        <Link
-          href="/categorias"
-          className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 dark:border-white/10 dark:text-gray-300"
-        >
-          Categorías
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-gray-300 dark:text-gray-600">
-            <path d="m9 6 6 6-6 6" />
-          </svg>
-        </Link>
-      </div>
+        <FilaLista titulo="Inicio del mes" subtitulo="Hoy siempre es el día 1" onClick={() => setSheetAbierto("inicio_mes")} />
+        <NotificacionesPush compacto />
+        <FilaLista titulo="Balance" subtitulo="Qué cuentas suman al balance (hoy suma todas)" onClick={() => setSheetAbierto("balance")} />
+      </Seccion>
 
-      <button
-        onClick={() => supabase.auth.signOut()}
-        className="mt-2 w-full rounded-lg border border-gray-200 dark:border-white/10 py-2 text-xs font-semibold text-gray-500 dark:text-gray-300 hover:border-red-200 hover:text-red-500"
-      >
-        Cerrar sesión
-      </button>
+      <Seccion titulo="Apariencia">
+        <FilaLista
+          titulo="Tema"
+          onClick={() => setSheetAbierto("tema")}
+          right={
+            <span className="flex shrink-0 items-center gap-1 text-xs text-gray-400 dark:text-gray-500">
+              {labelTema}
+              <IconoFlecha />
+            </span>
+          }
+        />
+        <FilaLista titulo="Vista principal" subtitulo="Elegir qué ver primero en Inicio" disabled />
+        <FilaLista titulo="Logos de marca" subtitulo="Mostrar el logo real de cada comercio" disabled />
+        <FilaLista titulo="Sugerir un logo" subtitulo="Pedir el logo de un comercio que falta" disabled />
+      </Seccion>
+
+      <div className="mt-4 space-y-2">
+        <button
+          onClick={() => supabase.auth.signOut()}
+          className="w-full rounded-lg border border-gray-200 dark:border-white/10 py-2 text-xs font-semibold text-gray-500 dark:text-gray-300 hover:border-red-200 hover:text-red-500"
+        >
+          Cerrar sesión
+        </button>
+        {mostrarEliminarCuenta ? (
+          <p className="rounded-lg border border-dashed border-gray-200 px-3 py-2 text-center text-[11px] text-gray-400 dark:border-white/10 dark:text-gray-500">
+            Por ahora esto no se puede hacer solo desde la app — escríbele a quien te dio acceso a Gastos del Hogar para pedir que
+            elimine tu cuenta.
+          </p>
+        ) : (
+          <button
+            onClick={() => setMostrarEliminarCuenta(true)}
+            className="w-full py-1 text-center text-[11px] font-semibold text-gray-300 hover:text-red-400 dark:text-gray-600"
+          >
+            Eliminar cuenta
+          </button>
+        )}
+      </div>
 
       {sheetAbierto === "inicio_mes" && <SheetInicioMesDemo onClose={() => setSheetAbierto(null)} />}
       {sheetAbierto === "balance" && <SheetBalanceDemo onClose={() => setSheetAbierto(null)} />}
-    </Card>
+      {sheetAbierto === "tema" && <SheetTema onClose={() => setSheetAbierto(null)} />}
+    </div>
   );
 }
