@@ -65,29 +65,16 @@ export interface Entidad {
   titular_persona_id: string | null;
 }
 
-export type TipoMarca =
-  | "banco"
-  | "casa_comercial"
-  | "caja_compensacion"
-  | "autopista"
-  | "telecom"
-  | "servicio_basico"
-  | "supermercado"
-  | "transporte"
-  | "compras_online"
-  | "delivery"
-  | "suscripcion"
-  // Auto y Salud (ver migration_25_marcas_auto_salud.sql) — a diferencia de
-  // los demás tipos, estos dos se agrupan de a varios por categoría (Auto:
-  // bencina+mecanico+repuestos; Salud: centro_medico+farmacia), por eso el
-  // selector de /auto y /salud usa MarcaAgrupadaPicker en vez de
-  // MarcaSugeridaPicker (pensado para UN tipo por categoría).
-  | "bencina"
-  | "mecanico"
-  | "repuestos"
-  | "centro_medico"
-  | "farmacia"
-  | "otro";
+// Hasta migration_39_tipos_marca_libres.sql, esto era una unión cerrada de
+// 17 valores fijos (Banco/Casa comercial/Supermercado/...), calcada de un
+// `check` de la base de datos — Felipe reportó que al crear una categoría
+// nueva (ej. "Mascotas") no había forma de que apareciera como opción "Tipo"
+// al crear una marca, porque la lista de tipos nunca podía crecer. Ahora es
+// texto libre: app/admin/page.tsx sigue ofreciendo los 17 de siempre como
+// catálogo base (con sus labels en español), más "+ Nuevo tipo…" para
+// agregar uno propio, que queda disponible de inmediato para categorías Y
+// marcas — ver ese archivo para la lista base y el generador de labels.
+export type TipoMarca = string;
 
 export interface Marca {
   id: string;
@@ -416,4 +403,53 @@ export interface DocumentoAuto {
   nombre: string;
   fecha_vencimiento: string;
   notas: string | null;
+}
+
+// Preferencias de "Mi perfil" (Ronda 9, pedido de Felipe: "Vista principal",
+// "Inicio del mes" y "Balance") — una fila por usuario (owner_id es la
+// llave primaria, ver migration_40_preferencias_usuario.sql). No existe
+// fila todavía para nadie que no haya entrado a configurar algo: en ese
+// caso se usa PREFERENCIAS_DEFECTO (lib/preferenciasUsuario.ts), que
+// reproduce EXACTO el comportamiento de siempre (día 1, todas las cuentas
+// no-tarjeta-crédito suman al balance, pestaña "Resumen" primero).
+export interface PreferenciasUsuario {
+  owner_id: string;
+  // Día del mes en que arranca tu ciclo (1-28). 1 = como siempre (mes
+  // calendario). Hoy solo lo usa Inicio (balance/ingresos/gastos del
+  // resumen) — /movimientos, /reportes, /tarjetas y el calendario de
+  // "Actividad del mes" siguen agrupando por mes calendario (día 1) sin
+  // importar este valor; ver lib/cicloMes.ts.
+  dia_inicio_mes: number;
+  // Qué cuentas suman al "Balance"/"Apertura del mes" de Inicio (antes
+  // siempre sumaba TODO menos tarjetas de crédito — eso sigue siendo lo que
+  // pasa por defecto con estos 3 en true/true/false).
+  balance_incluye_debito: boolean;
+  balance_incluye_efectivo: boolean;
+  // A diferencia de débito/efectivo (que suman el saldo), una tarjeta de
+  // crédito no tiene "saldo" en el mismo sentido — esto suma su CUPO
+  // DISPONIBLE (cupo - usado) en vez de un saldo.
+  balance_incluye_cupo_tc: boolean;
+  // Qué pestaña de Inicio (celular) se abre primero.
+  pestana_inicio_defecto: "resumen" | "ingresos" | "presupuesto";
+  // Orden de las 3 tarjetas de la pestaña "Resumen" (celular): "categoria"
+  // (dona de gastos por categoría), "presupuesto_categorias" (barras de
+  // presupuesto) y "actividad_mes" (calendario). En escritorio no hay
+  // pestañas, pero el mismo orden decide si "Presupuesto por categoría" o
+  // "Cuentas y tarjetas" va primero en la fila de abajo.
+  orden_resumen: string[];
+  updated_at: string;
+}
+
+// Una solicitud de logo (Ronda 9, "Sugerir un logo" — distinto del panel de
+// admin en /admin, que sube el logo; esto es para que cualquier usuario
+// PIDA el logo de una marca que todavía no lo tiene). Ver
+// migration_41_solicitudes_logo.sql. `estado` pasa a "resuelta" cuando el
+// admin sube el logo y la marca listo (o decide que no corresponde).
+export interface SolicitudLogo {
+  id: string;
+  owner_id: string;
+  marca_id: string;
+  nota: string | null;
+  estado: "pendiente" | "resuelta";
+  created_at: string;
 }

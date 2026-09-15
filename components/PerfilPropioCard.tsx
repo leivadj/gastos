@@ -10,8 +10,9 @@ import { ContadorOdometro } from "@/components/ContadorOdometro";
 import { subirImagenPropia } from "@/lib/subirImagen";
 import { mensajeError } from "@/lib/supabaseError";
 import { formatCLP, mesActualISO } from "@/lib/format";
-import { Ingreso, Persona, ResumenPersonaMes } from "@/lib/types";
+import { Ingreso, Marca, Persona, PreferenciasUsuario, ResumenPersonaMes, SolicitudLogo } from "@/lib/types";
 import { PreferenciaTema, useTheme } from "@/lib/theme";
+import { conDefectos, ordenResumenValido } from "@/lib/preferenciasUsuario";
 
 // Fila genérica de lista (ronda 6 del rediseño, "Mi perfil"): ícono a la
 // izquierda, título + subtítulo, y a la derecha una flecha ">" para entrar
@@ -90,11 +91,13 @@ function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) 
   );
 }
 
-// Envoltorio común de las hojas de demostración: mismo fondo oscuro +
-// bottom-sheet que el resto de la app (ver DividirGastoSheet.tsx), con un
-// aviso fijo de que es solo un ejemplo — ninguna de las dos guarda nada de
-// verdad todavía.
-function SheetDemo({ titulo, subtitulo, onClose, children, textoBoton }: { titulo: string; subtitulo?: string; onClose: () => void; children: ReactNode; textoBoton: string }) {
+// Envoltorio común de las hojas de "Mi perfil": mismo fondo oscuro +
+// bottom-sheet que el resto de la app (ver DividirGastoSheet.tsx). Hasta la
+// Ronda 9 existía una versión "SheetDemo" con un aviso fijo de "vista de
+// ejemplo" y un botón deshabilitado — Inicio del mes/Balance/Vista
+// principal ya guardan de verdad (preferencias_usuario,
+// migration_40_preferencias_usuario.sql), así que ese aviso se quitó.
+function SheetBase({ titulo, subtitulo, onClose, children }: { titulo: string; subtitulo?: string; onClose: () => void; children: ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" onClick={onClose}>
       <div
@@ -110,79 +113,340 @@ function SheetDemo({ titulo, subtitulo, onClose, children, textoBoton }: { titul
             ✕
           </button>
         </div>
-
         {children}
-
-        <p className="mt-4 rounded-xl border border-dashed border-white/15 px-3 py-2 text-[10.5px] leading-relaxed text-white/40">
-          Vista de ejemplo — todavía no se puede guardar de verdad, próximamente.
-        </p>
-        <button
-          type="button"
-          disabled
-          className="mt-3 w-full cursor-not-allowed rounded-full bg-white/20 py-3 text-sm font-bold text-white/50"
-        >
-          {textoBoton}
-        </button>
       </div>
     </div>
   );
 }
 
-// "Inicio del mes" (Sheets.dc.html) — elegir qué día del mes empieza el
-// ciclo. Grilla de ejemplo estática (día 1 marcado, igual que el mockup) —
-// hoy el ciclo siempre empieza el día 1 de cada mes en toda la app, esto
-// solo muestra cómo se vería el selector.
-function SheetInicioMesDemo({ onClose }: { onClose: () => void }) {
-  const dias = Array.from({ length: 14 }, (_, i) => i + 1);
+// "Inicio del mes" (Ronda 9, real): elegir qué día del mes empieza el
+// ciclo. Solo días 1-28 (mismo criterio que la mayoría de bancos, para no
+// tener que lidiar con "día 30 en febrero") — ver
+// migration_40_preferencias_usuario.sql. Por ahora esto solo cambia el
+// resumen de Inicio (Balance/Ingresos/Gastos) — ver el aviso más abajo y
+// lib/cicloMes.ts para el detalle de qué pantallas quedan afuera todavía.
+function SheetInicioMes({ diaActual, onClose, onGuardar }: { diaActual: number; onClose: () => void; onGuardar: (dia: number) => Promise<string | null> }) {
+  const [dia, setDia] = useState(diaActual);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const dias = Array.from({ length: 28 }, (_, i) => i + 1);
+
+  async function guardar() {
+    setGuardando(true);
+    setError("");
+    const err = await onGuardar(dia);
+    setGuardando(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    onClose();
+  }
+
   return (
-    <SheetDemo titulo="Inicio del mes" subtitulo="¿Cuándo comienza tu ciclo?" onClose={onClose} textoBoton="Guardar">
+    <SheetBase titulo="Inicio del mes" subtitulo="¿Cuándo comienza tu ciclo?" onClose={onClose}>
       <div className="mt-4 grid grid-cols-7 gap-1.5">
         {dias.map((d) => (
-          <span
+          <button
             key={d}
+            type="button"
+            onClick={() => setDia(d)}
             className={`flex aspect-square items-center justify-center rounded-[10px] text-xs font-semibold ${
-              d === 1 ? "bg-white font-extrabold text-black" : "bg-white/5 text-white/70"
+              d === dia ? "bg-white font-extrabold text-black" : "bg-white/5 text-white/70"
             }`}
           >
             {d}
-          </span>
+          </button>
         ))}
       </div>
-      <p className="mt-3.5 text-[11.5px] text-white/50">Tu mes irá del 1 al 30 de cada mes.</p>
-    </SheetDemo>
+      <p className="mt-3.5 text-[11.5px] text-white/50">
+        {dia === 1 ? "Tu mes irá del 1 al 30/31 de cada mes." : `Tu ciclo irá del día ${dia} de un mes al ${dia - 1} del siguiente.`}
+      </p>
+      <p className="mt-2.5 rounded-xl border border-dashed border-white/15 px-3 py-2 text-[10.5px] leading-relaxed text-white/40">
+        Por ahora esto solo cambia el resumen de Inicio (Balance/Ingresos/Gastos) — Movimientos, Reportes, Presupuesto y
+        Tarjetas siguen agrupando por mes calendario.
+      </p>
+      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+      <button
+        type="button"
+        disabled={guardando}
+        onClick={guardar}
+        className="mt-3 w-full rounded-full bg-white py-3 text-sm font-bold text-black disabled:opacity-60"
+      >
+        {guardando ? "Guardando…" : "Guardar"}
+      </button>
+    </SheetBase>
   );
 }
 
-// "Balance" (Sheets.dc.html) — elegir qué cuentas suman al balance
-// general. Switches de ejemplo estáticos (Débito/Efectivo activados, Cupo
-// TC desactivado, igual que el mockup) — hoy el balance de la app siempre
-// suma todas las cuentas.
-function SwitchDemo({ on }: { on: boolean }) {
+// "Balance" (Ronda 9, real): elegir qué cuentas suman al balance/apertura
+// del mes de Inicio. Antes siempre sumaba todo menos tarjetas de crédito —
+// eso sigue siendo lo que pasa con Débito/Efectivo en true y Cupo TC en
+// false (los valores de siempre). Línea de crédito y crédito hipotecario
+// siempre suman, como hasta ahora (no son parte de este selector porque el
+// mockup original tampoco los mostraba).
+function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <span className={`relative inline-block h-[22px] w-9 shrink-0 rounded-full transition-colors ${on ? "bg-white" : "bg-white/15"}`}>
-      <span
-        className={`absolute top-[3px] h-4 w-4 rounded-full transition-transform ${on ? "translate-x-[19px] bg-black" : "translate-x-[3px] bg-white"}`}
-      />
-    </span>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={`relative inline-block h-[22px] w-9 shrink-0 rounded-full transition-colors ${on ? "bg-white" : "bg-white/15"}`}
+    >
+      <span className={`absolute top-[3px] h-4 w-4 rounded-full transition-transform ${on ? "translate-x-[19px] bg-black" : "translate-x-[3px] bg-white"}`} />
+    </button>
   );
 }
-function SheetBalanceDemo({ onClose }: { onClose: () => void }) {
-  const filas = [
-    { titulo: "Débito", on: true },
-    { titulo: "Efectivo", on: true },
-    { titulo: "Cupo TC", on: false },
-  ];
+function SheetBalance({
+  prefs,
+  onClose,
+  onGuardar,
+}: {
+  prefs: PreferenciasUsuario;
+  onClose: () => void;
+  onGuardar: (cambios: Pick<PreferenciasUsuario, "balance_incluye_debito" | "balance_incluye_efectivo" | "balance_incluye_cupo_tc">) => Promise<string | null>;
+}) {
+  const [debito, setDebito] = useState(prefs.balance_incluye_debito);
+  const [efectivo, setEfectivo] = useState(prefs.balance_incluye_efectivo);
+  const [cupoTc, setCupoTc] = useState(prefs.balance_incluye_cupo_tc);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  async function aplicar() {
+    setGuardando(true);
+    setError("");
+    const err = await onGuardar({ balance_incluye_debito: debito, balance_incluye_efectivo: efectivo, balance_incluye_cupo_tc: cupoTc });
+    setGuardando(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    onClose();
+  }
+
   return (
-    <SheetDemo titulo="Balance" subtitulo="¿Qué incluir en tu balance?" onClose={onClose} textoBoton="Aplicar">
+    <SheetBase titulo="Balance" subtitulo="¿Qué incluir en tu balance?" onClose={onClose}>
       <div className="mt-3 divide-y divide-white/10">
-        {filas.map((f) => (
-          <div key={f.titulo} className="flex items-center gap-3 py-2.5">
-            <span className="flex-1 text-sm font-semibold">{f.titulo}</span>
-            <SwitchDemo on={f.on} />
+        <div className="flex items-center gap-3 py-2.5">
+          <span className="flex-1 text-sm font-semibold">Débito</span>
+          <Switch on={debito} onClick={() => setDebito((v) => !v)} />
+        </div>
+        <div className="flex items-center gap-3 py-2.5">
+          <span className="flex-1 text-sm font-semibold">Efectivo</span>
+          <Switch on={efectivo} onClick={() => setEfectivo((v) => !v)} />
+        </div>
+        <div className="flex items-center gap-3 py-2.5">
+          <span className="flex-1 text-sm font-semibold">Cupo TC</span>
+          <Switch on={cupoTc} onClick={() => setCupoTc((v) => !v)} />
+        </div>
+      </div>
+      <p className="mt-2.5 text-[10.5px] text-white/40">
+        "Cupo TC" suma el cupo disponible de tus tarjetas de crédito (no un saldo). Línea de crédito y crédito
+        hipotecario siempre suman, como hasta ahora.
+      </p>
+      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+      <button
+        type="button"
+        disabled={guardando}
+        onClick={aplicar}
+        className="mt-3 w-full rounded-full bg-white py-3 text-sm font-bold text-black disabled:opacity-60"
+      >
+        {guardando ? "Aplicando…" : "Aplicar"}
+      </button>
+    </SheetBase>
+  );
+}
+
+// "Vista principal" (Ronda 9, real): qué pestaña de Inicio (celular) abre
+// primero, y en qué orden se muestran las 3 tarjetas de "Resumen" (y, de
+// paso, si "Presupuesto por categoría" o "Cuentas y tarjetas" va primero en
+// escritorio — ver app/page.tsx, `presupuestoPrimeroEnDesktop`). Reordenar
+// con ▲▼ en vez de arrastrar: mismo criterio simple que el resto de la app,
+// sin sumar una librería de drag-and-drop para 3 filas.
+const LABEL_SECCION_RESUMEN: Record<string, string> = {
+  categoria: "Gastos por categoría",
+  presupuesto_categorias: "Presupuesto por categoría",
+  actividad_mes: "Actividad del mes",
+};
+const LABEL_PESTANA: Record<PreferenciasUsuario["pestana_inicio_defecto"], string> = {
+  resumen: "Resumen",
+  ingresos: "Ingresos",
+  presupuesto: "Presupuestos",
+};
+function SheetVistaPrincipal({
+  prefs,
+  onClose,
+  onGuardar,
+}: {
+  prefs: PreferenciasUsuario;
+  onClose: () => void;
+  onGuardar: (cambios: Pick<PreferenciasUsuario, "pestana_inicio_defecto" | "orden_resumen">) => Promise<string | null>;
+}) {
+  const [pestana, setPestana] = useState(prefs.pestana_inicio_defecto);
+  const [orden, setOrden] = useState<string[]>(ordenResumenValido(prefs.orden_resumen));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  function mover(i: number, dir: -1 | 1) {
+    setOrden((actual) => {
+      const j = i + dir;
+      if (j < 0 || j >= actual.length) return actual;
+      const copia = [...actual];
+      [copia[i], copia[j]] = [copia[j], copia[i]];
+      return copia;
+    });
+  }
+
+  async function guardar() {
+    setGuardando(true);
+    setError("");
+    const err = await onGuardar({ pestana_inicio_defecto: pestana, orden_resumen: orden });
+    setGuardando(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    onClose();
+  }
+
+  return (
+    <SheetBase titulo="Vista principal" subtitulo="Elegí qué ver primero en Inicio" onClose={onClose}>
+      <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-white/40">Pestaña que abre primero (celular)</p>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {(Object.keys(LABEL_PESTANA) as PreferenciasUsuario["pestana_inicio_defecto"][]).map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setPestana(p)}
+            className={`rounded-full py-2 text-xs font-semibold ${pestana === p ? "bg-white text-black" : "bg-white/10 text-white/70"}`}
+          >
+            {LABEL_PESTANA[p]}
+          </button>
+        ))}
+      </div>
+
+      <p className="mt-4 text-[11px] font-semibold uppercase tracking-wide text-white/40">Orden de las tarjetas de "Resumen"</p>
+      <div className="mt-2 divide-y divide-white/10 rounded-xl border border-white/10">
+        {orden.map((clave, i) => (
+          <div key={clave} className="flex items-center gap-2 px-3 py-2.5">
+            <span className="flex-1 text-sm">{LABEL_SECCION_RESUMEN[clave] ?? clave}</span>
+            <button type="button" disabled={i === 0} onClick={() => mover(i, -1)} aria-label="subir" className="text-white/60 disabled:opacity-20">
+              ▲
+            </button>
+            <button type="button" disabled={i === orden.length - 1} onClick={() => mover(i, 1)} aria-label="bajar" className="text-white/60 disabled:opacity-20">
+              ▼
+            </button>
           </div>
         ))}
       </div>
-    </SheetDemo>
+
+      {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+      <button
+        type="button"
+        disabled={guardando}
+        onClick={guardar}
+        className="mt-4 w-full rounded-full bg-white py-3 text-sm font-bold text-black disabled:opacity-60"
+      >
+        {guardando ? "Guardando…" : "Guardar"}
+      </button>
+    </SheetBase>
+  );
+}
+
+// "Sugerir un logo" (Ronda 9, real) — distinto de "Logos de marca" (que
+// apunta a /admin, donde el ADMIN sube el logo): esto es para que
+// CUALQUIER usuario pida el logo de una marca que todavía no lo tiene. Ver
+// migration_41_solicitudes_logo.sql — el admin ve todos los pedidos
+// pendientes en /admin.
+function SheetSugerirLogo({
+  marcas,
+  propias,
+  onClose,
+  onEnviar,
+}: {
+  marcas: Marca[];
+  propias: SolicitudLogo[];
+  onClose: () => void;
+  onEnviar: (marcaId: string, nota: string) => Promise<string | null>;
+}) {
+  const marcasSinLogo = marcas.filter((m) => !m.logo_url);
+  const [marcaId, setMarcaId] = useState("");
+  const [nota, setNota] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [error, setError] = useState("");
+
+  async function enviar() {
+    if (!marcaId) return;
+    setEnviando(true);
+    setError("");
+    const err = await onEnviar(marcaId, nota);
+    setEnviando(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setEnviado(true);
+  }
+
+  return (
+    <SheetBase titulo="Sugerir un logo" subtitulo="Pedí el logo de una marca que todavía no lo tiene" onClose={onClose}>
+      {enviado ? (
+        <p className="mt-4 text-sm text-white/70">
+          Listo — se lo pasamos a quien administra el catálogo. Cuando lo suba, el logo va a aparecer solo en esa marca.
+        </p>
+      ) : marcasSinLogo.length === 0 ? (
+        <p className="mt-4 text-sm text-white/50">Todas las marcas del catálogo ya tienen logo — ¡nada que pedir por ahora!</p>
+      ) : (
+        <>
+          <div className="mt-4">
+            <label className="text-xs text-white/50">Marca</label>
+            <select
+              value={marcaId}
+              onChange={(e) => setMarcaId(e.target.value)}
+              className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+            >
+              <option value="">Elegir…</option>
+              {marcasSinLogo.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-3">
+            <label className="text-xs text-white/50">Nota (opcional)</label>
+            <input
+              value={nota}
+              onChange={(e) => setNota(e.target.value)}
+              placeholder="Ej: es la app azul con una hoja"
+              className="mt-1 w-full rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white"
+            />
+          </div>
+          {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
+          <button
+            type="button"
+            disabled={!marcaId || enviando}
+            onClick={enviar}
+            className="mt-4 w-full rounded-full bg-white py-3 text-sm font-bold text-black disabled:opacity-60"
+          >
+            {enviando ? "Enviando…" : "Enviar pedido"}
+          </button>
+        </>
+      )}
+      {propias.length > 0 && (
+        <div className="mt-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-white/40">Tus pedidos</p>
+          <ul className="mt-1.5 space-y-1">
+            {propias.map((s) => (
+              <li key={s.id} className="text-xs text-white/50">
+                {marcas.find((m) => m.id === s.marca_id)?.nombre ?? "Marca"} — {s.estado === "pendiente" ? "en revisión" : "resuelto"}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </SheetBase>
   );
 }
 
@@ -283,27 +547,76 @@ export function PerfilPropioCard() {
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [correo, setCorreo] = useState("");
   const [cargado, setCargado] = useState(false);
+  // Ronda 9: preferencias reales de "Inicio del mes"/"Balance"/"Vista
+  // principal" (antes hojas de solo ejemplo) y catálogo de marcas +
+  // pedidos propios de logo, para "Sugerir un logo".
+  const [preferencias, setPreferencias] = useState<PreferenciasUsuario | null>(null);
+  const [marcas, setMarcas] = useState<Marca[]>([]);
+  const [solicitudesLogoPropias, setSolicitudesLogoPropias] = useState<SolicitudLogo[]>([]);
+  const prefs = conDefectos(preferencias);
 
   const [editandoPerfil, setEditandoPerfil] = useState(false);
   const [nombrePerfil, setNombrePerfil] = useState("");
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [subiendoFoto, setSubiendoFoto] = useState(false);
   const [errorPerfil, setErrorPerfil] = useState("");
-  const [sheetAbierto, setSheetAbierto] = useState<"inicio_mes" | "balance" | "tema" | null>(null);
+  const [sheetAbierto, setSheetAbierto] = useState<"inicio_mes" | "balance" | "tema" | "vista_principal" | "sugerir_logo" | null>(null);
   const [mostrarEliminarCuenta, setMostrarEliminarCuenta] = useState(false);
   const { preferencia } = useTheme();
   const intentoCrearPerfil = useRef(false);
 
   async function cargar() {
-    const [{ data: p }, { data: r }, { data: i }] = await Promise.all([
+    // Sesión primero: "solicitudes_logo" se filtra a mano por owner_id
+    // porque su policy de lectura deja ver TODAS las solicitudes a las
+    // cuentas admin (para que /admin las vea todas) — sin este filtro, "Tus
+    // pedidos" le mostraría a un admin los pedidos de todo el mundo, no
+    // solo los propios.
+    const { data: sesion } = await supabase.auth.getSession();
+    const uid = sesion.session?.user?.id;
+    const [{ data: p }, { data: r }, { data: i }, { data: prf }, { data: mar }, { data: sl }] = await Promise.all([
       supabase.from("personas").select("*").order("nombre"),
       supabase.from("vista_resumen_personas_mes").select("*"),
       supabase.from("ingresos").select("*"),
+      supabase.from("preferencias_usuario").select("*").maybeSingle(),
+      supabase.from("marcas").select("*").order("nombre"),
+      uid
+        ? supabase.from("solicitudes_logo").select("*").eq("owner_id", uid).order("created_at", { ascending: false })
+        : Promise.resolve({ data: [] as SolicitudLogo[] }),
     ]);
     setPersonas((p as Persona[]) ?? []);
     setResumen((r as ResumenPersonaMes[]) ?? []);
     setIngresos((i as Ingreso[]) ?? []);
+    setPreferencias((prf as PreferenciasUsuario) ?? null);
+    setMarcas((mar as Marca[]) ?? []);
+    setSolicitudesLogoPropias((sl as SolicitudLogo[]) ?? []);
     setCargado(true);
+  }
+
+  // Guarda cambios parciales de preferencias_usuario — upsert por owner_id
+  // (llave primaria con default auth.uid(), ver migration_40), así que no
+  // hace falta mandarlo a mano ni pasarle `onConflict`.
+  async function guardarPreferencias(cambios: Partial<Omit<PreferenciasUsuario, "owner_id" | "updated_at">>): Promise<string | null> {
+    const actual = conDefectos(preferencias);
+    const { error } = await supabase.from("preferencias_usuario").upsert({
+      dia_inicio_mes: actual.dia_inicio_mes,
+      balance_incluye_debito: actual.balance_incluye_debito,
+      balance_incluye_efectivo: actual.balance_incluye_efectivo,
+      balance_incluye_cupo_tc: actual.balance_incluye_cupo_tc,
+      pestana_inicio_defecto: actual.pestana_inicio_defecto,
+      orden_resumen: actual.orden_resumen,
+      ...cambios,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) return mensajeError(error) || "No se pudo guardar.";
+    cargar();
+    return null;
+  }
+
+  async function enviarSolicitudLogo(marcaId: string, nota: string): Promise<string | null> {
+    const { error } = await supabase.from("solicitudes_logo").insert({ marca_id: marcaId, nota: nota.trim() || null });
+    if (error) return mensajeError(error) || "No se pudo enviar el pedido.";
+    cargar();
+    return null;
   }
 
   useEffect(() => {
@@ -503,9 +816,23 @@ export function PerfilPropioCard() {
           subtitulo="Aprende de tu correo qué categoría va con cada comercio"
           href="/reglas-categorizacion"
         />
-        <FilaLista titulo="Inicio del mes" subtitulo="Hoy siempre es el día 1" onClick={() => setSheetAbierto("inicio_mes")} />
+        <FilaLista
+          titulo="Inicio del mes"
+          subtitulo={prefs.dia_inicio_mes === 1 ? "Tu ciclo empieza el día 1 (de siempre)" : `Tu ciclo empieza el día ${prefs.dia_inicio_mes}`}
+          onClick={() => setSheetAbierto("inicio_mes")}
+        />
         <NotificacionesPush compacto />
-        <FilaLista titulo="Balance" subtitulo="Qué cuentas suman al balance (hoy suma todas)" onClick={() => setSheetAbierto("balance")} />
+        <FilaLista
+          titulo="Balance"
+          subtitulo={[
+            prefs.balance_incluye_debito && "Débito",
+            prefs.balance_incluye_efectivo && "Efectivo",
+            prefs.balance_incluye_cupo_tc && "Cupo TC",
+          ]
+            .filter(Boolean)
+            .join(" + ") || "Nada seleccionado"}
+          onClick={() => setSheetAbierto("balance")}
+        />
       </Seccion>
 
       {/* Ronda 9: "Logos de marca" era un placeholder "Próximamente" de una
@@ -524,13 +851,17 @@ export function PerfilPropioCard() {
             </span>
           }
         />
-        <FilaLista titulo="Vista principal" subtitulo="Elegir qué ver primero en Inicio" disabled />
+        <FilaLista titulo="Vista principal" subtitulo="Elegir qué ver primero en Inicio" onClick={() => setSheetAbierto("vista_principal")} />
         <FilaLista
           titulo="Logos de marca"
           subtitulo="Ya se muestran solos cuando existen — súbelos en el panel admin"
           href="/admin"
         />
-        <FilaLista titulo="Sugerir un logo" subtitulo="Pedir el logo de un comercio que falta" disabled />
+        <FilaLista
+          titulo="Sugerir un logo"
+          subtitulo="Pedir el logo de un comercio que falta"
+          onClick={() => setSheetAbierto("sugerir_logo")}
+        />
       </Seccion>
 
       <div className="mt-4 space-y-2">
@@ -555,8 +886,27 @@ export function PerfilPropioCard() {
         )}
       </div>
 
-      {sheetAbierto === "inicio_mes" && <SheetInicioMesDemo onClose={() => setSheetAbierto(null)} />}
-      {sheetAbierto === "balance" && <SheetBalanceDemo onClose={() => setSheetAbierto(null)} />}
+      {sheetAbierto === "inicio_mes" && (
+        <SheetInicioMes
+          diaActual={prefs.dia_inicio_mes}
+          onClose={() => setSheetAbierto(null)}
+          onGuardar={(dia) => guardarPreferencias({ dia_inicio_mes: dia })}
+        />
+      )}
+      {sheetAbierto === "balance" && (
+        <SheetBalance prefs={prefs} onClose={() => setSheetAbierto(null)} onGuardar={(cambios) => guardarPreferencias(cambios)} />
+      )}
+      {sheetAbierto === "vista_principal" && (
+        <SheetVistaPrincipal prefs={prefs} onClose={() => setSheetAbierto(null)} onGuardar={(cambios) => guardarPreferencias(cambios)} />
+      )}
+      {sheetAbierto === "sugerir_logo" && (
+        <SheetSugerirLogo
+          marcas={marcas}
+          propias={solicitudesLogoPropias}
+          onClose={() => setSheetAbierto(null)}
+          onEnviar={enviarSolicitudLogo}
+        />
+      )}
       {sheetAbierto === "tema" && <SheetTema onClose={() => setSheetAbierto(null)} />}
     </div>
   );

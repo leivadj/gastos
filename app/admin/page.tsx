@@ -1,10 +1,10 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
-import { Categoria, Marca, TipoMarca } from "@/lib/types";
+import { Categoria, Marca, SolicitudLogo, TipoMarca } from "@/lib/types";
 import { colorFor } from "@/lib/avatarColor";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { IconoPicker } from "@/components/IconoPicker";
@@ -67,6 +67,119 @@ const TIPOS: { value: TipoMarca; label: string }[] = [
   { value: "otro", label: "Otro" },
 ];
 
+// Ronda 9 (bug reportado por Felipe: "al agregar una categoría, en marcas no
+// me aparece la categoría recién creada"): `categorias.tipo_marca_sugerido` y
+// `marcas.tipo` ya no están atados a esta lista fija de 17 (ver
+// migration_39_tipos_marca_libres.sql — se le quitó el check constraint en la
+// base de datos). TIPOS sigue siendo el catálogo BASE (los tipos "de
+// fábrica"), pero ahora se puede escribir un tipo nuevo desde el selector
+// ("+ Nuevo tipo…") tanto al crear/editar una categoría como al crear una
+// marca, y ese tipo queda disponible de inmediato en ambos lados.
+
+// Convierte texto libre en un slug estable para guardar en la base de datos
+// (minúsculas, sin acentos, espacios/símbolos → "_"). Nunca vacío: si no
+// queda nada usable, cae a "otro".
+function slugTipo(texto: string): string {
+  const slug = texto
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return slug || "otro";
+}
+
+// Para mostrar un tipo "custom" (guardado como slug) con una etiqueta
+// legible cuando no está en TIPOS — ej. "casa_rodante" → "Casa rodante".
+function tituloDesdeSlug(slug: string): string {
+  return slug
+    .split("_")
+    .filter(Boolean)
+    .map((palabra, i) => (i === 0 ? palabra.charAt(0).toUpperCase() + palabra.slice(1) : palabra))
+    .join(" ");
+}
+
+// Selector de "tipo de marca" reutilizable con opción de crear uno nuevo al
+// vuelo. Antes había un <select> con solo los 17 valores de TIPOS en cada uno
+// de los 3 lugares que usan tipo de marca (categoría: alta y edición; marca:
+// alta) — por eso una categoría nueva nunca podía introducir un tipo nuevo.
+function SelectorTipoMarca({
+  value,
+  onChange,
+  tiposDisponibles,
+  permitirNinguna,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  tiposDisponibles: { value: string; label: string }[];
+  permitirNinguna?: boolean;
+  className?: string;
+}) {
+  const [creandoNuevo, setCreandoNuevo] = useState(false);
+  const [nuevoTipo, setNuevoTipo] = useState("");
+  const claseBase =
+    className ?? "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white";
+
+  if (creandoNuevo) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          autoFocus
+          value={nuevoTipo}
+          onChange={(e) => setNuevoTipo(e.target.value)}
+          placeholder="Ej: Mascotas"
+          className={claseBase}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            onChange(slugTipo(nuevoTipo));
+            setCreandoNuevo(false);
+            setNuevoTipo("");
+          }}
+          className="shrink-0 text-xs font-semibold text-brand-from dark:text-white"
+        >
+          usar
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setCreandoNuevo(false);
+            setNuevoTipo("");
+          }}
+          className="shrink-0 text-xs text-gray-400 dark:text-gray-500"
+        >
+          cancelar
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => {
+        if (e.target.value === "__nuevo__") {
+          setCreandoNuevo(true);
+          return;
+        }
+        onChange(e.target.value);
+      }}
+      className={claseBase}
+    >
+      {permitirNinguna && <option value="">— Ninguna —</option>}
+      {tiposDisponibles.map((t) => (
+        <option key={t.value} value={t.value}>
+          {t.label}
+        </option>
+      ))}
+      <option value="__nuevo__">+ Nuevo tipo…</option>
+    </select>
+  );
+}
+
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const [marcas, setMarcas] = useState<Marca[]>([]);
@@ -94,6 +207,13 @@ export default function AdminPage() {
   const [editandoDatosCat, setEditandoDatosCat] = useState<string | null>(null);
   const [nombreCatEdit, setNombreCatEdit] = useState("");
   const [tipoCatEdit, setTipoCatEdit] = useState<"fijo" | "variable">("variable");
+  const [tipoMarcaSugeridaCategoria, setTipoMarcaSugeridaCategoria] = useState("");
+
+  // "Sugerir un logo" (Ronda 9): pedidos de logo de cualquier usuario (ver
+  // migration_41_solicitudes_logo.sql y components/PerfilPropioCard.tsx) —
+  // el admin los ve todos acá para saber qué marcas subir.
+  const [solicitudesLogo, setSolicitudesLogo] = useState<SolicitudLogo[]>([]);
+  const [resolviendoSolicitud, setResolviendoSolicitud] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -102,6 +222,25 @@ export default function AdminPage() {
   }, []);
 
   const esAdmin = checkEsAdmin(session?.user?.email);
+
+  // Tipos de marca disponibles: los 17 "de fábrica" (TIPOS) más cualquier
+  // valor custom que ya exista en categorías o marcas cargadas (creado antes
+  // desde "+ Nuevo tipo…") — así un tipo custom aparece como opción en TODOS
+  // los selectores, no solo en el registro donde se creó.
+  const tiposDisponibles = useMemo(() => {
+    const extras = new Map<string, string>();
+    for (const c of categorias) {
+      if (c.tipo_marca_sugerido && !TIPOS.some((t) => t.value === c.tipo_marca_sugerido)) {
+        extras.set(c.tipo_marca_sugerido, tituloDesdeSlug(c.tipo_marca_sugerido));
+      }
+    }
+    for (const m of marcas) {
+      if (m.tipo && !TIPOS.some((t) => t.value === m.tipo)) {
+        extras.set(m.tipo, tituloDesdeSlug(m.tipo));
+      }
+    }
+    return [...TIPOS, ...Array.from(extras, ([value, label]) => ({ value, label }))];
+  }, [categorias, marcas]);
 
   async function cargarMarcas() {
     const { data } = await supabase.from("marcas").select("*").order("nombre");
@@ -113,12 +252,32 @@ export default function AdminPage() {
     setCategorias((data as Categoria[]) ?? []);
   }
 
+  async function cargarSolicitudesLogo() {
+    const { data } = await supabase.from("solicitudes_logo").select("*").order("created_at", { ascending: false });
+    setSolicitudesLogo((data as SolicitudLogo[]) ?? []);
+  }
+
   useEffect(() => {
     if (esAdmin) {
       cargarMarcas();
       cargarCategorias();
+      cargarSolicitudesLogo();
     }
   }, [esAdmin]);
+
+  async function marcarSolicitudResuelta(id: string) {
+    setResolviendoSolicitud(id);
+    await supabase.from("solicitudes_logo").update({ estado: "resuelta" }).eq("id", id);
+    setResolviendoSolicitud(null);
+    cargarSolicitudesLogo();
+  }
+
+  async function borrarSolicitud(id: string) {
+    setResolviendoSolicitud(id);
+    await supabase.from("solicitudes_logo").delete().eq("id", id);
+    setResolviendoSolicitud(null);
+    cargarSolicitudesLogo();
+  }
 
   async function guardarIconoCategoria(id: string, icono: string) {
     const { error: dbError } = await supabase
@@ -261,6 +420,7 @@ export default function AdminPage() {
         tipo: tipoCategoria,
         icono: iconoCategoria || null,
         color: colorCategoria || null,
+        tipo_marca_sugerido: tipoMarcaSugeridaCategoria || null,
       });
       if (insertError) throw insertError;
       setMostrarFormCategoria(false);
@@ -268,6 +428,7 @@ export default function AdminPage() {
       setTipoCategoria("variable");
       setIconoCategoria("");
       setColorCategoria("");
+      setTipoMarcaSugeridaCategoria("");
       cargarCategorias();
     } catch (err) {
       setError(traducirErrorCategoria(err, nombreCategoria, "guardar"));
@@ -344,6 +505,50 @@ export default function AdminPage() {
         <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>
       )}
 
+      {/* "Logos solicitados" (Ronda 9) — pedidos de "Sugerir un logo"
+          (cualquier usuario, ver components/PerfilPropioCard.tsx y
+          migration_41_solicitudes_logo.sql). Solo se muestra si hay algo
+          pendiente, para no ocupar espacio de siempre cuando no hay nada
+          que revisar. */}
+      {solicitudesLogo.some((s) => s.estado === "pendiente") && (
+        <Card>
+          <h2 className="mb-2 text-sm font-bold text-gray-800 dark:text-white">Logos solicitados</h2>
+          <ul className="divide-y divide-gray-100 dark:divide-white/10">
+            {solicitudesLogo
+              .filter((s) => s.estado === "pendiente")
+              .map((s) => {
+                const marca = marcas.find((m) => m.id === s.marca_id);
+                return (
+                  <li key={s.id} className="flex items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{marca?.nombre ?? "Marca borrada"}</p>
+                      {s.nota && <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">{s.nota}</p>}
+                    </div>
+                    <button
+                      onClick={() => marcarSolicitudResuelta(s.id)}
+                      disabled={resolviendoSolicitud === s.id}
+                      className="shrink-0 text-xs font-semibold text-brand-from disabled:opacity-50 dark:text-white"
+                    >
+                      resuelto
+                    </button>
+                    <button
+                      onClick={() => borrarSolicitud(s.id)}
+                      disabled={resolviendoSolicitud === s.id}
+                      className="shrink-0 text-gray-300 hover:text-red-400 disabled:opacity-50 dark:text-gray-600"
+                      aria-label="descartar"
+                    >
+                      🗑
+                    </button>
+                  </li>
+                );
+              })}
+          </ul>
+          <p className="mt-2 text-[10.5px] text-gray-400 dark:text-gray-500">
+            Subí el logo desde la lista de "Marcas" de abajo (el ícono con marco 🖼) y marcá el pedido como resuelto.
+          </p>
+        </Card>
+      )}
+
       {/* Dos paneles lado a lado en escritorio (mockup PDF pág. 15,
           "Categorías y marcas"): antes eran dos secciones apiladas con
           grillas de tarjetas — mismo contenido y funciones, ahora en filas
@@ -397,6 +602,17 @@ export default function AdminPage() {
                   <SelectorColorCategoria value={colorCategoria} onChange={setColorCategoria} />
                 </div>
               </div>
+              <div>
+                <label className="text-xs text-gray-500 dark:text-gray-400">
+                  Marca sugerida (opcional — qué tipo de marca se ofrece primero al usar esta categoría)
+                </label>
+                <SelectorTipoMarca
+                  value={tipoMarcaSugeridaCategoria}
+                  onChange={setTipoMarcaSugeridaCategoria}
+                  tiposDisponibles={tiposDisponibles}
+                  permitirNinguna
+                />
+              </div>
               <button
                 type="submit"
                 disabled={guardandoCategoria}
@@ -424,7 +640,7 @@ export default function AdminPage() {
                       <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{c.nombre}</p>
                       <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">
                         {c.tipo_marca_sugerido
-                          ? `Marca sugerida: ${TIPOS.find((t) => t.value === c.tipo_marca_sugerido)?.label ?? c.tipo_marca_sugerido}`
+                          ? `Marca sugerida: ${tiposDisponibles.find((t) => t.value === c.tipo_marca_sugerido)?.label ?? c.tipo_marca_sugerido}`
                           : "Sin marca sugerida"}
                       </p>
                     </div>
@@ -462,18 +678,13 @@ export default function AdminPage() {
                       </select>
                       <div>
                         <label className="text-[11px] text-gray-400 dark:text-gray-500">Marca sugerida</label>
-                        <select
+                        <SelectorTipoMarca
                           value={c.tipo_marca_sugerido ?? ""}
-                          onChange={(e) => guardarTipoSugerido(c.id, e.target.value)}
+                          onChange={(v) => guardarTipoSugerido(c.id, v)}
+                          tiposDisponibles={tiposDisponibles}
+                          permitirNinguna
                           className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
-                        >
-                          <option value="">— Ninguna —</option>
-                          {TIPOS.map((t) => (
-                            <option key={t.value} value={t.value}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </div>
                       <div>
                         <label className="text-[11px] text-gray-400 dark:text-gray-500">Ícono</label>
@@ -528,17 +739,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400">Tipo</label>
-                <select
-                  value={tipo}
-                  onChange={(e) => setTipo(e.target.value as TipoMarca)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-                >
-                  {TIPOS.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                <SelectorTipoMarca value={tipo} onChange={(v) => setTipo(v as TipoMarca)} tiposDisponibles={tiposDisponibles} />
               </div>
               <div>
                 <label className="text-xs text-gray-500 dark:text-gray-400">Logo (imagen)</label>
@@ -583,7 +784,7 @@ export default function AdminPage() {
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{m.nombre}</p>
-                      <p className="text-[11px] text-gray-400 dark:text-gray-500">{TIPOS.find((t) => t.value === m.tipo)?.label ?? m.tipo}</p>
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500">{tiposDisponibles.find((t) => t.value === m.tipo)?.label ?? m.tipo}</p>
                     </div>
                     <div className="flex shrink-0 items-center gap-2.5">
                       <label className="cursor-pointer text-brand-from dark:text-white" aria-label={m.logo_url ? "cambiar logo" : "subir logo"}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -36,8 +36,10 @@ import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { resumenGastosMes } from "@/lib/resumenGastos";
 import { cuotaActualEn, esMismoMes, isoDelMes, mesAnterior, mesRefActual, mesSiguiente, MesRef } from "@/lib/cuotasHistoricas";
+import { perteneceAlCiclo, refCicloActual } from "@/lib/cicloMes";
 import { NivelGasto, estiloNivelGasto, nivelDeGasto } from "@/lib/nivelGasto";
 import { colorCategoria } from "@/lib/colorCategoria";
+import { conDefectos, ordenResumenValido } from "@/lib/preferenciasUsuario";
 import {
   Categoria,
   Compra,
@@ -51,6 +53,7 @@ import {
   MetaAhorroProgreso,
   Pago,
   Persona,
+  PreferenciasUsuario,
   PresupuestoCategoria,
   RepartoCuota,
   RepartoGastoDiario,
@@ -215,6 +218,29 @@ export default function DashboardPage() {
   const [busquedaInicio, setBusquedaInicio] = useState("");
   const router = useRouter();
 
+  // Preferencias de Mi perfil (Ronda 9: "Vista principal"/"Inicio del
+  // mes"/"Balance", ver migration_40_preferencias_usuario.sql) — null hasta
+  // que se cargan (o si nunca se guardó nada, no existe fila). `prefs`, más
+  // abajo, siempre tiene los 6 campos completos (con los valores de
+  // PREFERENCIAS_DEFECTO si falta alguno) para no tener que chequear null
+  // en cada lugar que los usa.
+  const [preferencias, setPreferencias] = useState<PreferenciasUsuario | null>(null);
+  const prefs = conDefectos(preferencias);
+  // "ref" y "tabResumen" arrancan con el valor de siempre (mes calendario /
+  // pestaña "Resumen") porque las preferencias todavía no cargaron en el
+  // primer render — este flag hace que, una sola vez, apenas cargan, se
+  // ajusten al ciclo/pestaña elegidos por el usuario (si eligió alguno
+  // distinto del de siempre). Sin el flag, cada re-render con `preferencias`
+  // ya cargado pisaría la navegación manual del usuario (ej. si ya hizo
+  // clic en "mes anterior" o cambió de pestaña a mano).
+  const yaAjustoPreferenciasIniciales = useRef(false);
+  useEffect(() => {
+    if (!preferencias || yaAjustoPreferenciasIniciales.current) return;
+    yaAjustoPreferenciasIniciales.current = true;
+    if (preferencias.dia_inicio_mes > 1) setRef(refCicloActual(preferencias.dia_inicio_mes));
+    if (preferencias.pestana_inicio_defecto !== "resumen") setTabResumen(preferencias.pestana_inicio_defecto);
+  }, [preferencias]);
+
   useEffect(() => {
     async function cargar() {
       const [
@@ -235,6 +261,7 @@ export default function DashboardPage() {
         { data: gr },
         { data: tr },
         { data: pc },
+        { data: prf },
       ] = await Promise.all([
         supabase.from("compras").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -253,6 +280,7 @@ export default function DashboardPage() {
         supabase.from("grupos").select("*"),
         supabase.from("transferencias").select("*"),
         supabase.from("presupuestos_categoria").select("*"),
+        supabase.from("preferencias_usuario").select("*").maybeSingle(),
       ]);
       setComprasRaw((c as Compra[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -271,6 +299,7 @@ export default function DashboardPage() {
       setGrupos((gr as Grupo[]) ?? []);
       setTransferencias((tr as Transferencia[]) ?? []);
       setPresupuestos((pc as PresupuestoCategoria[]) ?? []);
+      setPreferencias((prf as PreferenciasUsuario) ?? null);
       setCargando(false);
     }
     cargar();
@@ -286,9 +315,17 @@ export default function DashboardPage() {
   // Recorte al mes elegido (ver comentario junto a "ref" más arriba).
   const refIso = isoDelMes(ref);
   const refMesTexto = refIso.slice(0, 7);
-  const enMesActual = esMismoMes(ref, mesRefActual());
+  // "Inicio del mes" (Ronda 9): con dia_inicio_mes > 1, "el mes actual" ya no
+  // es el mes calendario de hoy sino el ciclo vigente (ver lib/cicloMes.ts).
+  // Con el valor de siempre (1) esto es exactamente `esMismoMes(ref,
+  // mesRefActual())`, sin cambios.
+  const enMesActual = esMismoMes(ref, refCicloActual(prefs.dia_inicio_mes));
   const cuotas = cuotasDelMes(comprasRaw, pagos, ref, refIso);
-  const gastosDiarios = gastosDiariosRaw.filter((d) => d.fecha.slice(0, 7) === refMesTexto);
+  // gastos_diarios tiene fecha real (a diferencia de gastos_fijos/cuotas/
+  // ingresos, etiquetados a un mes calendario específico al crearlos) —
+  // por eso es lo único que se recorta según el ciclo elegido, no el mes
+  // calendario.
+  const gastosDiarios = gastosDiariosRaw.filter((d) => perteneceAlCiclo(d.fecha, ref, prefs.dia_inicio_mes));
   const ingresosDelMes = ingresosLista.filter((i) => i.mes.slice(0, 7) === refMesTexto);
   const ingresosMes = ingresosDelMes.reduce((acc, r) => acc + Number(r.monto), 0);
 
@@ -487,27 +524,6 @@ export default function DashboardPage() {
   }));
   const nombreGrupoHogar = grupos[0]?.nombre ?? "Grupo compartido";
 
-  // Datos para la tabla "Apertura del mes / Ingresos / Gastos / Pago de
-  // tarjeta / Balance" de la pestaña "Resumen" móvil (mockup): "Pago de
-  // tarjeta" = transferencias de este mes hacia una tarjeta de crédito
-  // (mismo concepto que ya usa /tarjetas para "abonos"). "Apertura del
-  // mes" no se guarda como una foto fija en la base (el saldo de
-  // entidades.saldo es el saldo ACTUAL, no el de hace 13 días) — se
-  // aproxima restándole al saldo actual el movimiento neto de este mes,
-  // para no inventar un número sin relación con datos reales. Esa
-  // aproximación solo es válida para el mes actual (el saldo de hoy menos
-  // lo que pasó ESTE mes) — para un mes anterior haría falta reconstruir
-  // el saldo de cada mes entre medio, así que esa fila se oculta cuando se
-  // navega a un mes que no es el actual (ver "enMesActual" más abajo).
-  const totalEnCuentas = entidades
-    .filter((e) => e.tipo !== "tarjeta_credito" && e.saldo != null)
-    .reduce((acc, e) => acc + Number(e.saldo), 0);
-  const pagoTarjetaMes = transferencias
-    .filter((t) => t.fecha.slice(0, 7) === refMesTexto)
-    .filter((t) => entidades.find((e) => e.id === t.cuenta_destino_id)?.tipo === "tarjeta_credito")
-    .reduce((acc, t) => acc + Number(t.monto), 0);
-  const aperturaMes = totalEnCuentas - (ingresosMes - gastosYaPagados - pagoTarjetaMes);
-
   // Cuántas tarjetas entran en la fila "Cuentas próximas / Meta / Grupo
   // Hogar" del dashboard de escritorio — "Cuentas próximas" solo aplica en
   // el mes actual (no hay pagos "por vencer" en un mes anterior ya
@@ -560,6 +576,49 @@ export default function DashboardPage() {
       disponiblePorEntidadId[e.id] = Math.max(0, e.cupo - usado);
     });
   }
+
+  // Datos para la tabla "Apertura del mes / Ingresos / Gastos / Pago de
+  // tarjeta / Balance" de la pestaña "Resumen" móvil (mockup): "Pago de
+  // tarjeta" = transferencias de este mes hacia una tarjeta de crédito
+  // (mismo concepto que ya usa /tarjetas para "abonos"). "Apertura del
+  // mes" no se guarda como una foto fija en la base (el saldo de
+  // entidades.saldo es el saldo ACTUAL, no el de hace 13 días) — se
+  // aproxima restándole al saldo actual el movimiento neto de este mes,
+  // para no inventar un número sin relación con datos reales. Esa
+  // aproximación solo es válida para el mes actual (el saldo de hoy menos
+  // lo que pasó ESTE mes) — para un mes anterior haría falta reconstruir
+  // el saldo de cada mes entre medio, así que esa fila se oculta cuando se
+  // navega a un mes que no es el actual (ver "enMesActual" más abajo).
+  //
+  // "Balance" (Ronda 9): antes esto siempre sumaba TODAS las cuentas menos
+  // las tarjetas de crédito — ahora respeta qué tipos de cuenta elige sumar
+  // el usuario en Mi perfil (prefs.balance_incluye_*). Con los 3 valores de
+  // siempre (débito y efectivo sí, cupo TC no) da el mismo número que
+  // antes. "Cupo TC" no suma un saldo (una tarjeta de crédito no tiene uno
+  // en el mismo sentido) sino el CUPO DISPONIBLE (disponiblePorEntidadId,
+  // ya calculado arriba para "Cuentas y tarjetas").
+  const totalEnCuentas =
+    entidades
+      .filter(
+        (e) =>
+          e.saldo != null &&
+          ((e.tipo === "tarjeta_debito" && prefs.balance_incluye_debito) ||
+            (e.tipo === "efectivo" && prefs.balance_incluye_efectivo) ||
+            (e.tipo !== "tarjeta_debito" && e.tipo !== "efectivo" && e.tipo !== "tarjeta_credito"))
+      )
+      .reduce((acc, e) => acc + Number(e.saldo), 0) +
+    (prefs.balance_incluye_cupo_tc
+      ? entidades
+          .filter((e) => e.tipo === "tarjeta_credito")
+          .reduce((acc, e) => acc + (disponiblePorEntidadId[e.id] ?? e.cupo ?? 0), 0)
+      : 0);
+  // "Inicio del mes" (Ronda 9): mismo criterio que gastosDiarios más arriba
+  // — se recorta al ciclo elegido en vez del mes calendario.
+  const pagoTarjetaMes = transferencias
+    .filter((t) => perteneceAlCiclo(t.fecha, ref, prefs.dia_inicio_mes))
+    .filter((t) => entidades.find((e) => e.id === t.cuenta_destino_id)?.tipo === "tarjeta_credito")
+    .reduce((acc, t) => acc + Number(t.monto), 0);
+  const aperturaMes = totalEnCuentas - (ingresosMes - gastosYaPagados - pagoTarjetaMes);
 
   // Presupuesto por categoría (Feature G del pedido de Felipe): un objetivo
   // mensual por categoría (migration_31_presupuesto_categorias.sql) contra
@@ -1069,6 +1128,22 @@ export default function DashboardPage() {
     </Card>
   );
 
+  // "Vista principal" (Ronda 9): orden elegido por el usuario para las 3
+  // tarjetas de la pestaña "Resumen" (celular) — prefs.orden_resumen,
+  // pasado por ordenResumenValido() para completar/filtrar cualquier valor
+  // guardado incompleto o corrupto (así nunca desaparece una tarjeta). En
+  // escritorio no hay pestañas, pero se usa el mismo orden para decidir si
+  // "Presupuesto por categoría" o "Cuentas y tarjetas" va primero en la fila
+  // de abajo (ver más abajo, `presupuestoPrimeroEnDesktop`).
+  const seccionesResumenPorClave: Record<string, ReactNode> = {
+    categoria: tarjetaCategoria,
+    presupuesto_categorias: tarjetaPresupuestoCategorias,
+    actividad_mes: tarjetaCalendarioActividad,
+  };
+  const ordenResumenCompleto = ordenResumenValido(prefs.orden_resumen);
+  const presupuestoPrimeroEnDesktop =
+    ordenResumenCompleto.indexOf("presupuesto_categorias") < ordenResumenCompleto.indexOf("actividad_mes");
+
   // Hoja "Movimientos de ese día" (Feature G-2): se abre al hacer clic en un
   // día marcado del calendario de arriba. createPortal para que quede fija
   // sobre el viewport sin importar dónde esté montada en el árbol (mismo
@@ -1203,9 +1278,9 @@ export default function DashboardPage() {
         </div>
       </Card>
 
-      {tarjetaCategoria}
-      {tarjetaPresupuestoCategorias}
-      {tarjetaCalendarioActividad}
+      {ordenResumenCompleto.map((clave) => (
+        <div key={clave}>{seccionesResumenPorClave[clave]}</div>
+      ))}
     </div>
   );
 
@@ -1534,8 +1609,17 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {tarjetaPresupuestoCategorias}
-        {tarjetaCuentasResumen}
+        {presupuestoPrimeroEnDesktop ? (
+          <>
+            {tarjetaPresupuestoCategorias}
+            {tarjetaCuentasResumen}
+          </>
+        ) : (
+          <>
+            {tarjetaCuentasResumen}
+            {tarjetaPresupuestoCategorias}
+          </>
+        )}
       </div>
     </div>
   );
