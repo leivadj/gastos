@@ -626,7 +626,9 @@ export default function MovimientosPage() {
             onClick={() => setDetalleAbierto(null)}
           >
             <div
-              className="max-h-[85dvh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 shadow-2xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
+              // Ronda 8: sm:max-w-md → sm:max-w-xl (auditoría de UX de
+              // escritorio, mismo motivo que el detalle de /tarjetas).
+              className="max-h-[85dvh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 shadow-2xl dark:bg-[#111113] dark:text-white sm:max-w-xl sm:rounded-3xl"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="sticky top-0 z-10 flex items-start justify-between gap-2 rounded-t-3xl bg-white p-5 pb-3 dark:bg-[#111113]">

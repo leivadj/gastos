@@ -515,6 +515,52 @@ export default function DashboardPage() {
   // sola persona en la cuenta) y el grid se acomoda solo.
   const numTarjetasSecundarias = (enMesActual ? 1 : 0) + (metas[0] ? 1 : 0) + (enMesActual && personas.length > 1 ? 1 : 0);
 
+  // "Cuentas y tarjetas" (Ronda 8, escritorio): reemplaza a "Actividad del
+  // mes" en el dashboard de escritorio — Felipe pidió un cuadro parecido a
+  // "Movimientos recientes" pero con las cuentas/tarjetas, cada una con su
+  // saldo/cupo restante y lo gastado este mes, para hacer clic y llegar a
+  // su detalle (ver /tarjetas, que ahora acepta ?entidad=<id> para abrir
+  // directo esa cuenta — ver app/tarjetas/page.tsx). Mismo cálculo de
+  // "gastado"/"disponible" que ya usa /tarjetas (gastoPorEntidad /
+  // disponiblePorEntidad ahí), recalculado acá con las cuotas/gastos fijos
+  // del MES ACTUAL real (no el "ref" que se esté navegando en Inicio — el
+  // saldo/cupo de una cuenta es un valor de hoy, no de un mes pasado).
+  const refHoy = mesRefActual();
+  const cuotasMesActualEntidades = cuotasDelMes(comprasRaw, pagos, refHoy, isoDelMes(refHoy));
+  const gastoPorEntidadId: Record<string, number> = {};
+  cuotasMesActualEntidades.forEach((c) => {
+    if (!c.entidad_id) return;
+    gastoPorEntidadId[c.entidad_id] = (gastoPorEntidadId[c.entidad_id] ?? 0) + Number(c.monto_cuota);
+  });
+  gastosFijos.forEach((g) => {
+    if (!g.entidad_id) return;
+    gastoPorEntidadId[g.entidad_id] = (gastoPorEntidadId[g.entidad_id] ?? 0) + Number(g.monto_estimado);
+  });
+  const disponiblePorEntidadId: Record<string, number> = {};
+  {
+    const deudaCuotas: Record<string, number> = {};
+    cuotasMesActualEntidades.forEach((c) => {
+      if (!c.entidad_id) return;
+      const cuotasRestantes = c.n_cuotas - c.cuota_actual + 1;
+      deudaCuotas[c.entidad_id] = (deudaCuotas[c.entidad_id] ?? 0) + Number(c.monto_cuota) * cuotasRestantes;
+    });
+    const deudaFijos: Record<string, number> = {};
+    gastosFijos.forEach((g) => {
+      if (!g.entidad_id) return;
+      deudaFijos[g.entidad_id] = (deudaFijos[g.entidad_id] ?? 0) + Number(g.monto_estimado);
+    });
+    const abonos: Record<string, number> = {};
+    transferencias.forEach((t) => {
+      if (!t.cuenta_destino_id) return;
+      abonos[t.cuenta_destino_id] = (abonos[t.cuenta_destino_id] ?? 0) + Number(t.monto);
+    });
+    entidades.forEach((e) => {
+      if (e.tipo !== "tarjeta_credito" || e.cupo == null) return;
+      const usado = Math.max(0, (deudaCuotas[e.id] ?? 0) + (deudaFijos[e.id] ?? 0) - (abonos[e.id] ?? 0));
+      disponiblePorEntidadId[e.id] = Math.max(0, e.cupo - usado);
+    });
+  }
+
   // Presupuesto por categoría (Feature G del pedido de Felipe): un objetivo
   // mensual por categoría (migration_31_presupuesto_categorias.sql) contra
   // lo efectivamente gastado este mes, agrupado por categoria_id (a
@@ -970,6 +1016,56 @@ export default function DashboardPage() {
         más
       </div>
       <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">Los días marcados tuvieron algún movimiento — el color indica cuánto se gastó.</p>
+    </Card>
+  );
+
+  // "Cuentas y tarjetas" (Ronda 8, solo escritorio): reemplaza a "Actividad
+  // del mes" — mismo formato de lista que "Movimientos recientes" de acá
+  // arriba, una fila por cada cuenta/tarjeta con lo gastado este mes y lo
+  // que le queda (cupo disponible en tarjetas de crédito, saldo en el
+  // resto). Clic en una fila navega a /tarjetas?entidad=<id>, que abre
+  // directo el detalle de esa cuenta (ver app/tarjetas/page.tsx).
+  const tarjetaCuentasResumen = (
+    <Card>
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">Cuentas y tarjetas</p>
+        <Link href="/tarjetas" className="text-xs font-semibold text-brand-from dark:text-white">
+          Ver todas →
+        </Link>
+      </div>
+      {entidades.length === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500">Todavía no agregas cuentas ni tarjetas.</p>
+      ) : (
+        <ul className="divide-y divide-gray-100 dark:divide-white/10">
+          {entidades.map((e) => {
+            const marca = marcas.find((m) => m.id === e.marca_id) ?? resolverMarca(e, marcas);
+            const gastado = gastoPorEntidadId[e.id] ?? 0;
+            const esTarjetaCredito = e.tipo === "tarjeta_credito" && e.cupo != null;
+            const restante = esTarjetaCredito ? disponiblePorEntidadId[e.id] ?? e.cupo ?? 0 : e.saldo;
+            return (
+              <li key={e.id}>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/tarjetas?entidad=${e.id}`)}
+                  className="flex w-full items-center gap-3 py-2.5 text-left text-sm transition hover:opacity-80"
+                >
+                  <EntidadAvatar entidad={e} marca={marca} nombreFallback={e.nombre} className="h-9 w-9 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-gray-700 dark:text-gray-200">{e.nombre}</p>
+                    <p className="truncate text-xs text-gray-400 dark:text-gray-500">Gastado este mes · {formatCLP(gastado)}</p>
+                  </div>
+                  {restante != null && (
+                    <div className="shrink-0 text-right">
+                      <p className="font-semibold text-gray-800 dark:text-gray-100">{formatCLP(restante)}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500">{esTarjetaCredito ? "cupo disp." : "saldo"}</p>
+                    </div>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </Card>
   );
 
@@ -1439,7 +1535,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {tarjetaPresupuestoCategorias}
-        {tarjetaCalendarioActividad}
+        {tarjetaCuentasResumen}
       </div>
     </div>
   );

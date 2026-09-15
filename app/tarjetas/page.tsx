@@ -1,9 +1,9 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
+import { VentanaModal } from "@/components/VentanaModal";
 import { TarjetasCarousel } from "@/components/TarjetasCarousel";
 import { TarjetaVisual, TIPO_LABEL } from "@/components/TarjetaVisual";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
@@ -112,7 +112,21 @@ export default function TarjetasPage() {
   }
 
   useEffect(() => {
-    cargarTodo();
+    cargarTodo().then(() => {
+      // Ronda 8: acceso directo desde la nueva tarjeta "Cuentas y tarjetas"
+      // de Inicio (ver app/page.tsx) — clic en una cuenta navega acá con
+      // ?entidad=<id> y abre directo su detalle, en vez de tener que
+      // buscarla de nuevo en el carrusel. Mismo criterio de leer
+      // window.location.search en vez de useSearchParams que ya usa "nueva"
+      // más abajo, para no forzar un límite de Suspense en la página.
+      if (typeof window !== "undefined") {
+        const idDeUrl = new URLSearchParams(window.location.search).get("entidad");
+        if (idDeUrl) {
+          setActivaId(idDeUrl);
+          setMostrarDetalle(true);
+        }
+      }
+    });
     // Acceso directo desde "Tu perfil" (/personas): abre el formulario de
     // nueva tarjeta directamente, sin pasos extra. Se lee así (en vez de
     // useSearchParams) para no forzar un límite de Suspense en la página.
@@ -741,58 +755,57 @@ export default function TarjetasPage() {
         </>
       )}
 
-      {mostrarDetalle && entidadActiva && createPortal(
-        // createPortal: se monta como hijo directo de <body>, así la hoja
-        // siempre queda fija sobre el viewport actual sin importar el
-        // scroll o el contenedor donde React la haya insertado en el árbol
-        // (antes quedaba encajonada/desplazada por el layout de escritorio
-        // con overflow-y-auto que envuelve el contenido, ver AuthGate.tsx).
-        // "100vh" en el celular incluye el área que queda tapada por la
-        // barra de direcciones/el home indicator cuando están visibles —
-        // eso hacía que esta hoja (anclada abajo con items-end) se dibujara
-        // más alta que el área realmente visible, empujando su parte de
-        // arriba (donde vive el botón ✕, sticky) por encima de lo que se
-        // ve, y dejando un hueco en blanco abajo una vez el navegador
-        // recalculaba. "dvh" (dynamic viewport height) sigue el tamaño
-        // REAL visible en cada momento, así que la hoja completa (header +
-        // botón cerrar) siempre cabe en pantalla. Mismo motivo por el que
-        // se agrega "px-0 sm:px-4" al fondo: en el celular (angosto) la
-        // hoja debe cubrir el ancho completo de borde a borde; recién en
-        // sm: (ya se ve como modal centrado) tiene sentido dejarle aire a
-        // los costados.
-        <div
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4"
-          onClick={() => setMostrarDetalle(false)}
-        >
-          <div
-            className="max-h-[90dvh] w-full overflow-y-auto rounded-t-3xl bg-white text-gray-800 shadow-2xl dark:bg-[#111113] dark:text-white sm:max-w-md sm:rounded-3xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header sticky: antes se desplazaba junto con el resto del
-                contenido dentro de este mismo panel con scroll, así que al
-                bajar a ver los movimientos el botón de cerrar (✕) quedaba
-                fuera de la pantalla y no había forma de cerrar la hoja sin
-                volver a subir el scroll del todo. */}
-            <div className="sticky top-0 z-10 flex items-start justify-between gap-2 rounded-t-3xl bg-white p-5 pb-3 dark:bg-[#111113] sm:rounded-t-3xl">
-              <div className="min-w-0">
-                <p className="truncate text-base font-bold">{entidadActiva.nombre}</p>
-                <p className="text-xs text-gray-400 dark:text-white/50">
-                  {TIPO_LABEL[entidadActiva.tipo]}
-                  {entidadActiva.ultimos_digitos && ` · •••• ${entidadActiva.ultimos_digitos}`}
-                  {entidadActiva.titular_persona_id &&
-                    ` · Titular: ${personas.find((p) => p.id === entidadActiva.titular_persona_id)?.nombre ?? "?"}`}
-                </p>
-              </div>
+      {mostrarDetalle && entidadActiva && (
+        // Ronda 8: este detalle pasó del modal angosto (fijo en sm:max-w-md,
+        // igual en celu y en PC) al VentanaModal ancho ("xl") con 2
+        // columnas en escritorio — pedido explícito de Felipe de que la web
+        // aproveche el ancho de pantalla en vez de calcar el layout móvil.
+        // En celular sigue viéndose igual que antes (una sola columna,
+        // hoja desde abajo — ver components/VentanaModal.tsx).
+        <VentanaModal
+          titulo={entidadActiva.nombre}
+          subtitulo={
+            <>
+              {TIPO_LABEL[entidadActiva.tipo]}
+              {entidadActiva.ultimos_digitos && ` · •••• ${entidadActiva.ultimos_digitos}`}
+              {entidadActiva.titular_persona_id &&
+                ` · Titular: ${personas.find((p) => p.id === entidadActiva.titular_persona_id)?.nombre ?? "?"}`}
+            </>
+          }
+          onClose={() => setMostrarDetalle(false)}
+          ancho="xl"
+          footer={
+            <>
               <button
-                onClick={() => setMostrarDetalle(false)}
-                aria-label="Cerrar"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 dark:bg-white/10"
+                onClick={exportarMovimientosCSV}
+                disabled={itemsActivos.length === 0}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gray-100 py-3 text-xs font-bold disabled:opacity-40 dark:bg-white/10"
               >
-                ✕
+                Exportar
               </button>
-            </div>
-
-            <div className="space-y-4 p-5 pb-[max(env(safe-area-inset-bottom),1.25rem)] pt-0">
+              <button
+                onClick={() => {
+                  setMostrarDetalle(false);
+                  iniciarEdicion(entidadActiva);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gray-100 py-3 text-xs font-bold dark:bg-white/10"
+              >
+                Editar
+              </button>
+              <button
+                onClick={() => {
+                  setMostrarDetalle(false);
+                  eliminar(entidadActiva.id);
+                }}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gasto/10 py-3 text-xs font-bold text-gasto"
+              >
+                Eliminar
+              </button>
+            </>
+          }
+        >
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+            <div className="space-y-4">
               {entidadActiva.tipo === "tarjeta_credito" && entidadActiva.cupo != null ? (
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-white/50">Cupo disponible</p>
@@ -816,63 +829,34 @@ export default function TarjetasPage() {
                   <p className="mt-0.5 text-sm font-bold text-gasto">-{formatCLP(gastosCuentaActivaMes)}</p>
                 </div>
               </div>
+            </div>
 
-              <div>
-                <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-white/50">Movimientos de esta cuenta</p>
-                {itemsActivos.length === 0 ? (
-                  <p className="py-1 text-sm text-gray-400 dark:text-white/40">Sin movimientos este mes con esta cuenta.</p>
-                ) : (
-                  <ul className="divide-y divide-gray-100 dark:divide-white/10">
-                    {itemsActivos.map((it) => (
-                      <li key={it.key} className="flex items-center gap-3 py-2.5">
-                        <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-9 w-9" />
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">{it.descripcion}</p>
-                          <p className="text-xs text-gray-400 dark:text-white/50">
-                            {it.categoria} · {it.detalle}
-                          </p>
-                        </div>
-                        <p className={`shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold dark:bg-white/10 ${it.signo === 1 ? "text-ingreso" : "text-gasto"}`}>
-                          {it.signo === 1 ? "+" : "-"}
-                          {formatCLP(it.monto)}
+            <div>
+              <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-white/50">Movimientos de esta cuenta</p>
+              {itemsActivos.length === 0 ? (
+                <p className="py-1 text-sm text-gray-400 dark:text-white/40">Sin movimientos este mes con esta cuenta.</p>
+              ) : (
+                <ul className="max-h-[50dvh] divide-y divide-gray-100 overflow-y-auto dark:divide-white/10">
+                  {itemsActivos.map((it) => (
+                    <li key={it.key} className="flex items-center gap-3 py-2.5">
+                      <EntidadAvatar marca={marcaDe(it.marca_id) ?? marcaActiva} icono={it.icono} nombreFallback={it.descripcion} className="h-9 w-9" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{it.descripcion}</p>
+                        <p className="text-xs text-gray-400 dark:text-white/50">
+                          {it.categoria} · {it.detalle}
                         </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="flex gap-2.5 pt-1">
-                <button
-                  onClick={exportarMovimientosCSV}
-                  disabled={itemsActivos.length === 0}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gray-100 py-3 text-xs font-bold disabled:opacity-40 dark:bg-white/10"
-                >
-                  Exportar
-                </button>
-                <button
-                  onClick={() => {
-                    setMostrarDetalle(false);
-                    iniciarEdicion(entidadActiva);
-                  }}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gray-100 py-3 text-xs font-bold dark:bg-white/10"
-                >
-                  Editar
-                </button>
-                <button
-                  onClick={() => {
-                    setMostrarDetalle(false);
-                    eliminar(entidadActiva.id);
-                  }}
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-gasto/10 py-3 text-xs font-bold text-gasto"
-                >
-                  Eliminar
-                </button>
-              </div>
+                      </div>
+                      <p className={`shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-bold dark:bg-white/10 ${it.signo === 1 ? "text-ingreso" : "text-gasto"}`}>
+                        {it.signo === 1 ? "+" : "-"}
+                        {formatCLP(it.monto)}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
-        </div>,
-        document.body
+        </VentanaModal>
       )}
     </div>
   );

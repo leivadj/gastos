@@ -3,9 +3,12 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 import { CuotasLista } from "@/components/gastos/CuotasLista";
 import { DiariosLista } from "@/components/gastos/DiariosLista";
 import { GastosFijosLista } from "@/components/gastos/GastosFijosLista";
+import { GastosFiltrados } from "@/components/gastos/GastosFiltrados";
+import { Categoria, Entidad, Persona } from "@/lib/types";
 
 type Tab = "normal" | "recurrente" | "cuotas";
 
@@ -62,10 +65,39 @@ function GastosContenido() {
   const searchParams = useSearchParams();
   const [tab, setTab] = useState<Tab>("normal");
 
+  // Ronda 8: filtros por persona/categoría/cuenta, pedidos por Felipe para
+  // ver de un vistazo "todo lo de Marian" o "todo lo de la tarjeta Paris"
+  // sin importar si quedó cargado como Normal, Recurrente o Cuotas. Apenas
+  // hay al menos un filtro activo, las 3 pestañas de siempre se reemplazan
+  // por GastosFiltrados (ver ese componente), que junta las 3 fuentes en un
+  // solo listado editable. Catálogos livianos, cargados acá una sola vez
+  // para no duplicar la consulta en cada pestaña.
+  const [personas, setPersonas] = useState<Persona[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [entidades, setEntidades] = useState<Entidad[]>([]);
+  const [filtroPersona, setFiltroPersona] = useState("");
+  const [filtroCategoria, setFiltroCategoria] = useState("");
+  const [filtroEntidad, setFiltroEntidad] = useState("");
+  const hayFiltros = !!(filtroPersona || filtroCategoria || filtroEntidad);
+
   useEffect(() => {
     const deLaUrl = searchParams.get("tab");
     if (deLaUrl && TABS_VALIDOS.has(deLaUrl as Tab)) setTab(deLaUrl as Tab);
   }, [searchParams]);
+
+  useEffect(() => {
+    async function cargarCatalogos() {
+      const [{ data: p }, { data: cat }, { data: e }] = await Promise.all([
+        supabase.from("personas").select("*").eq("activo", true).order("nombre"),
+        supabase.from("categorias").select("*").order("nombre"),
+        supabase.from("entidades").select("*").order("nombre"),
+      ]);
+      setPersonas((p as Persona[]) ?? []);
+      setCategorias((cat as Categoria[]) ?? []);
+      setEntidades((e as Entidad[]) ?? []);
+    }
+    cargarCatalogos();
+  }, []);
 
   return (
     <div className="space-y-4 pb-10">
@@ -90,50 +122,109 @@ function GastosContenido() {
         </Link>
       </div>
 
-      <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-sm dark:bg-white/5">
-        {TABS.map((t) => (
+      <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gray-100 bg-white p-3 dark:border-white/10 dark:bg-white/5 md:flex-nowrap">
+        <select
+          value={filtroPersona}
+          onChange={(e) => setFiltroPersona(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2.5 py-2 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+        >
+          <option value="">Persona: todas</option>
+          {personas.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.nombre}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filtroCategoria}
+          onChange={(e) => setFiltroCategoria(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2.5 py-2 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+        >
+          <option value="">Categoría: todas</option>
+          {categorias.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.icono ? `${c.icono} ` : ""}
+              {c.nombre}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filtroEntidad}
+          onChange={(e) => setFiltroEntidad(e.target.value)}
+          className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2.5 py-2 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+        >
+          <option value="">Cuenta o tarjeta: todas</option>
+          {entidades.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.nombre}
+            </option>
+          ))}
+        </select>
+        {hayFiltros && (
           <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
-              tab === t.id
-                ? "bg-white text-brand-from shadow-sm dark:bg-gray-800 dark:text-white dark:shadow-none"
-                : "text-gray-500 dark:text-gray-500"
-            }`}
+            type="button"
+            onClick={() => {
+              setFiltroPersona("");
+              setFiltroCategoria("");
+              setFiltroEntidad("");
+            }}
+            className="shrink-0 rounded-lg bg-gray-100 px-3 py-2 text-xs font-semibold text-gray-500 dark:bg-white/10 dark:text-gray-300"
           >
-            {t.label}
+            Quitar filtros
           </button>
-        ))}
+        )}
       </div>
 
-      {(tab === "recurrente" || tab === "cuotas") && (
-        <Link
-          href="/calendario-pagos"
-          className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-brand-from dark:bg-white/10 dark:text-white"
-        >
-          Ver calendario de pagos
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="m9 6 6 6-6 6" />
-          </svg>
-        </Link>
-      )}
-
-      {tab === "normal" && (
-        <div className="space-y-6">
-          <CuotasLista modo="una-vez" />
-          <div className="border-t border-gray-100 pt-5 dark:border-white/10">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              Gastos diarios (sin tarjeta ni cuenta)
-            </p>
-            <DiariosLista
-              textoAyuda='Compras chicas o improvisadas del día a día (pan, feria, colegio…). Elige la categoría y, si corresponde, el grupo con el que se reparte.'
-              categoriasElegibles={["Hogar", "Feria", "Panadería", "Educación (colegio, cursos)"]}
-            />
+      {hayFiltros ? (
+        <GastosFiltrados personaId={filtroPersona} categoriaId={filtroCategoria} entidadId={filtroEntidad} />
+      ) : (
+        <>
+          <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-sm dark:bg-white/5">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
+                  tab === t.id
+                    ? "bg-white text-brand-from shadow-sm dark:bg-gray-800 dark:text-white dark:shadow-none"
+                    : "text-gray-500 dark:text-gray-500"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-        </div>
+
+          {(tab === "recurrente" || tab === "cuotas") && (
+            <Link
+              href="/calendario-pagos"
+              className="flex items-center justify-between rounded-2xl bg-gray-50 px-4 py-3 text-sm font-semibold text-brand-from dark:bg-white/10 dark:text-white"
+            >
+              Ver calendario de pagos
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <path d="m9 6 6 6-6 6" />
+              </svg>
+            </Link>
+          )}
+
+          {tab === "normal" && (
+            <div className="space-y-6">
+              <CuotasLista modo="una-vez" />
+              <div className="border-t border-gray-100 pt-5 dark:border-white/10">
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                  Gastos diarios (sin tarjeta ni cuenta)
+                </p>
+                <DiariosLista
+                  textoAyuda='Compras chicas o improvisadas del día a día (pan, feria, colegio…). Elige la categoría y, si corresponde, el grupo con el que se reparte.'
+                  categoriasElegibles={["Hogar", "Feria", "Panadería", "Educación (colegio, cursos)"]}
+                />
+              </div>
+            </div>
+          )}
+          {tab === "recurrente" && <GastosFijosLista />}
+          {tab === "cuotas" && <CuotasLista modo="cuotas" />}
+        </>
       )}
-      {tab === "recurrente" && <GastosFijosLista />}
-      {tab === "cuotas" && <CuotasLista modo="cuotas" />}
     </div>
   );
 }

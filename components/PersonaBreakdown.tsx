@@ -395,7 +395,10 @@ export function PersonaBreakdown({
     >
       <div
         data-open={abierto}
-        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-neutral-900 dark:shadow-none sm:max-w-lg sm:rounded-2xl"
+        // Ronda 8: sm:max-w-lg → sm:max-w-xl (auditoría de UX de escritorio)
+        // — este panel es el que abre el clic en un avatar de la tarjeta
+        // "Hogar" de Inicio, con ingresos + listado de ítems juntos.
+        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-neutral-900 dark:shadow-none sm:max-w-xl sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {contenido}

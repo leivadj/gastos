@@ -25,7 +25,20 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // entidad/persona/detalle/monto) que con max-w-4xl quedaba con columnas
   // cortadas o apretadas en escritorio (Felipe lo reportó) — usa el ancho
   // completo disponible en vez del ancho "moderado" del resto de páginas.
-  const anchoDesktop = pathname === "/" ? "max-w-6xl" : pathname.startsWith("/reportes") ? "max-w-none" : "max-w-4xl";
+  //
+  // Ronda 8: antes cada ancho era un número fijo (ej. "max-w-4xl" SIEMPRE,
+  // sin importar si la ventana medía 1280px o 2560px) — Felipe, como
+  // auditoría de UX de escritorio, pidió que la web "aproveche totalmente
+  // el ancho de la pantalla, adaptándose a la resolución" en vez de quedar
+  // clavada en un ancho de computador chico. Ahora cada nivel crece un
+  // escalón más en pantallas grandes (xl:/2xl:, ambos ya usados en el resto
+  // del proyecto — ver tailwind.config.ts) en vez de quedar fijo.
+  const anchoDesktop =
+    pathname === "/"
+      ? "max-w-6xl 2xl:max-w-[92rem]"
+      : pathname.startsWith("/reportes")
+      ? "max-w-none"
+      : "max-w-4xl xl:max-w-6xl 2xl:max-w-7xl";
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");

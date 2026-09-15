@@ -563,7 +563,9 @@ export default function CalendarioPagosPage() {
               onClick={() => setDiaSeleccionado(null)}
             >
               <div
-                className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-[#111113] p-5 pb-7 text-white sm:max-w-md sm:rounded-3xl"
+                // Ronda 8: sm:max-w-md → sm:max-w-xl (auditoría de UX de
+                // escritorio, mismo motivo que el detalle de /tarjetas).
+                className="max-h-[85vh] w-full overflow-y-auto rounded-t-3xl bg-[#111113] p-5 pb-7 text-white sm:max-w-xl sm:rounded-3xl"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-3 flex justify-center sm:hidden">

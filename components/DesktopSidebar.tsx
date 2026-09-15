@@ -17,11 +17,15 @@ import { Persona } from "@/lib/types";
 // categoría — Felipe pidió calcar el mockup exacto y dejar lo que no está ahí
 // oculto (ver mockup-v2-decisiones.md, "Menú lateral (sidebar) de escritorio").
 //
-// Los 8 destinos y su orden son fijos, tal como aparecen en los 4 artboards
-// de escritorio del mockup (mismo orden en los 4): Inicio, Cuentas, Gastos,
-// Presupuesto, Calendario, Movimientos, Reportes, y Personas — que en
-// AdminWeb.dc.html ese mismo puesto lo ocupa Admin, así que acá alterna
-// según esAdmin, igual que ese artboard sugiere.
+// Los 8 destinos originales y su orden calcan los 4 artboards de escritorio
+// del mockup (mismo orden en los 4): Inicio, Cuentas, Gastos, Presupuesto,
+// Calendario, Movimientos, Reportes, y Personas — que en AdminWeb.dc.html
+// ese mismo puesto lo ocupa Admin, así que acá alterna según esAdmin, igual
+// que ese artboard sugiere.
+//
+// Ronda 8: se agregó "Compromisos" al rail (después de Gastos), a pedido de
+// Felipe — deja de calcar el mockup al pie de la letra porque ya no tenía
+// sentido mantenerlo escondido en "Más" cuando lo usa seguido.
 //
 // "Gastos" apunta a /gastos (la pantalla con pestañas Fijos/Variables/Cuotas/
 // Diarios) en vez de separarlo en 2 accesos como hacía el sidebar anterior —
@@ -65,6 +69,24 @@ const ITEMS: ItemRail[] = [
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <rect x="4" y="3.5" width="16" height="17" rx="2" />
         <path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
+    // Ronda 8: Felipe pidió que "Compromisos" salga del popover "Más" y
+    // quede en el rail principal, justo después de Gastos — antes vivía en
+    // ITEMS_MAS (ver comentario ahí abajo) por calcar el rail de 8 íconos
+    // exacto del mockup original, pero Felipe ahora prioriza encontrarlo
+    // directo sobre calcar ese mockup al pie de la letra.
+    key: "compromisos",
+    href: "/compromisos",
+    label: "Compromisos",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="3" y="7" width="18" height="13" rx="2.2" />
+        <path d="M3 11h18" strokeLinecap="round" />
+        <path d="M7 15.5h4" strokeLinecap="round" />
+        <path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" strokeLinecap="round" />
       </svg>
     ),
   },
@@ -122,8 +144,10 @@ const ITEMS: ItemRail[] = [
 // exacto del mockup, quedaron sin ningún punto de entrada: ni ícono propio
 // ni un "Más" que las agrupara. Felipe reportó "los menus faltantes en la
 // app" — este ítem "Más" (mismo ícono de 4 cuadros que su versión móvil)
-// es el arreglo: abre un popover con estos 6 destinos en vez de agregar
+// es el arreglo: abre un popover con estos destinos en vez de agregar
 // más íconos sueltos al rail (que dejaría de calcar el mockup).
+// "Compromisos" vivía acá también hasta la ronda 8, cuando se promovió al
+// rail principal (ver ITEMS más arriba).
 const ITEMS_MAS: ItemRail[] = [
   {
     key: "metas-ahorro",
@@ -198,19 +222,6 @@ const ITEMS_MAS: ItemRail[] = [
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <rect x="3" y="5" width="18" height="14" rx="2.2" />
         <path d="m3.5 6 8.5 6.5L20.5 6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    key: "compromisos",
-    href: "/compromisos",
-    label: "Compromisos",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <rect x="3" y="7" width="18" height="13" rx="2.2" />
-        <path d="M3 11h18" strokeLinecap="round" />
-        <path d="M7 15.5h4" strokeLinecap="round" />
-        <path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" strokeLinecap="round" />
       </svg>
     ),
   },
