@@ -36,6 +36,7 @@ import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { resumenGastosMes } from "@/lib/resumenGastos";
 import { cuotaActualEn, esMismoMes, isoDelMes, mesAnterior, mesRefActual, mesSiguiente, MesRef } from "@/lib/cuotasHistoricas";
+import { NivelGasto, estiloNivelGasto, nivelDeGasto } from "@/lib/nivelGasto";
 import {
   Categoria,
   Compra,
@@ -552,6 +553,29 @@ export default function DashboardPage() {
     gastoPorCategoriaId[d.categoria_id] = (gastoPorCategoriaId[d.categoria_id] ?? 0) + Number(d.monto);
   });
 
+  // Gasto total por día (ronda 5): mismas 3 fuentes que gastoPorCategoriaId
+  // de arriba (cuotas + gastosFijos + gastosDiarios, sin transferencias —
+  // un traspaso entre cuentas propias no es gasto real), pero agrupado por
+  // día del mes en vez de por categoría, para colorear "Actividad del mes"
+  // según cuánto se gastó cada día — con la misma escala/paleta que la
+  // pestaña "Intensidad" de /calendario-pagos (ver lib/nivelGasto.ts), solo
+  // que acá el máximo es de todas las cuentas/categorías juntas, porque esta
+  // pantalla no tiene selector de cuenta.
+  const gastoPorDiaTotal: Record<number, number> = {};
+  cuotas.forEach((c) => {
+    const dia = diaDelMes(c.fecha_primera_cuota);
+    gastoPorDiaTotal[dia] = (gastoPorDiaTotal[dia] ?? 0) + Number(c.monto_cuota);
+  });
+  gastosFijos.forEach((g) => {
+    if (g.dia_mes_pago == null) return;
+    gastoPorDiaTotal[g.dia_mes_pago] = (gastoPorDiaTotal[g.dia_mes_pago] ?? 0) + Number(g.monto_estimado);
+  });
+  gastosDiarios.forEach((d) => {
+    const dia = diaDelMes(d.fecha);
+    gastoPorDiaTotal[dia] = (gastoPorDiaTotal[dia] ?? 0) + Number(d.monto);
+  });
+  const maxGastoDiaMes = Math.max(0, ...Object.values(gastoPorDiaTotal));
+
   const categoriasConPresupuesto = presupuestos
     .map((p) => ({ presupuesto: p, categoria: categorias.find((c) => c.id === p.categoria_id) ?? null }))
     .filter((x): x is { presupuesto: PresupuestoCategoria; categoria: Categoria } => x.categoria != null)
@@ -715,9 +739,18 @@ export default function DashboardPage() {
     </Card>
   );
 
-  // Tarjeta "Presupuesto por categoría" (Feature G): barra de gasto-vs-
-  // objetivo por cada categoría con presupuesto definido, más un mini form
-  // para agregar/editar/quitar objetivos.
+  // Tarjeta "Presupuesto por categoría" (Feature G, rediseñada ronda 5):
+  // antes era una lista de barras horizontales de progreso; ahora es un
+  // gráfico de barras verticales (una por categoría) con una línea punteada
+  // marcando el presupuesto asignado — pedido explícito del usuario, calcado
+  // de una captura real de Not Pato. Cada barra se escala en su PROPIO
+  // contenedor (denom = máximo entre gastado y presupuesto, +15% de aire)
+  // porque los presupuestos de distintas categorías pueden ser de montos muy
+  // distintos (ej. $40.000 en Comida vs. $550.000 en Hogar) y no tendría
+  // sentido compararlos en una sola escala común. Debajo del gráfico se
+  // mantiene la lista compacta con los montos exactos y los mismos
+  // controles de editar/quitar de siempre, y el mini form de agregar no
+  // cambia.
   const tarjetaPresupuestoCategorias = (
     <Card>
       <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Presupuesto por categoría</p>
@@ -726,15 +759,58 @@ export default function DashboardPage() {
           Todavía no defines un presupuesto por categoría — agrega uno abajo para ver cuánto llevas gastado.
         </p>
       ) : (
-        <div className="space-y-3">
-          {categoriasConPresupuesto.map(({ presupuesto, categoria }) => {
-            const gastado = gastoPorCategoriaId[categoria.id] ?? 0;
-            const pct = Math.min(100, Math.round((gastado / presupuesto.monto_mensual) * 100));
-            const sobrepasado = gastado > presupuesto.monto_mensual;
-            const editando = editandoPresupuestoId === categoria.id;
-            return (
-              <div key={categoria.id}>
-                <div className="mb-1 flex items-center justify-between gap-2 text-xs">
+        <>
+          <div className="flex items-end gap-3 overflow-x-auto pb-1">
+            {categoriasConPresupuesto.map(({ presupuesto, categoria }) => {
+              const gastado = gastoPorCategoriaId[categoria.id] ?? 0;
+              const sobrepasado = gastado > presupuesto.monto_mensual;
+              const denom = Math.max(gastado, presupuesto.monto_mensual) * 1.15;
+              const barPct = denom > 0 ? Math.min(100, (gastado / denom) * 100) : 0;
+              const lineaPct = denom > 0 ? Math.min(100, (presupuesto.monto_mensual / denom) * 100) : 0;
+              return (
+                <div
+                  key={categoria.id}
+                  className="flex w-14 shrink-0 flex-col items-center gap-1.5"
+                  title={`${categoria.nombre}: ${formatCLP(gastado)} de ${formatCLP(presupuesto.monto_mensual)}`}
+                >
+                  <div className="relative h-32 w-6 overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                    <div
+                      className="absolute inset-x-0 border-t-2 border-dashed border-gray-400 dark:border-gray-400/60"
+                      style={{ bottom: `${lineaPct}%` }}
+                    />
+                    <div
+                      className={`absolute inset-x-0 bottom-0 rounded-full transition-[height] ${
+                        sobrepasado ? "bg-gasto" : "bg-brand-gradient"
+                      }`}
+                      style={{ height: `${barPct}%` }}
+                    />
+                  </div>
+                  <span className="max-w-full truncate text-sm leading-none">{categoria.icono || "🏷️"}</span>
+                  <span className="max-w-full truncate text-[10px] font-semibold text-gray-500 dark:text-gray-400">
+                    {categoria.nombre}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-gray-400 dark:text-gray-500">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-brand-gradient" /> Gastado
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-0 w-3 border-t-2 border-dashed border-gray-400 dark:border-gray-400/60" /> Presupuesto
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-gasto" /> Excedido
+            </span>
+          </div>
+
+          <div className="mt-4 space-y-2 border-t border-gray-50 pt-3 dark:border-white/10">
+            {categoriasConPresupuesto.map(({ presupuesto, categoria }) => {
+              const gastado = gastoPorCategoriaId[categoria.id] ?? 0;
+              const editando = editandoPresupuestoId === categoria.id;
+              return (
+                <div key={categoria.id} className="flex items-center justify-between gap-2 text-xs">
                   <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-gray-700 dark:text-gray-200">
                     {categoria.icono ? `${categoria.icono} ` : ""}
                     {categoria.nombre}
@@ -782,13 +858,10 @@ export default function DashboardPage() {
                     </span>
                   )}
                 </div>
-                <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
-                  <div className={`h-full ${sobrepasado ? "bg-gasto" : "bg-brand-gradient"}`} style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3 dark:border-white/10">
@@ -845,21 +918,26 @@ export default function DashboardPage() {
         {celdasCalendario.map((dia, i) => {
           const esHoy = enMesActual && dia === hoyDia;
           const tieneMovimiento = dia != null && diasConMovimiento.has(dia);
+          // Ronda 5: el color de fondo ahora indica cuánto se gastó ese día
+          // (misma paleta/umbrales que la pestaña "Intensidad" de
+          // /calendario-pagos, ver lib/nivelGasto.ts), en vez del tinte fijo
+          // de antes. "Hoy" pasa de relleno sólido a un anillo superpuesto
+          // sobre ese color, para no taparlo (mismo patrón que Intensidad).
+          const nivel: NivelGasto = dia != null ? nivelDeGasto(gastoPorDiaTotal[dia] ?? 0, maxGastoDiaMes) : 0;
           return (
             <div key={i} className="flex items-center justify-center py-0.5">
               <button
                 type="button"
                 disabled={dia == null || !tieneMovimiento}
                 onClick={() => dia != null && setDiaSeleccionado(dia)}
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs ${
+                style={dia != null && tieneMovimiento ? estiloNivelGasto(nivel) : undefined}
+                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs transition ${
                   dia == null
                     ? "cursor-default"
-                    : esHoy
-                    ? "bg-gray-800 font-bold text-white dark:bg-white dark:text-black"
                     : tieneMovimiento
-                    ? "bg-brand-gradient/15 font-semibold text-gray-800 active:scale-90 dark:bg-white/15 dark:text-white"
+                    ? "font-semibold text-gray-800 active:scale-90 dark:text-white"
                     : "cursor-default text-gray-300 dark:text-gray-600"
-                }`}
+                } ${esHoy ? "ring-[1.5px] ring-brand-from dark:ring-white" : ""}`}
               >
                 {dia ?? ""}
               </button>
@@ -867,7 +945,14 @@ export default function DashboardPage() {
           );
         })}
       </div>
-      <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">Los días marcados tuvieron algún movimiento.</p>
+      <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
+        menos
+        {([0, 1, 2, 3, 4] as NivelGasto[]).map((n) => (
+          <span key={n} className="h-3.5 w-3.5 rounded-[4px]" style={estiloNivelGasto(n)} />
+        ))}
+        más
+      </div>
+      <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">Los días marcados tuvieron algún movimiento — el color indica cuánto se gastó.</p>
     </Card>
   );
 

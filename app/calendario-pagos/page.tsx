@@ -10,9 +10,9 @@ import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
 import { CompraVigente, Entidad, GastoFijo, Marca, Pago, Transferencia } from "@/lib/types";
+import { NivelGasto, estiloNivelGasto, nivelDeGasto } from "@/lib/nivelGasto";
 
 type Tab = "pagos" | "intensidad";
-type Nivel = 0 | 1 | 2 | 3 | 4;
 
 // Rediseño v2 — nueva pestaña "Intensidad": calendario de gasto diario por
 // día (pedido del usuario, inspirado en una captura real de la app Not
@@ -32,21 +32,10 @@ type Nivel = 0 | 1 | 2 | 3 | 4;
 // Los 5 niveles de color (gris → verde → amarillo → naranja → rojo) son la
 // misma escala que el usuario aprobó en el mockup calcada de esa captura de
 // Not Pato — una excepción a propósito a la regla "verde/rojo solo para
-// montos de ingreso/gasto", documentada en mockup-v2-decisiones.md.
-function estiloNivel(nivel: Nivel): { background: string; color?: string } {
-  switch (nivel) {
-    case 0:
-      return { background: "rgba(120,120,120,0.08)" };
-    case 1:
-      return { background: "rgba(93,203,134,0.32)" };
-    case 2:
-      return { background: "rgba(224,197,74,0.4)" };
-    case 3:
-      return { background: "rgba(224,146,74,0.45)" };
-    case 4:
-      return { background: "rgba(226,88,75,0.55)" };
-  }
-}
+// montos de ingreso/gasto", documentada en mockup-v2-decisiones.md. Las
+// funciones que definen esos niveles/colores ahora viven en
+// lib/nivelGasto.ts, compartidas con el calendario "Actividad del mes" de
+// Inicio, para que ambos usen exactamente la misma paleta.
 
 type Evento = {
   origen: "gasto_fijo" | "compra";
@@ -296,14 +285,8 @@ export default function CalendarioPagosPage() {
     .filter((t) => (filtroInterno === "pago_tc" ? esPagoTC(t) : !esPagoTC(t)))
     .sort((a, b) => (a.fecha < b.fecha ? 1 : -1));
 
-  function nivelDe(fechaISO: string): Nivel {
-    const monto = gastoPorDia[fechaISO] ?? 0;
-    if (monto <= 0 || maxDelMes <= 0) return 0;
-    const pct = monto / maxDelMes;
-    if (pct > 0.75) return 4;
-    if (pct > 0.5) return 3;
-    if (pct > 0.25) return 2;
-    return 1;
+  function nivelDe(fechaISO: string): NivelGasto {
+    return nivelDeGasto(gastoPorDia[fechaISO] ?? 0, maxDelMes);
   }
 
   const descripcionPago = (p: Pago) => {
@@ -494,7 +477,7 @@ export default function CalendarioPagosPage() {
                     } ${esHoy ? "ring-[1.5px] ring-brand-from dark:ring-white" : ""} ${
                       seleccionada ? "ring-2 ring-brand-from dark:ring-white" : ""
                     }`}
-                    style={celda.delMes ? estiloNivel(nivel) : undefined}
+                    style={celda.delMes ? estiloNivelGasto(nivel) : undefined}
                   >
                     {celda.numero}
                     {tieneIngreso && (
@@ -506,8 +489,8 @@ export default function CalendarioPagosPage() {
             </div>
             <div className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500">
               menos
-              {([0, 1, 2, 3, 4] as Nivel[]).map((n) => (
-                <span key={n} className="h-3.5 w-3.5 rounded-[4px]" style={estiloNivel(n)} />
+              {([0, 1, 2, 3, 4] as NivelGasto[]).map((n) => (
+                <span key={n} className="h-3.5 w-3.5 rounded-[4px]" style={estiloNivelGasto(n)} />
               ))}
               más
             </div>
