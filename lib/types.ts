@@ -351,6 +351,11 @@ export interface MetaAhorroProgreso {
 // centro médico, farmacia...), ver migration_25_marcas_auto_salud.sql;
 // "Diarios" de /gastos no lo usa. `grupo_id` es opcional (null = sin
 // reparto, como siempre) — ver migration_27_reparto_gastos_diarios.sql.
+// `entidad_id` es opcional (null = efectivo/sin cuenta, el comportamiento de
+// siempre) — ver migration_37_entidad_gastos_diarios.sql. Se agregó porque
+// /sugerencias confirma TODO acá (también las compras con tarjeta real que
+// llegan del correo del banco), no solo los diarios en efectivo cargados a
+// mano.
 export interface GastoDiario {
   id: string;
   descripcion: string;
@@ -358,7 +363,25 @@ export interface GastoDiario {
   categoria_id: string | null;
   marca_id: string | null;
   grupo_id: string | null;
+  entidad_id: string | null;
   fecha: string;
+}
+
+// Una regla de categorización aprendida (ver
+// migration_38_reglas_categorizacion.sql y /reglas-categorizacion): "cuando
+// el texto del correo se parece a `patron`, sugerir esta categoría (y de
+// paso la marca/cuenta, si también se aprendieron)". `patron` se guarda
+// normalizado (mayúsculas, sin espacios de sobra). `veces_usada` es solo
+// para ordenar "más usadas" primero en la pantalla.
+export interface ReglaCategorizacion {
+  id: string;
+  patron: string;
+  categoria_id: string;
+  marca_id: string | null;
+  entidad_id: string | null;
+  veces_usada: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // Personalización del menú lateral de escritorio (DesktopSidebar.tsx): una

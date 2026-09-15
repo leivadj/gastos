@@ -508,6 +508,11 @@ export function PerfilPropioCard() {
         <FilaLista titulo="Balance" subtitulo="Qué cuentas suman al balance (hoy suma todas)" onClick={() => setSheetAbierto("balance")} />
       </Seccion>
 
+      {/* Ronda 9: "Logos de marca" era un placeholder "Próximamente" de una
+          ronda vieja, pero /admin (panel de Categorías y Marcas) YA subía y
+          mostraba logos reales de marca desde antes (EntidadAvatar.tsx y
+          TarjetaVisual.tsx ya leen marca.logo_url) — quedó huérfano. Ahora
+          apunta directo a /admin, donde la función ya existe de verdad. */}
       <Seccion titulo="Apariencia">
         <FilaLista
           titulo="Tema"
@@ -520,7 +525,11 @@ export function PerfilPropioCard() {
           }
         />
         <FilaLista titulo="Vista principal" subtitulo="Elegir qué ver primero en Inicio" disabled />
-        <FilaLista titulo="Logos de marca" subtitulo="Mostrar el logo real de cada comercio" disabled />
+        <FilaLista
+          titulo="Logos de marca"
+          subtitulo="Ya se muestran solos cuando existen — súbelos en el panel admin"
+          href="/admin"
+        />
         <FilaLista titulo="Sugerir un logo" subtitulo="Pedir el logo de un comercio que falta" disabled />
       </Seccion>
 

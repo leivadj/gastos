@@ -262,7 +262,7 @@ export default function MovimientosPage() {
         monto: Number(d.monto),
         esPromedio: false,
         pagado: null,
-        entidadId: null,
+        entidadId: d.entidad_id,
         marcaId: null,
         icono: categoria?.icono ?? null,
         categoriaId: d.categoria_id,

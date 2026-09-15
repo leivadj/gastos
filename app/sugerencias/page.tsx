@@ -6,7 +6,8 @@ import { Card } from "@/components/Card";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { formatCLP } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, CategoriaGrupoPreferido, Entidad, Grupo, Marca, SugerenciaCorreo, TipoSugerenciaCorreo } from "@/lib/types";
+import { buscarReglaQueCalce, normalizarPatron } from "@/lib/reglasCategorizacion";
+import { Categoria, CategoriaGrupoPreferido, Entidad, Grupo, Marca, ReglaCategorizacion, SugerenciaCorreo, TipoSugerenciaCorreo } from "@/lib/types";
 
 function fechaCorta(fechaISO: string): string {
   const fecha = new Date(`${fechaISO.slice(0, 10)}T00:00:00`);
@@ -33,6 +34,12 @@ export default function SugerenciasPage() {
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
+  // Reglas de categorización aprendidas (ver migration_38 y
+  // lib/reglasCategorizacion.ts) — al abrir una sugerencia se busca si su
+  // texto ya calza con alguna, para precargar categoría/marca/cuenta sin que
+  // el usuario tenga que repetirlo cada vez que ve el mismo comercio.
+  const [reglas, setReglas] = useState<ReglaCategorizacion[]>([]);
+  const [reglaAplicada, setReglaAplicada] = useState<ReglaCategorizacion | null>(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
   const [mostrarResueltas, setMostrarResueltas] = useState(false);
@@ -47,6 +54,7 @@ export default function SugerenciasPage() {
   const [fecha, setFecha] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [marcaId, setMarcaId] = useState("");
+  const [entidadId, setEntidadId] = useState("");
   const [grupoId, setGrupoId] = useState("");
   const [grupoEsAutomatico, setGrupoEsAutomatico] = useState(false);
 
@@ -57,13 +65,14 @@ export default function SugerenciasPage() {
 
   async function cargarTodo() {
     setCargando(true);
-    const [{ data: s }, { data: cat }, { data: m }, { data: g }, { data: e }, { data: cgp }] = await Promise.all([
+    const [{ data: s }, { data: cat }, { data: m }, { data: g }, { data: e }, { data: cgp }, { data: rc }] = await Promise.all([
       supabase.from("sugerencias_correo").select("*").order("fecha", { ascending: false }).order("created_at", { ascending: false }),
       supabase.from("categorias").select("*").order("nombre"),
       supabase.from("marcas").select("*"),
       supabase.from("grupos").select("*").order("nombre"),
       supabase.from("entidades").select("*").order("nombre"),
       supabase.from("categoria_grupo_preferido").select("*"),
+      supabase.from("reglas_categorizacion").select("*"),
     ]);
     setSugerencias((s as SugerenciaCorreo[]) ?? []);
     setCategorias((cat as Categoria[]) ?? []);
@@ -75,6 +84,7 @@ export default function SugerenciasPage() {
       mapaPreferido[row.categoria_id] = row.grupo_id;
     });
     setPreferidoPorCategoria(mapaPreferido);
+    setReglas((rc as ReglaCategorizacion[]) ?? []);
     setCargando(false);
   }
 
@@ -89,11 +99,13 @@ export default function SugerenciasPage() {
     setFecha("");
     setCategoriaId("");
     setMarcaId("");
+    setEntidadId("");
     setGrupoId("");
     setGrupoEsAutomatico(false);
     setOrigenId("");
     setDestinoId("");
     setNotas("");
+    setReglaAplicada(null);
     setError("");
   }
 
@@ -110,22 +122,71 @@ export default function SugerenciasPage() {
       setNotas(sug.descripcion);
       setOrigenId("");
       setDestinoId("");
+      setReglaAplicada(null);
     } else {
       setDescripcion(sug.descripcion);
-      setCategoriaId("");
-      setMarcaId("");
-      setGrupoId("");
-      setGrupoEsAutomatico(false);
+      // Regla aprendida (ver lib/reglasCategorizacion.ts): si el texto de
+      // esta sugerencia ya calzó antes con un comercio confirmado, se
+      // precargan categoría/marca/cuenta solas — el usuario solo tiene que
+      // revisar y confirmar, no repetir el trabajo de la vez anterior.
+      const regla = buscarReglaQueCalce(normalizarPatron(sug.descripcion), reglas);
+      setReglaAplicada(regla);
+      setCategoriaId(regla?.categoria_id ?? "");
+      setMarcaId(regla?.marca_id ?? "");
+      setEntidadId(regla?.entidad_id ?? "");
+      const sugerido = regla ? (preferidoPorCategoria[regla.categoria_id] ?? "") : "";
+      setGrupoId(sugerido);
+      setGrupoEsAutomatico(!!sugerido);
     }
   }
 
   function elegirCategoria(id: string) {
     setCategoriaId(id);
     setMarcaId("");
+    // Si el usuario cambia la categoría a mano, la regla que se había
+    // aplicado sola ya no describe lo que se va a guardar — al confirmar se
+    // aprenderá/actualizará con lo que él elija, no se sigue mostrando como
+    // "aplicada automáticamente".
+    if (reglaAplicada && id !== reglaAplicada.categoria_id) setReglaAplicada(null);
     if (!grupoId || grupoEsAutomatico) {
       const sugerido = preferidoPorCategoria[id] ?? "";
       setGrupoId(sugerido);
       setGrupoEsAutomatico(!!sugerido);
+    }
+  }
+
+  // Aprende o refuerza la regla de categorización para esta descripción (ver
+  // migration_38 y lib/reglasCategorizacion.ts): si ya existía una regla con
+  // el mismo patrón, se actualiza con la categoría/marca/cuenta recién
+  // confirmadas (por si el usuario corrigió lo que la regla sugería) y suma
+  // un uso; si no existía, se crea. Nunca debe hacer fallar la confirmación
+  // del gasto: si esto falla, el gasto ya se guardó igual, solo no se
+  // aprendió nada nuevo esta vez.
+  async function aprenderRegla(patronOriginal: string) {
+    try {
+      const patron = normalizarPatron(patronOriginal);
+      const existente = reglas.find((r) => r.patron === patron);
+      if (existente) {
+        await supabase
+          .from("reglas_categorizacion")
+          .update({
+            categoria_id: categoriaId,
+            marca_id: marcaId || null,
+            entidad_id: entidadId || null,
+            veces_usada: existente.veces_usada + 1,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existente.id);
+      } else {
+        await supabase.from("reglas_categorizacion").insert({
+          patron,
+          categoria_id: categoriaId,
+          marca_id: marcaId || null,
+          entidad_id: entidadId || null,
+        });
+      }
+    } catch {
+      // best effort — ver comentario de la función.
     }
   }
 
@@ -143,11 +204,13 @@ export default function SugerenciasPage() {
         fecha,
         categoria_id: categoriaId,
         marca_id: marcaId || null,
+        entidad_id: entidadId || null,
         grupo_id: grupoId || null,
       });
       if (insError) throw insError;
       const { error: updError } = await supabase.from("sugerencias_correo").update({ estado: "confirmada" }).eq("id", sug.id);
       if (updError) throw updError;
+      await aprenderRegla(sug.descripcion);
       cerrarForm();
       await cargarTodo();
     } catch (err) {
@@ -250,6 +313,12 @@ export default function SugerenciasPage() {
                   }}
                   className="mt-4 space-y-3 border-t border-gray-100 pt-4 dark:border-white/10"
                 >
+                  {reglaAplicada && (
+                    <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[11px] font-medium text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400">
+                      Autocategorizado: la última vez que confirmaste &quot;{reglaAplicada.patron}&quot; usaste esta
+                      categoría/cuenta — revisa y confirma, o cambia lo que corresponda.
+                    </p>
+                  )}
                   <div>
                     <label className="text-xs text-gray-500 dark:text-gray-400">Descripción</label>
                     <input
@@ -311,6 +380,21 @@ export default function SugerenciasPage() {
                       />
                     </div>
                   )}
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">Pagado con (opcional)</label>
+                    <select
+                      value={entidadId}
+                      onChange={(e) => setEntidadId(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+                    >
+                      <option value="">Efectivo · sin tarjeta</option>
+                      {entidades.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   {grupos.length > 0 && (
                     <div>
                       <label className="text-xs text-gray-500 dark:text-gray-400">Grupo (opcional)</label>

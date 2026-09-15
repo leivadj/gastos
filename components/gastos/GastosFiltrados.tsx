@@ -176,7 +176,7 @@ export function GastosFiltrados({
       descripcion: d.descripcion,
       monto: Number(d.monto),
       categoriaId: d.categoria_id,
-      entidadId: null,
+      entidadId: d.entidad_id,
       grupoId: d.grupo_id,
       detalle: "Diario",
       fecha: d.fecha,
@@ -231,7 +231,10 @@ export function GastosFiltrados({
         payload.monto = Number(fMonto);
         payload.fecha = fFecha;
       }
-      if (editando.origen !== "gasto_diario") payload.entidad_id = fEntidadId || null;
+      // Ronda 9: gastos_diarios ya tiene entidad_id (migration_37) — antes
+      // este campo se guardaba en todos los orígenes MENOS diario, porque la
+      // columna no existía. Ahora se guarda siempre.
+      payload.entidad_id = fEntidadId || null;
       const { error: updError } = await supabase.from(tabla).update(payload).eq("id", editando.origenId);
       if (updError) throw updError;
       setEditando(null);
@@ -335,23 +338,21 @@ export function GastosFiltrados({
               </select>
             </div>
 
-            {editando.origen !== "gasto_diario" && (
-              <div>
-                <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Cuenta o tarjeta</label>
-                <select
-                  value={fEntidadId}
-                  onChange={(e) => setFEntidadId(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-                >
-                  <option value="">Sin cuenta</option>
-                  {entidades.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div>
+              <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Cuenta o tarjeta</label>
+              <select
+                value={fEntidadId}
+                onChange={(e) => setFEntidadId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+              >
+                <option value="">Efectivo · sin tarjeta</option>
+                {entidades.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             <div>
               <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Grupo / a quién se reparte</label>

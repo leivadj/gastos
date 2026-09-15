@@ -7,7 +7,7 @@ import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { GrupoMarca, MarcaAgrupadaPicker } from "@/components/MarcaAgrupadaPicker";
 import { formatCLP, mesActualISO, primerDiaMesSiguiente } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, CategoriaGrupoPreferido, GastoDiario, Grupo, Marca } from "@/lib/types";
+import { Categoria, CategoriaGrupoPreferido, Entidad, GastoDiario, Grupo, Marca } from "@/lib/types";
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
 
@@ -67,6 +67,13 @@ export function DiariosLista({
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // Cuenta/tarjeta con la que se pagó (opcional, "" = efectivo/sin cuenta,
+  // el comportamiento de siempre) — ver migration_37_entidad_gastos_diarios.
+  // Se agregó porque un "diario" ya no es solo la carga manual en efectivo:
+  // /sugerencias también guarda acá los gastos que llegan del correo del
+  // banco, y esos sí tienen una cuenta real detrás.
+  const [entidades, setEntidades] = useState<Entidad[]>([]);
+  const [entidadId, setEntidadId] = useState("");
   // "Esta categoría usa este grupo por defecto" (ver Grupos y
   // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
   const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
@@ -92,12 +99,14 @@ export function DiariosLista({
 
   async function cargarTodo() {
     setCargando(true);
-    const [{ data: cat }, { data: m }, { data: gr }, { data: cgp }] = await Promise.all([
+    const [{ data: cat }, { data: m }, { data: gr }, { data: cgp }, { data: e }] = await Promise.all([
       supabase.from("categorias").select("*").in("nombre", nombresBuscados),
       gruposMarca ? supabase.from("marcas").select("*").order("nombre") : Promise.resolve({ data: [] as Marca[] }),
       supabase.from("grupos").select("*").order("nombre"),
       supabase.from("categoria_grupo_preferido").select("*"),
+      supabase.from("entidades").select("*").order("nombre"),
     ]);
+    setEntidades((e as Entidad[]) ?? []);
     // Mantiene el orden pedido en nombresBuscados (no el que devuelva la
     // consulta), así los chips salen siempre en el mismo orden.
     const disponibles = nombresBuscados
@@ -166,12 +175,14 @@ export function DiariosLista({
         categoria_id: categoriaId,
         marca_id: gruposMarca ? marcaId || null : null,
         grupo_id: grupoId || null,
+        entidad_id: entidadId || null,
       });
       if (insError) throw insError;
       setDescripcion("");
       setMonto("");
       setFecha(hoyISO());
       setMarcaId("");
+      setEntidadId("");
       // Vuelve a aplicar el grupo por defecto de la misma categoría (queda
       // elegida para el próximo ítem, es común cargar varios seguidos).
       const sugerido = categoriaId ? (preferidoPorCategoria[categoriaId] ?? "") : "";
@@ -258,6 +269,23 @@ export function DiariosLista({
               {guardando ? "Guardando…" : "+ Agregar"}
             </button>
           </div>
+          {entidades.length > 0 && (
+            <div className="pt-1">
+              <label className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Pagado con (opcional)</label>
+              <select
+                value={entidadId}
+                onChange={(e) => setEntidadId(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
+              >
+                <option value="">Efectivo · sin tarjeta</option>
+                {entidades.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           {gruposMarca && (
             <div className="pt-1">
               <p className="mb-1 text-[11px] font-medium text-gray-400 dark:text-gray-500">¿Dónde? (opcional)</p>
@@ -317,6 +345,7 @@ export function DiariosLista({
           const marca = g.marca_id ? marcas.find((m) => m.id === g.marca_id) ?? null : null;
           const categoria = categoriasDisponibles.length > 1 ? categoriasDisponibles.find((c) => c.id === g.categoria_id) : null;
           const grupo = g.grupo_id ? grupos.find((gr) => gr.id === g.grupo_id) : null;
+          const entidad = g.entidad_id ? entidades.find((e) => e.id === g.entidad_id) : null;
           return (
             <Card key={g.id} className="!p-3.5">
               <div className="flex items-center justify-between gap-3">
@@ -329,6 +358,7 @@ export function DiariosLista({
                       {marca ? ` · ${marca.nombre}` : ""}
                       {categoria ? ` · ${categoria.nombre}` : ""}
                       {grupo ? ` · Grupo: ${grupo.nombre}` : ""}
+                      {` · ${entidad ? entidad.nombre : "Efectivo"}`}
                     </p>
                   </div>
                 </div>

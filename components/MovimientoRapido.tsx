@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
 import { CategoriaPicker } from "@/components/CategoriaPicker";
@@ -167,7 +167,6 @@ export function FormMovimiento({
   const [categoriaId, setCategoriaId] = useState("");
   const [marcaId, setMarcaId] = useState("");
   const [selectorAbierto, setSelectorAbierto] = useState<"origen" | "destino" | null>(null);
-  const selectorRef = useRef<HTMLDivElement>(null);
 
   const unicaPersona = personas.length === 1 ? personas[0] : null;
   const activas = personas;
@@ -180,15 +179,6 @@ export function FormMovimiento({
 
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!selectorAbierto) return;
-    function onClick(e: MouseEvent) {
-      if (selectorRef.current && !selectorRef.current.contains(e.target as Node)) setSelectorAbierto(null);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [selectorAbierto]);
 
   const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId) ?? null;
   const marcaSeleccionada = marcas.find((m) => m.id === marcaId) ?? null;
@@ -231,6 +221,21 @@ export function FormMovimiento({
   // overlay "fixed" de pantalla completa (mismo patrón que el resto de las
   // hojas de la app) con su propio fondo oscuro + difuminado, así siempre
   // cabe entero y se nota claramente que es una ventana aparte, por encima.
+  //
+  // BUG encontrado y arreglado (Felipe: "al elegir una tarjeta, no me deja,
+  // solo deja la opción efectivo"): este dropdown se cierra solo al hacer
+  // clic en su propio fondo oscuro (onClick de abajo + stopPropagation en el
+  // panel blanco) — eso ya basta para "cerrar al hacer clic afuera". Pero
+  // ADEMÁS existía un listener global de "mousedown" en el documento (en
+  // FormMovimiento) que cerraba el selector si el clic caía fuera de un
+  // `ref` puesto en el botón disparador. Como este dropdown vive portado a
+  // <body> (createPortal), un clic en "Paris" o "Banco Estado" caía FUERA de
+  // ese ref (el ref solo envuelve el botón, no el portal) — el listener lo
+  // detectaba como "clic afuera" en el mousedown y cerraba el menú ANTES de
+  // que el click en la tarjeta llegara a dispararse, así que la elección
+  // nunca se aplicaba y quedaba pegado en "Efectivo" (el valor inicial). Se
+  // quitó ese listener redundante (y el ref que solo servía para él) — el
+  // cierre por backdrop de acá abajo ya cubre el mismo caso sin este bug.
   function DropdownCuentas({ valor, onElegir, onTransferencia }: { valor: string; onElegir: (id: string) => void; onTransferencia?: () => void }) {
     // createPortal: este dropdown se abre DENTRO de la hoja "Nuevo
     // movimiento", que a su vez ya está portada a <body> (ver más abajo) —
@@ -595,7 +600,7 @@ export function FormMovimiento({
             />
           </div>
           {!modoTransferencia && tipo === "gasto" && (
-            <div className="relative min-w-0 flex-1" ref={selectorRef}>
+            <div className="relative min-w-0 flex-1">
               <button
                 type="button"
                 onClick={() => setSelectorAbierto(selectorAbierto === "origen" ? null : "origen")}
@@ -628,7 +633,7 @@ export function FormMovimiento({
 
         {modoTransferencia && (
           <div className="mt-3 space-y-2">
-            <div className="relative" ref={selectorAbierto === "origen" ? selectorRef : undefined}>
+            <div className="relative">
               <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Desde</p>
               <button
                 type="button"
@@ -642,7 +647,7 @@ export function FormMovimiento({
               </button>
               {selectorAbierto === "origen" && <DropdownCuentas valor={entidadId} onElegir={(id) => { setEntidadId(id); setSelectorAbierto(null); }} />}
             </div>
-            <div className="relative" ref={selectorAbierto === "destino" ? selectorRef : undefined}>
+            <div className="relative">
               <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Hacia</p>
               <button
                 type="button"
