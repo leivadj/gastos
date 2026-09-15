@@ -20,7 +20,8 @@ import { diaDelMes, formatCLP, mesActualISO, nombreMes, nombreMesCorto } from "@
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, Compra, Entidad, GastoDiario, GastoFijo, Grupo, Ingreso, ItemParticipante, Marca, OrigenItem, Pago, Persona, Transferencia } from "@/lib/types";
+import { colorAnilloPresupuesto } from "@/lib/colorPresupuesto";
+import { Categoria, Compra, Entidad, GastoDiario, GastoFijo, Grupo, Ingreso, ItemParticipante, Marca, OrigenItem, Pago, Persona, PresupuestoCategoria, Transferencia } from "@/lib/types";
 
 type TipoMovimiento = "fijo" | "variable" | "cuota" | "diario" | "ingreso" | "transferencia";
 
@@ -92,6 +93,7 @@ export default function MovimientosPage() {
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [presupuestos, setPresupuestos] = useState<PresupuestoCategoria[]>([]);
   const [participantesPorItem, setParticipantesPorItem] = useState<Record<string, ItemParticipante[]>>({});
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
@@ -112,7 +114,7 @@ export default function MovimientosPage() {
 
   async function cargarTodo() {
     try {
-      const [{ data: c }, { data: gf }, { data: gd }, { data: ing }, { data: tr }, { data: pg }, { data: cat }, { data: e }, { data: m }, { data: p }, { data: gr }, { data: ipCompra }, { data: ipFijo }] =
+      const [{ data: c }, { data: gf }, { data: gd }, { data: ing }, { data: tr }, { data: pg }, { data: cat }, { data: e }, { data: m }, { data: p }, { data: gr }, { data: ipCompra }, { data: ipFijo }, { data: pc }] =
         await Promise.all([
           supabase.from("compras").select("*"),
           supabase.from("gastos_fijos").select("*").eq("activo", true),
@@ -127,6 +129,7 @@ export default function MovimientosPage() {
           supabase.from("grupos").select("*").order("nombre"),
           supabase.from("item_participantes").select("*").eq("origen", "compra"),
           supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
+          supabase.from("presupuestos_categoria").select("*"),
         ]);
       setCompras((c as Compra[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -139,6 +142,7 @@ export default function MovimientosPage() {
       setMarcas((m as Marca[]) ?? []);
       setPersonas((p as Persona[]) ?? []);
       setGrupos((gr as Grupo[]) ?? []);
+      setPresupuestos((pc as PresupuestoCategoria[]) ?? []);
       const agrupado: Record<string, ItemParticipante[]> = {};
       ((ipCompra as ItemParticipante[]) ?? []).forEach((row) => {
         if (!agrupado[row.origen_id]) agrupado[row.origen_id] = [];
@@ -314,6 +318,23 @@ export default function MovimientosPage() {
   const totalIngresos = movIngresos.reduce((acc, m) => acc + m.monto, 0);
   const balance = totalIngresos - totalGastos;
 
+  // Franja de presupuesto por categoría (ronda 7 del rediseño) — Felipe
+  // pidió ver, en el mismo listado de Movimientos, cuánto presupuesto le
+  // queda por categoría, coloreado verde/amarillo/naranjo/rojo. Se muestran
+  // TODAS las categorías con presupuesto asignado (sin filtro), calculadas
+  // sobre el mes que se esté mirando (`ref`) — mismas 3 fuentes que
+  // gastoPorCategoriaId de Inicio/Presupuesto (cuotas + fijos + diarios, sin
+  // ingresos ni transferencias, que no son gasto real).
+  const gastoPorCategoriaId: Record<string, number> = {};
+  [...movCuotas, ...movFijos, ...movDiarios].forEach((m) => {
+    if (!m.categoriaId) return;
+    gastoPorCategoriaId[m.categoriaId] = (gastoPorCategoriaId[m.categoriaId] ?? 0) + m.monto;
+  });
+  const categoriasConPresupuesto = presupuestos
+    .map((p) => ({ presupuesto: p, categoria: categoriaDe(p.categoria_id) }))
+    .filter((x): x is { presupuesto: PresupuestoCategoria; categoria: Categoria } => x.categoria != null)
+    .sort((a, b) => a.categoria.nombre.localeCompare(b.categoria.nombre));
+
   const busquedaNormalizada = busqueda.trim().toLowerCase();
   const visibles = (
     vista === "todo" ? todos : vista === "ingresos" ? movIngresos : [...movCuotas, ...movFijos, ...movDiarios]
@@ -426,6 +447,43 @@ export default function MovimientosPage() {
         </div>
       </Card>
 
+      {categoriasConPresupuesto.length > 0 && (
+        // Franja horizontal con el presupuesto restante de cada categoría
+        // (ver cálculo de categoriasConPresupuesto/gastoPorCategoriaId más
+        // arriba) — mismo esquema de color por umbral que los anillos de
+        // /presupuesto (lib/colorPresupuesto.ts), pero en formato barra para
+        // que quepan varias categorías de un vistazo en un scroll horizontal.
+        <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+          <div className="flex gap-2.5" style={{ width: "max-content" }}>
+            {categoriasConPresupuesto.map(({ presupuesto, categoria }) => {
+              const gastado = gastoPorCategoriaId[categoria.id] ?? 0;
+              const monto = Number(presupuesto.monto_mensual);
+              const sobrepasado = gastado > monto;
+              const pct = monto > 0 ? Math.min(100, (gastado / monto) * 100) : 0;
+              const color = colorAnilloPresupuesto(gastado, monto);
+              const restante = sobrepasado ? gastado - monto : Math.max(0, monto - gastado);
+              return (
+                <div key={categoria.id} className="w-36 shrink-0 rounded-2xl border border-gray-100 bg-white p-3 dark:border-white/10 dark:bg-neutral-900">
+                  <p className="flex items-center gap-1.5 truncate text-xs font-semibold text-gray-700 dark:text-gray-200">
+                    <span>{categoria.icono || "🏷️"}</span>
+                    <span className="truncate">{categoria.nombre}</span>
+                  </p>
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                    <div className="h-full rounded-full transition-[width]" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  </div>
+                  <p className="mt-1.5 text-[10.5px] text-gray-400 dark:text-gray-500">
+                    <span className="font-semibold" style={{ color }}>
+                      {formatCLP(restante)}
+                    </span>{" "}
+                    {sobrepasado ? "excedido" : "disponible"}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
         {VISTAS.map((v) => (
           <button key={v.id} onClick={() => setVista(v.id)} className={pill(vista === v.id)}>
@@ -457,13 +515,28 @@ export default function MovimientosPage() {
                         onClick={() => setDetalleAbierto(m)}
                         className="flex w-full items-center gap-3 py-2.5 text-left first:pt-0 last:pb-0"
                       >
-                        <EntidadAvatar
-                          entidad={entidadDe(m.entidadId)}
-                          marca={marcaItem ?? marcaDeEntidad(m.entidadId)}
-                          icono={m.icono}
-                          nombreFallback={m.descripcion}
-                          className="h-9 w-9"
-                        />
+                        {esTransferencia ? (
+                          // Ícono fijo (no el color hash-por-nombre de
+                          // EntidadAvatar, que variaría según qué 2 cuentas
+                          // se movió la plata) — Felipe pidió que las
+                          // transferencias entre sus propias cuentas se
+                          // reconozcan de un vistazo con una flecha, siempre
+                          // igual, en vez de mezclarse con el resto de íconos.
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M7 7h11l-3-3" />
+                              <path d="M17 17H6l3 3" />
+                            </svg>
+                          </span>
+                        ) : (
+                          <EntidadAvatar
+                            entidad={entidadDe(m.entidadId)}
+                            marca={marcaItem ?? marcaDeEntidad(m.entidadId)}
+                            icono={m.icono}
+                            nombreFallback={m.descripcion}
+                            className="h-9 w-9"
+                          />
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-sm font-medium text-gray-700 dark:text-gray-200">{m.descripcion}</p>
                           <p className="truncate text-xs text-gray-400 dark:text-gray-500">

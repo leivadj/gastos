@@ -671,6 +671,7 @@ export function FormMovimiento({
                 if (nueva?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
                 setCategoriaId(id);
               }}
+              onCatalogoActualizado={onCatalogoActualizado}
             />
             {categoriaSeleccionada?.tipo_marca_sugerido && (
               <div className="mt-2">

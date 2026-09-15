@@ -259,6 +259,38 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
     return { monto: promedio, esPromedio: meses > 0 };
   }
 
+  // Pagado/pendiente de ESTE mes, para el check rápido en el listado (ronda
+  // 7 del rediseño: "en recurrentes, en el listado poder marcar como pagado
+  // o no" — sin tener que ir al Calendario de pagos). Un solo tap: si no
+  // está pagado, se marca con el monto vigente de hoy (estimado o promedio
+  // móvil); si ya está pagado, se saca directamente (mismo criterio sin
+  // confirmación que ya usa "deshacer" en /calendario-pagos).
+  const pagoDe = (id: string) => pagos.find((p) => p.origen_id === id && p.mes === mesActualISO()) ?? null;
+
+  async function marcarPagado(g: GastoFijo) {
+    setError("");
+    const { monto } = montoVigente(g);
+    const { error: upError } = await supabase.from("pagos").upsert(
+      { origen: "gasto_fijo", origen_id: g.id, mes: mesActualISO(), monto_real: monto, pagado: true, fecha_pago: new Date().toISOString().slice(0, 10) },
+      { onConflict: "origen,origen_id,mes" }
+    );
+    if (upError) {
+      setError(mensajeError(upError) || "No se pudo marcar como pagado.");
+      return;
+    }
+    cargarTodo();
+  }
+
+  async function desmarcarPagado(pagoId: string) {
+    setError("");
+    const { error: delError } = await supabase.from("pagos").delete().eq("id", pagoId);
+    if (delError) {
+      setError(mensajeError(delError) || "No se pudo desmarcar.");
+      return;
+    }
+    cargarTodo();
+  }
+
   function resumenReparto(g: GastoFijo) {
     if (g.grupo_id) return `Grupo: ${grupoDe(g.grupo_id)?.nombre ?? "—"}`;
     const filas = participantesPorItem[g.id] ?? [];
@@ -549,11 +581,52 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fij
                         </button>
                       </div>
                     </div>
-                    <p className="mt-2 text-right font-semibold text-gray-800 dark:text-white">
-                      {esPromedio && <span className="mr-1 text-xs font-normal text-gray-400 dark:text-gray-500">~</span>}
-                      {formatCLP(montoActual)}
-                    </p>
-                    {esPromedio && <p className="text-right text-[10.5px] text-gray-400 dark:text-gray-500">promedio móvil</p>}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      {/* Check rápido de pagado/pendiente de este mes — sin
+                          tener que ir al Calendario de pagos (ver
+                          pagoDe/marcarPagado/desmarcarPagado más arriba). Un
+                          solo tap: marca con el monto vigente de hoy, o saca
+                          el pago si ya estaba marcado. */}
+                      {(() => {
+                        const pago = pagoDe(g.id);
+                        const pagado = pago?.pagado ?? false;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              pagado && pago ? desmarcarPagado(pago.id) : marcarPagado(g);
+                            }}
+                            className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[11px] font-semibold transition-colors ${
+                              pagado
+                                ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                : "bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500"
+                            }`}
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill={pagado ? "currentColor" : "none"}
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              className="shrink-0"
+                            >
+                              <circle cx="12" cy="12" r="9" fill={pagado ? "currentColor" : "none"} className={pagado ? "" : "opacity-40"} />
+                              {pagado && <path d="m8.5 12.5 2.5 2.5 4.5-5" stroke="white" strokeLinecap="round" strokeLinejoin="round" />}
+                            </svg>
+                            {pagado ? "Pagado" : "Marcar pagado"}
+                          </button>
+                        );
+                      })()}
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-800 dark:text-white">
+                          {esPromedio && <span className="mr-1 text-xs font-normal text-gray-400 dark:text-gray-500">~</span>}
+                          {formatCLP(montoActual)}
+                        </p>
+                        {esPromedio && <p className="text-[10.5px] text-gray-400 dark:text-gray-500">promedio móvil</p>}
+                      </div>
+                    </div>
                   </div>
                 )}
                 detalle={({ onClick }) => (
