@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
+import { TIPO_CORTO } from "@/components/TarjetaVisual";
 import { formatCLP } from "@/lib/format";
 import { mensajeError } from "@/lib/supabaseError";
 import { buscarReglaQueCalce, normalizarPatron } from "@/lib/reglasCategorizacion";
@@ -12,6 +13,20 @@ import { Categoria, CategoriaGrupoPreferido, Entidad, Grupo, Marca, ReglaCategor
 function fechaCorta(fechaISO: string): string {
   const fecha = new Date(`${fechaISO.slice(0, 10)}T00:00:00`);
   return new Intl.DateTimeFormat("es-CL", { day: "numeric", month: "short" }).format(fecha).replace(".", "");
+}
+
+// Felipe reportó: al confirmar una sugerencia y elegir el banco, no se podía
+// distinguir "Banco Estado" débito de "Banco Estado" crédito (ambos aparecían
+// con el mismo nombre en el <select>) — mismo problema que ya se había
+// resuelto para EntidadPicker (ver TIPO_CORTO en TarjetaVisual.tsx, pensado
+// justo para este caso). Acá se reutiliza esa misma etiqueta corta, más los
+// últimos 4 dígitos si la cuenta/tarjeta los tiene, para que las opciones del
+// <select> alcancen a distinguirse igual sin depender del logo/avatar (que
+// este selector de texto plano no muestra).
+function etiquetaEntidad(e: Entidad): string {
+  const partes = [e.nombre, TIPO_CORTO[e.tipo]];
+  if (e.ultimos_digitos) partes.push(`•••• ${e.ultimos_digitos}`);
+  return partes.join(" · ");
 }
 
 const ETIQUETA_TIPO: Record<TipoSugerenciaCorreo, string> = {
@@ -390,7 +405,7 @@ export default function SugerenciasPage() {
                       <option value="">Efectivo · sin tarjeta</option>
                       {entidades.map((e) => (
                         <option key={e.id} value={e.id}>
-                          {e.nombre}
+                          {etiquetaEntidad(e)}
                         </option>
                       ))}
                     </select>
@@ -472,7 +487,7 @@ export default function SugerenciasPage() {
                       <option value="">— Elegir —</option>
                       {entidades.map((e) => (
                         <option key={e.id} value={e.id}>
-                          {e.nombre}
+                          {etiquetaEntidad(e)}
                         </option>
                       ))}
                     </select>
@@ -488,7 +503,7 @@ export default function SugerenciasPage() {
                       <option value="">— Elegir —</option>
                       {entidades.map((e) => (
                         <option key={e.id} value={e.id}>
-                          {e.nombre}
+                          {etiquetaEntidad(e)}
                         </option>
                       ))}
                     </select>

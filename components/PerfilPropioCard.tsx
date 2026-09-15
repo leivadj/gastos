@@ -836,10 +836,12 @@ export function PerfilPropioCard() {
       </Seccion>
 
       {/* Ronda 9: "Logos de marca" era un placeholder "Próximamente" de una
-          ronda vieja, pero /admin (panel de Categorías y Marcas) YA subía y
-          mostraba logos reales de marca desde antes (EntidadAvatar.tsx y
-          TarjetaVisual.tsx ya leen marca.logo_url) — quedó huérfano. Ahora
-          apunta directo a /admin, donde la función ya existe de verdad. */}
+          ronda vieja, pero YA se suben y muestran logos reales de marca desde
+          antes (EntidadAvatar.tsx y TarjetaVisual.tsx ya leen
+          marca.logo_url) — quedó huérfano. Ronda 10 (unificación de
+          categorías, ver claude/propuesta-modulo-compromisos.md) movió esa
+          función de /admin a /categorias ("Marcas" queda debajo de las
+          categorías ahí) — este ítem apunta ahora ahí en vez de a /admin. */}
       <Seccion titulo="Apariencia">
         <FilaLista
           titulo="Tema"
@@ -854,8 +856,8 @@ export function PerfilPropioCard() {
         <FilaLista titulo="Vista principal" subtitulo="Elegir qué ver primero en Inicio" onClick={() => setSheetAbierto("vista_principal")} />
         <FilaLista
           titulo="Logos de marca"
-          subtitulo="Ya se muestran solos cuando existen — súbelos en el panel admin"
-          href="/admin"
+          subtitulo="Ya se muestran solos cuando existen — súbelos en Categorías"
+          href="/categorias"
         />
         <FilaLista
           titulo="Sugerir un logo"

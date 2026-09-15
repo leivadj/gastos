@@ -1,19 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { adminNavItem, esAdmin as checkEsAdmin, navItems } from "@/components/navItems";
+import { useState } from "react";
+import { navItems } from "@/components/navItems";
 import { PerfilPropioCard } from "@/components/PerfilPropioCard";
 
 // Todo lo que no entra en la barra inferior (Metas, Auto, Salud, Ingresos,
-// Grupos, Personas, Sugerencias, Admin, Gastos, Calendario, Movimientos,
-// Reportes) vive acá agrupado. Esto NO es la app anterior al rediseño —
-// son pantallas actuales del rediseño v2, así que la etiqueta ya no dice
-// "versión anterior" (Felipe reportó no encontrar varias de estas — el
-// nombre daba a entender que eran herramientas viejas/descartables) y el
-// acordeón arranca abierto en vez de colapsado. "Auto" y "Salud" son
-// pantallas nuevas de gastos sueltos (ver navItems.tsx).
+// Grupos, Personas, Sugerencias, Gastos, Calendario, Movimientos, Reportes)
+// vive acá agrupado. Esto NO es la app anterior al rediseño — son pantallas
+// actuales del rediseño v2, así que la etiqueta ya no dice "versión
+// anterior" (Felipe reportó no encontrar varias de estas — el nombre daba a
+// entender que eran herramientas viejas/descartables) y el acordeón arranca
+// abierto en vez de colapsado. "Auto" y "Salud" son pantallas nuevas de
+// gastos sueltos (ver navItems.tsx).
+//
+// Ronda 10: se sacó "Admin" de esta lista — la gestión de categorías y
+// marcas que vivía en /admin ahora está en Perfil > Configuración >
+// Categorías (/categorias), disponible para cualquier cuenta, no solo la
+// admin (ver claude/propuesta-modulo-compromisos.md). /admin sigue
+// existiendo igual que antes (el rail de escritorio lo sigue mostrando ahí,
+// ver DesktopSidebar.tsx — eso no cambió), solo deja de duplicarse acá.
 const HREFS_HERRAMIENTAS_ANTERIORES = [
   "/metas-ahorro",
   "/auto",
@@ -30,19 +36,9 @@ const HREFS_HERRAMIENTAS_ANTERIORES = [
 ];
 
 export default function MasPage() {
-  const [esAdminUsuario, setEsAdminUsuario] = useState(false);
   const [herramientasAbiertas, setHerramientasAbiertas] = useState(true);
 
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setEsAdminUsuario(checkEsAdmin(data.session?.user?.email)));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setEsAdminUsuario(checkEsAdmin(s?.user?.email)));
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  const itemsAnteriores = [
-    ...navItems.filter((item) => HREFS_HERRAMIENTAS_ANTERIORES.includes(item.href)),
-    ...(esAdminUsuario ? [adminNavItem] : []),
-  ];
+  const itemsAnteriores = navItems.filter((item) => HREFS_HERRAMIENTAS_ANTERIORES.includes(item.href));
 
   return (
     <div className="space-y-6 pb-10 pt-2">
@@ -85,7 +81,7 @@ export default function MasPage() {
           <div className="border-t border-gray-50 dark:border-white/10">
             <p className="px-5 pt-3 text-[11px] text-gray-400 dark:text-gray-500">
               Metas, auto, salud, ingresos, grupos, compromisos, personas, sugerencias, gastos, calendario de pagos,
-              movimientos y reportes{esAdminUsuario ? " y ajustes" : ""}.
+              movimientos y reportes.
             </p>
             {itemsAnteriores.map((item, i) => (
               <Link

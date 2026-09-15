@@ -9,6 +9,8 @@ import { colorFor } from "@/lib/avatarColor";
 import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { IconoPicker } from "@/components/IconoPicker";
 import { SelectorColorCategoria } from "@/components/SelectorColorCategoria";
+import { SelectorTipoMarca } from "@/components/SelectorTipoMarca";
+import { TIPOS_MARCA_BASE as TIPOS, tituloDesdeSlug } from "@/lib/tiposMarca";
 import { mensajeError } from "@/lib/supabaseError";
 
 // A diferencia de personas/grupos/entidades (que son POR CUENTA), el
@@ -47,138 +49,19 @@ function traducirErrorCategoria(err: unknown, nombreIntentado: string, accion: "
   return msg || (accion === "eliminar" ? "No se pudo eliminar la categoría." : "No se pudo guardar la categoría.");
 }
 
-const TIPOS: { value: TipoMarca; label: string }[] = [
-  { value: "banco", label: "Banco" },
-  { value: "casa_comercial", label: "Casa comercial" },
-  { value: "caja_compensacion", label: "Caja de compensación" },
-  { value: "autopista", label: "Autopista / TAG" },
-  { value: "telecom", label: "Internet / Móvil" },
-  { value: "servicio_basico", label: "Servicio básico (luz, agua, gas...)" },
-  { value: "supermercado", label: "Supermercado" },
-  { value: "transporte", label: "Pasajes (bus, avión)" },
-  { value: "compras_online", label: "Compras online" },
-  { value: "delivery", label: "Delivery (comida, encargos)" },
-  { value: "suscripcion", label: "Suscripción (streaming, apps...)" },
-  { value: "bencina", label: "Bencina" },
-  { value: "mecanico", label: "Mecánico" },
-  { value: "repuestos", label: "Repuestos" },
-  { value: "centro_medico", label: "Centro médico" },
-  { value: "farmacia", label: "Farmacia (medicamentos)" },
-  { value: "otro", label: "Otro" },
-];
-
 // Ronda 9 (bug reportado por Felipe: "al agregar una categoría, en marcas no
 // me aparece la categoría recién creada"): `categorias.tipo_marca_sugerido` y
-// `marcas.tipo` ya no están atados a esta lista fija de 17 (ver
+// `marcas.tipo` ya no están atados a una lista fija de 17 (ver
 // migration_39_tipos_marca_libres.sql — se le quitó el check constraint en la
-// base de datos). TIPOS sigue siendo el catálogo BASE (los tipos "de
-// fábrica"), pero ahora se puede escribir un tipo nuevo desde el selector
-// ("+ Nuevo tipo…") tanto al crear/editar una categoría como al crear una
-// marca, y ese tipo queda disponible de inmediato en ambos lados.
-
-// Convierte texto libre en un slug estable para guardar en la base de datos
-// (minúsculas, sin acentos, espacios/símbolos → "_"). Nunca vacío: si no
-// queda nada usable, cae a "otro".
-function slugTipo(texto: string): string {
-  const slug = texto
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return slug || "otro";
-}
-
-// Para mostrar un tipo "custom" (guardado como slug) con una etiqueta
-// legible cuando no está en TIPOS — ej. "casa_rodante" → "Casa rodante".
-function tituloDesdeSlug(slug: string): string {
-  return slug
-    .split("_")
-    .filter(Boolean)
-    .map((palabra, i) => (i === 0 ? palabra.charAt(0).toUpperCase() + palabra.slice(1) : palabra))
-    .join(" ");
-}
-
-// Selector de "tipo de marca" reutilizable con opción de crear uno nuevo al
-// vuelo. Antes había un <select> con solo los 17 valores de TIPOS en cada uno
-// de los 3 lugares que usan tipo de marca (categoría: alta y edición; marca:
-// alta) — por eso una categoría nueva nunca podía introducir un tipo nuevo.
-function SelectorTipoMarca({
-  value,
-  onChange,
-  tiposDisponibles,
-  permitirNinguna,
-  className,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  tiposDisponibles: { value: string; label: string }[];
-  permitirNinguna?: boolean;
-  className?: string;
-}) {
-  const [creandoNuevo, setCreandoNuevo] = useState(false);
-  const [nuevoTipo, setNuevoTipo] = useState("");
-  const claseBase =
-    className ?? "w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white";
-
-  if (creandoNuevo) {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          autoFocus
-          value={nuevoTipo}
-          onChange={(e) => setNuevoTipo(e.target.value)}
-          placeholder="Ej: Mascotas"
-          className={claseBase}
-        />
-        <button
-          type="button"
-          onClick={() => {
-            onChange(slugTipo(nuevoTipo));
-            setCreandoNuevo(false);
-            setNuevoTipo("");
-          }}
-          className="shrink-0 text-xs font-semibold text-brand-from dark:text-white"
-        >
-          usar
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setCreandoNuevo(false);
-            setNuevoTipo("");
-          }}
-          className="shrink-0 text-xs text-gray-400 dark:text-gray-500"
-        >
-          cancelar
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <select
-      value={value}
-      onChange={(e) => {
-        if (e.target.value === "__nuevo__") {
-          setCreandoNuevo(true);
-          return;
-        }
-        onChange(e.target.value);
-      }}
-      className={claseBase}
-    >
-      {permitirNinguna && <option value="">— Ninguna —</option>}
-      {tiposDisponibles.map((t) => (
-        <option key={t.value} value={t.value}>
-          {t.label}
-        </option>
-      ))}
-      <option value="__nuevo__">+ Nuevo tipo…</option>
-    </select>
-  );
-}
+// base de datos). TIPOS (importado de lib/tiposMarca.ts) sigue siendo el
+// catálogo BASE (los tipos "de fábrica"), pero ahora se puede escribir un
+// tipo nuevo desde el selector ("+ Nuevo tipo…", componente
+// SelectorTipoMarca) tanto al crear/editar una categoría como al crear una
+// marca, y ese tipo queda disponible de inmediato en ambos lados. Ronda 10
+// centralizó TIPOS/slugTipo/tituloDesdeSlug/SelectorTipoMarca en
+// lib/tiposMarca.ts y components/SelectorTipoMarca.tsx porque
+// app/categorias/page.tsx también los necesita ahora — mismo comportamiento
+// de siempre acá, solo se movió de dónde vive el código.
 
 export default function AdminPage() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
