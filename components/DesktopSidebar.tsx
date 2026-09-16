@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { MovimientoFab } from "@/components/MovimientoRapido";
 import { useTheme, PreferenciaTema } from "@/lib/theme";
 import { Persona } from "@/lib/types";
@@ -20,8 +19,14 @@ import { Persona } from "@/lib/types";
 // Los 8 destinos originales y su orden calcan los 4 artboards de escritorio
 // del mockup (mismo orden en los 4): Inicio, Cuentas, Gastos, Presupuesto,
 // Calendario, Movimientos, Reportes, y Personas — que en AdminWeb.dc.html
-// ese mismo puesto lo ocupa Admin, así que acá alterna según esAdmin, igual
-// que ese artboard sugiere.
+// ese mismo puesto lo ocupa Admin, así que hasta la Ronda 10 acá alternaba
+// según esAdmin (mostrando Admin en vez de Personas para las 2 cuentas
+// admin), igual que ese artboard sugiere.
+//
+// Ronda 11: Felipe pidió eliminar el menú Admin del todo (no solo dejar de
+// enlazarlo) — con /admin retirado (redirige a /categorias, ver ese
+// archivo), el último puesto del rail vuelve a ser siempre "Personas" para
+// cualquier cuenta, sin distinción de admin.
 //
 // Ronda 8: se agregó "Compromisos" al rail (después de Gastos), a pedido de
 // Felipe — deja de calcar el mockup al pie de la letra porque ya no tenía
@@ -137,18 +142,35 @@ const ITEMS: ItemRail[] = [
   },
 ];
 
-// Rutas que en el mockup NO tienen ícono propio en el rail (Metas, Auto,
-// Salud, Grupos, Ingresos, Sugerencias) pero SÍ existen como pantallas
-// completas del rediseño — en celular viven dentro de "Más" (ver
-// app/mas/page.tsx), pero en escritorio, al calcar el rail de 8 íconos
-// exacto del mockup, quedaron sin ningún punto de entrada: ni ícono propio
-// ni un "Más" que las agrupara. Felipe reportó "los menus faltantes en la
-// app" — este ítem "Más" (mismo ícono de 4 cuadros que su versión móvil)
-// es el arreglo: abre un popover con estos destinos en vez de agregar
-// más íconos sueltos al rail (que dejaría de calcar el mockup).
+// Rutas que en el mockup NO tienen ícono propio en el rail (Metas, Grupos,
+// Ingresos, Sugerencias) pero SÍ existen como pantallas completas del
+// rediseño — en celular viven dentro de "Más" (ver app/mas/page.tsx), pero
+// en escritorio, al calcar el rail de 8 íconos exacto del mockup, quedaron
+// sin ningún punto de entrada: ni ícono propio ni un "Más" que las
+// agrupara. Felipe reportó "los menus faltantes en la app" — este ítem
+// "Más" (mismo ícono de 4 cuadros que su versión móvil) es el arreglo: abre
+// un popover con estos destinos en vez de agregar más íconos sueltos al
+// rail (que dejaría de calcar el mockup).
 // "Compromisos" vivía acá también hasta la ronda 8, cuando se promovió al
 // rail principal (ver ITEMS más arriba).
+//
+// Ronda 11: Felipe pidió sacar "Auto" y "Salud" de acá — ya aparecen como
+// categoría de gasto (con su propio ícono/tile en Gastos, Reportes, etc.),
+// así que no hace falta que tengan también su propio destino de menú; y
+// agregar "Perfil" acá, además del avatar de abajo del rail que ya llevaba
+// a /mas — un punto de entrada más explícito que un círculo con iniciales.
 const ITEMS_MAS: ItemRail[] = [
+  {
+    key: "perfil",
+    href: "/mas",
+    label: "Perfil",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M4.5 20c0-4 3.5-6.5 7.5-6.5s7.5 2.5 7.5 6.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
   {
     key: "metas-ahorro",
     href: "/metas-ahorro",
@@ -157,37 +179,6 @@ const ITEMS_MAS: ItemRail[] = [
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <circle cx="12" cy="12" r="8.5" />
         <circle cx="12" cy="12" r="4" />
-      </svg>
-    ),
-  },
-  {
-    key: "auto",
-    href: "/auto",
-    label: "Auto",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          d="M4 16v-3.5a2 2 0 0 1 1.2-1.8l1.3-3.4A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.3l1.3 3.4a2 2 0 0 1 1.2 1.8V16"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path d="M4 16h16" strokeLinecap="round" />
-        <circle cx="7.5" cy="16.5" r="1.5" />
-        <circle cx="16.5" cy="16.5" r="1.5" />
-      </svg>
-    ),
-  },
-  {
-    key: "salud",
-    href: "/salud",
-    label: "Salud",
-    icon: (
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-        <path
-          d="M12 20s-7-4.35-9.5-8.5C.8 8.2 2.4 5 5.6 5c1.8 0 3.1 1 4.4 2.6C11.3 6 12.6 5 14.4 5c3.2 0 4.8 3.2 3.1 6.5C15 15.65 12 20 12 20Z"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
       </svg>
     ),
   },
@@ -237,18 +228,6 @@ const ITEM_PERSONAS: ItemRail = {
       <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" strokeLinecap="round" />
       <circle cx="17.5" cy="8.5" r="2.4" />
       <path d="M15.5 12.3c2.3.3 4 2 4 4.4" strokeLinecap="round" />
-    </svg>
-  ),
-};
-
-const ITEM_ADMIN: ItemRail = {
-  key: "admin",
-  href: "/admin",
-  label: "Admin",
-  icon: (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path d="M4 4.5h16M4 12h16M4 19.5h10" strokeLinecap="round" />
-      <circle cx="17" cy="12" r="1.6" fill="currentColor" stroke="none" />
     </svg>
   ),
 };
@@ -314,9 +293,7 @@ export function DesktopSidebar() {
       .then(({ data }) => setPersonaSelf((data as Persona) ?? null));
   }, [session]);
 
-  const esAdmin = checkEsAdmin(session?.user?.email);
-  const itemUltimo = esAdmin ? ITEM_ADMIN : ITEM_PERSONAS;
-  const todosLosItems = [...ITEMS, itemUltimo];
+  const todosLosItems = [...ITEMS, ITEM_PERSONAS];
 
   function ciclarTema() {
     const i = ORDEN_TEMA.indexOf(preferencia);

@@ -20,7 +20,10 @@ import { conDefectos, ordenResumenValido } from "@/lib/preferenciasUsuario";
 // estilo en todas las listas nuevas (Integraciones/Configuración/
 // Apariencia) — calcado de las capturas de referencia que mandó el
 // usuario (una app de terceros, "Not Pato"): cada fila entra a algo o abre
-// una hoja inferior, nunca navega "hacia el lado".
+// una hoja inferior, nunca navega "hacia el lado". Exportado desde la
+// Ronda 11 para que app/mas/page.tsx también lo use (la lista "Más
+// secciones", antes un acordeón con estilo propio) — mismo componente,
+// mismo estilo en toda la pantalla.
 function IconoFlecha({ className = "shrink-0 text-gray-300 dark:text-gray-600" }: { className?: string }) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -29,7 +32,7 @@ function IconoFlecha({ className = "shrink-0 text-gray-300 dark:text-gray-600" }
   );
 }
 
-function FilaLista({
+export function FilaLista({
   titulo,
   subtitulo,
   href,
@@ -80,7 +83,7 @@ function FilaLista({
 // sola tarjeta con separadores finos entre filas, calcado de las capturas
 // de referencia (en vez del recuadro punteado individual de antes, que
 // seguía usándose solo para las filas sueltas "Próximamente").
-function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
+export function Seccion({ titulo, children }: { titulo: string; children: ReactNode }) {
   return (
     <div>
       <p className="mb-1.5 mt-4 text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{titulo}</p>

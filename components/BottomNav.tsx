@@ -8,11 +8,11 @@ import { MovimientoFab } from "@/components/MovimientoRapido";
 import { EVENTO_HOJA_PANTALLA_COMPLETA } from "@/lib/sheetVisibility";
 
 // Rutas que "pertenecen" a la pestaña Más, para que se marque activa aunque
-// el usuario esté en /gastos, /calendario-pagos, /grupos, /admin, etc. (no
-// solo en /mas mismo). /compras y /gastos-fijos quedaron como redirect a
-// /gastos, así que ya no hace falta listarlas acá aparte. /movimientos
-// salió de esta lista porque ahora tiene su propio ítem en la barra (ver
-// más abajo).
+// el usuario esté en /gastos, /calendario-pagos, /grupos, etc. (no solo en
+// /mas mismo). /compras y /gastos-fijos quedaron como redirect a /gastos, y
+// /admin como redirect a /categorias (Ronda 10/11) — ya no hace falta
+// listarlas acá aparte. /movimientos salió de esta lista porque ahora tiene
+// su propio ítem en la barra (ver más abajo).
 const RUTAS_MAS = [
   "/mas",
   "/gastos",
@@ -25,7 +25,6 @@ const RUTAS_MAS = [
   "/compromisos",
   "/personas",
   "/sugerencias",
-  "/admin",
 ];
 
 // Rediseño v2: "Presupuesto" (e "Ingresos") ya no tienen ítem propio en la

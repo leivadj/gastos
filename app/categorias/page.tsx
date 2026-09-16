@@ -2,16 +2,18 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
 import { Card } from "@/components/Card";
 import { IconoPicker } from "@/components/IconoPicker";
 import { SelectorColorCategoria } from "@/components/SelectorColorCategoria";
 import { SelectorTipoMarca } from "@/components/SelectorTipoMarca";
 import { EntidadAvatar } from "@/components/EntidadAvatar";
+import { esAdmin as checkEsAdmin } from "@/components/navItems";
 import { colorCategoria } from "@/lib/colorCategoria";
 import { mensajeError } from "@/lib/supabaseError";
 import { generarSlugUnico, tituloDesdeSlug } from "@/lib/tiposMarca";
-import { Categoria, Marca } from "@/lib/types";
+import { Categoria, Marca, SolicitudLogo } from "@/lib/types";
 
 // Ronda 10 — Felipe pidió unificar la gestión de categorías y marcas en un
 // solo lugar ("dejar solo categorías en perfil/configuración/categorías"):
@@ -20,9 +22,11 @@ import { Categoria, Marca } from "@/lib/types";
 // cambio. Ahora ES el lugar: crear/editar/borrar categorías, y más abajo un
 // listado de marcas donde se elige a qué categoría está asociada cada una
 // (crear marcas nuevas y subirles su logo también, cuando el catálogo aún no
-// las tiene). /admin sigue existiendo tal cual (accesible desde "Más" en el
-// rail de escritorio, ver DesktopSidebar.tsx) por si hace falta, pero deja
-// de ser el único camino.
+// las tiene).
+//
+// Ronda 11: Felipe pidió eliminar el menú Admin del todo, no solo dejar de
+// enlazarlo — /admin ahora es un redirect acá (ver app/admin/page.tsx), así
+// que esta pantalla es el único lugar, sin excepción.
 //
 // Cómo queda guardada la asociación marca↔categoría: NO se agregó una
 // columna nueva (`marcas.categoria_id`) — se reutiliza el mecanismo que ya
@@ -45,11 +49,26 @@ import { Categoria, Marca } from "@/lib/types";
 // práctica no bloquea a nadie; si algún día se agrega una cuenta no-admin,
 // un intento de crear/editar una marca desde acá mostrará el mismo error
 // traducido que ya usan EntidadPicker/MarcaSugeridaPicker en ese caso.
+//
+// "Logos solicitados": /admin quedó retirado (redirige acá — Felipe pidió
+// sacarlo del todo, no solo dejar de enlazarlo) pero tenía una función que
+// esta pantalla no tenía todavía: el panel donde el admin revisaba los
+// pedidos de "Sugerir un logo" (cualquier usuario, ver
+// components/PerfilPropioCard.tsx y migration_41_solicitudes_logo.sql). Se
+// porta tal cual acá, gateado por esAdmin (igual que en /admin) — a un
+// usuario no-admin ni siquiera le llegan filas de otras cuentas por RLS
+// (`ver_propias_o_admin`), pero mostrarle un panel de "resolver pedidos
+// ajenos" para sus propios pedidos no tendría sentido, así que directamente
+// no se le muestra.
 export default function CategoriasPage() {
+  const [session, setSession] = useState<Session | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState("");
+
+  const [solicitudesLogo, setSolicitudesLogo] = useState<SolicitudLogo[]>([]);
+  const [resolviendoSolicitud, setResolviendoSolicitud] = useState<string | null>(null);
 
   // --- Categorías: alta y edición ---
   const [mostrarFormCategoria, setMostrarFormCategoria] = useState(false);
@@ -84,9 +103,37 @@ export default function CategoriasPage() {
     setMarcas((data as Marca[]) ?? []);
   }
 
+  async function cargarSolicitudesLogo() {
+    const { data } = await supabase.from("solicitudes_logo").select("*").order("created_at", { ascending: false });
+    setSolicitudesLogo((data as SolicitudLogo[]) ?? []);
+  }
+
   useEffect(() => {
     Promise.all([cargarCategorias(), cargarMarcas()]).then(() => setCargando(false));
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
   }, []);
+
+  const esAdmin = checkEsAdmin(session?.user?.email);
+
+  useEffect(() => {
+    if (esAdmin) cargarSolicitudesLogo();
+  }, [esAdmin]);
+
+  async function marcarSolicitudResuelta(id: string) {
+    setResolviendoSolicitud(id);
+    await supabase.from("solicitudes_logo").update({ estado: "resuelta" }).eq("id", id);
+    setResolviendoSolicitud(null);
+    cargarSolicitudesLogo();
+  }
+
+  async function borrarSolicitud(id: string) {
+    setResolviendoSolicitud(id);
+    await supabase.from("solicitudes_logo").delete().eq("id", id);
+    setResolviendoSolicitud(null);
+    cargarSolicitudesLogo();
+  }
 
   // Le genera un tipo propio (tipo_marca_sugerido) a cualquier categoría que
   // todavía no tenga uno, para que el selector "Categoría asociada" de
@@ -339,6 +386,45 @@ export default function CategoriasPage() {
 
       {error && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>
+      )}
+
+      {esAdmin && solicitudesLogo.some((s) => s.estado === "pendiente") && (
+        <Card>
+          <h2 className="mb-2 text-sm font-bold text-gray-800 dark:text-white">Logos solicitados</h2>
+          <ul className="divide-y divide-gray-100 dark:divide-white/10">
+            {solicitudesLogo
+              .filter((s) => s.estado === "pendiente")
+              .map((s) => {
+                const marca = marcas.find((m) => m.id === s.marca_id);
+                return (
+                  <li key={s.id} className="flex items-center gap-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-gray-800 dark:text-white">{marca?.nombre ?? "Marca borrada"}</p>
+                      {s.nota && <p className="truncate text-[11px] text-gray-400 dark:text-gray-500">{s.nota}</p>}
+                    </div>
+                    <button
+                      onClick={() => marcarSolicitudResuelta(s.id)}
+                      disabled={resolviendoSolicitud === s.id}
+                      className="shrink-0 text-xs font-semibold text-brand-from disabled:opacity-50 dark:text-white"
+                    >
+                      resuelto
+                    </button>
+                    <button
+                      onClick={() => borrarSolicitud(s.id)}
+                      disabled={resolviendoSolicitud === s.id}
+                      className="shrink-0 text-gray-300 hover:text-red-400 disabled:opacity-50 dark:text-gray-600"
+                      aria-label="descartar"
+                    >
+                      🗑
+                    </button>
+                  </li>
+                );
+              })}
+          </ul>
+          <p className="mt-2 text-[10.5px] text-gray-400 dark:text-gray-500">
+            Subí el logo desde la lista de "Marcas" de abajo (el ícono con marco 🖼) y marcá el pedido como resuelto.
+          </p>
+        </Card>
       )}
 
       <Card>
