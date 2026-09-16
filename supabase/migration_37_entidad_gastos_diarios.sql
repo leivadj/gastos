@@ -1,0 +1,34 @@
+-- ============================================================================
+-- Gastos del Hogar — Migración 37: cuenta/tarjeta en gastos diarios
+-- ============================================================================
+-- Por qué: `gastos_diarios` nunca tuvo una columna de cuenta/tarjeta — se
+-- diseñó pensando en gastos "sin tarjeta ni cuenta" (efectivo, ver el
+-- comentario de DiariosLista.tsx). El problema: /sugerencias (la bandeja que
+-- confirma los avisos que llegan del correo del banco, ver
+-- app/api/sugerencias-correo) también guarda TODO en `gastos_diarios` al
+-- confirmar — y como la mayoría de los gastos reales de Felipe llegan por
+-- esa vía (tarjetas de débito/crédito reales, no efectivo), terminaban
+-- mostrándose como "Pagado con: Efectivo" en /movimientos aunque el correo
+-- diga clarísimo "WEBPAY TC BANCO CHILE ... tarjeta débito ****5344". Felipe
+-- lo reportó: "en movimientos, todo me muestra con efectivo, cuando fue
+-- realizado con débito de banco estado".
+--
+-- Qué agrega:
+--   `gastos_diarios.entidad_id` — igual que en `compras`/`gastos_fijos`,
+--   opcional (null sigue significando "efectivo/sin cuenta", el
+--   comportamiento de siempre para un diario cargado a mano sin elegir
+--   cuenta). Al confirmar una sugerencia de correo o cargar un diario a
+--   mano, ahora se puede (no es obligatorio) decir con qué cuenta/tarjeta
+--   fue.
+--
+-- Segura de correr aunque ya hayas corrido las migraciones anteriores.
+-- ============================================================================
+
+alter table gastos_diarios add column if not exists entidad_id uuid references entidades(id);
+
+-- ============================================================================
+-- Listo: en /sugerencias (al confirmar como gasto) y en "Gastos diarios" de
+-- /gastos ahora aparece un selector opcional "Pagado con" (Efectivo por
+-- defecto, igual que antes). /movimientos y el listado unificado de /gastos
+-- ya leen este campo para mostrar la cuenta real en vez de asumir Efectivo.
+-- ============================================================================

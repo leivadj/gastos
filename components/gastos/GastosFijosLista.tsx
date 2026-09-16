@@ -14,21 +14,32 @@ import { formatCLP, mesActualISO } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resolverMarca } from "@/lib/resolverMarca";
 import { mensajeError } from "@/lib/supabaseError";
-import { Categoria, CategoriaGrupoPreferido, Entidad, GastoFijo, Grupo, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
+import { resolverPorcentajesEfectivos } from "@/lib/reparto";
+import { Categoria, CategoriaGrupoPreferido, Entidad, GastoFijo, Grupo, GrupoParticipante, ItemParticipante, Marca, Pago, Participante, Persona } from "@/lib/types";
 
-// Pestañas "Fijos" y "Variables" de /gastos: misma tabla (gastos_fijos),
-// filtradas por tipo_monto — antes eran dos secciones de una sola pantalla
-// (/gastos-fijos), ahora dos pestañas separadas que comparten este mismo
-// componente. El formulario de alta arranca con el tipo de la pestaña
-// actual, pero se puede cambiar (por si un ítem cambia de "cobra siempre lo
-// mismo" a "vencimiento fijo, monto variable" o viceversa).
-export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo" | "variable" }) {
+// Pestaña "Recurrente" de /gastos: gastos_fijos, sin filtrar por tipo_monto
+// — Felipe pidió que /gastos tenga solo 3 categorías (Normal/Recurrente/
+// Cuotas, la misma taxonomía que ya usa "Nuevo movimiento"), así que "monto
+// fijo" y "monto variable" (antes dos pestañas separadas, "Fijos" y
+// "Variables") ahora conviven en una sola lista — la distinción sigue
+// existiendo (el form la sigue preguntando, cada tarjeta muestra una
+// etiqueta "Fijo"/"Variable"), solo dejó de ser el criterio que separa
+// pestañas. Si en el futuro hiciera falta volver a filtrar por uno de los
+// dos (ej. una pantalla dedicada), la prop `tipoMonto` sigue aceptando un
+// valor único para eso — sin ella, se listan ambos.
+export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto?: "fijo" | "variable" }) {
   const [gastos, setGastos] = useState<GastoFijo[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // Reparto de cada grupo (para congelarlo en item_participantes al guardar
+  // un ítem con grupo — ver migration_33_compromisos_fundacion.sql). Ya no se
+  // deja que el reparto de un ítem con grupo se resuelva en vivo contra el
+  // grupo: se copia una vez, al guardar, así un cambio de % más adelante no
+  // mueve retroactivamente lo que ya está cargado.
+  const [grupoParticipantesTodos, setGrupoParticipantesTodos] = useState<GrupoParticipante[]>([]);
   // "Esta categoría usa este grupo por defecto" (ver Grupos y
   // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
   const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
@@ -42,7 +53,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   const [descripcion, setDescripcion] = useState("");
   const [monto, setMonto] = useState("");
   const [diaMes, setDiaMes] = useState("1");
-  const [tipoMonto, setTipoMonto] = useState<"fijo" | "variable">(tabTipoMonto);
+  const [tipoMonto, setTipoMonto] = useState<"fijo" | "variable">(tabTipoMonto ?? "fijo");
   const [entidadId, setEntidadId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [grupoId, setGrupoId] = useState("");
@@ -61,7 +72,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargarTodo() {
-    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: cgp }, { data: ip }, { data: pg }] =
+    const [{ data: g }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: gp }, { data: cgp }, { data: ip }, { data: pg }] =
       await Promise.all([
         supabase.from("gastos_fijos").select("*").eq("activo", true).order("descripcion"),
         supabase.from("entidades").select("*").order("nombre"),
@@ -69,6 +80,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
         supabase.from("categorias").select("*").order("nombre"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
+        supabase.from("grupo_participantes").select("*"),
         supabase.from("categoria_grupo_preferido").select("*"),
         supabase.from("item_participantes").select("*").eq("origen", "gasto_fijo"),
         supabase.from("pagos").select("*").eq("origen", "gasto_fijo"),
@@ -79,6 +91,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
+    setGrupoParticipantesTodos((gp as GrupoParticipante[]) ?? []);
     const mapaPreferido: Record<string, string> = {};
     ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
       mapaPreferido[row.categoria_id] = row.grupo_id;
@@ -106,7 +119,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setDescripcion("");
     setMonto("");
     setDiaMes("1");
-    setTipoMonto(tabTipoMonto);
+    setTipoMonto(tabTipoMonto ?? "fijo");
     setEntidadId("");
     setCategoriaId("");
     setGrupoId("");
@@ -118,7 +131,7 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
   }
 
   function abrirFormNuevo() {
-    setTipoMonto(tabTipoMonto);
+    setTipoMonto(tabTipoMonto ?? "fijo");
     if (unicaPersona) setParticipantes([{ persona_id: unicaPersona.id, porcentaje: null }]);
     setMostrarForm(true);
   }
@@ -149,6 +162,20 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     setMostrarForm(true);
   }
 
+  // Ver el mismo helper en CuotasLista.tsx: si el gasto tiene grupo, se
+  // CONGELA el % efectivo del grupo tal cual está ahora (en vez de dejar que
+  // se resuelva en vivo contra el grupo para siempre).
+  function participantesAGuardar(): Participante[] {
+    if (grupoId) {
+      const idsActivos = new Set(personas.map((p) => p.id));
+      return resolverPorcentajesEfectivos(
+        grupoParticipantesTodos.filter((gp) => gp.grupo_id === grupoId),
+        idsActivos
+      ).map((p) => ({ persona_id: p.persona_id, porcentaje: p.porcentaje }));
+    }
+    return participantes;
+  }
+
   async function guardarParticipantes(gastoId: string) {
     const { error: delError } = await supabase
       .from("item_participantes")
@@ -156,9 +183,10 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
       .eq("origen", "gasto_fijo")
       .eq("origen_id", gastoId);
     if (delError) throw delError;
-    if (!grupoId && participantes.length > 0) {
+    const aGuardar = participantesAGuardar();
+    if (aGuardar.length > 0) {
       const { error: insError } = await supabase.from("item_participantes").insert(
-        participantes.map((p) => ({ origen: "gasto_fijo", origen_id: gastoId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+        aGuardar.map((p) => ({ origen: "gasto_fijo", origen_id: gastoId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
       );
       if (insError) throw insError;
     }
@@ -231,6 +259,38 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     return { monto: promedio, esPromedio: meses > 0 };
   }
 
+  // Pagado/pendiente de ESTE mes, para el check rápido en el listado (ronda
+  // 7 del rediseño: "en recurrentes, en el listado poder marcar como pagado
+  // o no" — sin tener que ir al Calendario de pagos). Un solo tap: si no
+  // está pagado, se marca con el monto vigente de hoy (estimado o promedio
+  // móvil); si ya está pagado, se saca directamente (mismo criterio sin
+  // confirmación que ya usa "deshacer" en /calendario-pagos).
+  const pagoDe = (id: string) => pagos.find((p) => p.origen_id === id && p.mes === mesActualISO()) ?? null;
+
+  async function marcarPagado(g: GastoFijo) {
+    setError("");
+    const { monto } = montoVigente(g);
+    const { error: upError } = await supabase.from("pagos").upsert(
+      { origen: "gasto_fijo", origen_id: g.id, mes: mesActualISO(), monto_real: monto, pagado: true, fecha_pago: new Date().toISOString().slice(0, 10) },
+      { onConflict: "origen,origen_id,mes" }
+    );
+    if (upError) {
+      setError(mensajeError(upError) || "No se pudo marcar como pagado.");
+      return;
+    }
+    cargarTodo();
+  }
+
+  async function desmarcarPagado(pagoId: string) {
+    setError("");
+    const { error: delError } = await supabase.from("pagos").delete().eq("id", pagoId);
+    if (delError) {
+      setError(mensajeError(delError) || "No se pudo desmarcar.");
+      return;
+    }
+    cargarTodo();
+  }
+
   function resumenReparto(g: GastoFijo) {
     if (g.grupo_id) return `Grupo: ${grupoDe(g.grupo_id)?.nombre ?? "—"}`;
     const filas = participantesPorItem[g.id] ?? [];
@@ -239,8 +299,10 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
     return nombres.join(", ");
   }
 
-  const lista = gastos.filter((g) => g.tipo_monto === tabTipoMonto);
+  const lista = tabTipoMonto ? gastos.filter((g) => g.tipo_monto === tabTipoMonto) : gastos;
   const total = lista.reduce((acc, g) => acc + montoVigente(g).monto, 0);
+  const totalFijo = gastos.filter((g) => g.tipo_monto === "fijo").reduce((acc, g) => acc + montoVigente(g).monto, 0);
+  const totalVariable = gastos.filter((g) => g.tipo_monto === "variable").reduce((acc, g) => acc + montoVigente(g).monto, 0);
 
   return (
     <div className="space-y-4">
@@ -445,16 +507,38 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
 
       {lista.length > 0 && (
         <Card>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-500 dark:text-gray-400">
-              {tabTipoMonto === "fijo" ? "Total monto fijo / mes" : "Total variable (promedio móvil) / mes"}
-            </span>
-            <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(total)}</span>
-          </div>
+          {tabTipoMonto ? (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-500 dark:text-gray-400">
+                {tabTipoMonto === "fijo" ? "Total monto fijo / mes" : "Total variable (promedio móvil) / mes"}
+              </span>
+              <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(total)}</span>
+            </div>
+          ) : (
+            <div className="space-y-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Monto fijo / mes</span>
+                <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(totalFijo)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500 dark:text-gray-400">Monto variable (promedio móvil) / mes</span>
+                <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(totalVariable)}</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-gray-100 pt-1.5 dark:border-white/10">
+                <span className="font-semibold text-gray-600 dark:text-gray-300">Total recurrente / mes</span>
+                <span className="font-bold text-gray-800 dark:text-white">{formatCLP(total)}</span>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Felipe pidió que en la web el listado se vea "más estirado al
+          horizontal, no como cuadros" — antes esto armaba una grilla de
+          2-3 columnas en sm:/lg: (tarjetas cuadradas una al lado de otra);
+          ahora queda siempre en una sola columna a lo ancho completo, en
+          cualquier tamaño de pantalla. */}
+      <div className="flex flex-col gap-3">
         {lista.map((g) => {
           const marcaItem = marcaDe(g.marca_id);
           const filasReparto = participantesPorItem[g.id] ?? [];
@@ -473,7 +557,14 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                           className="h-9 w-9"
                         />
                         <div>
-                          <p className="font-semibold text-gray-800 dark:text-white">{g.descripcion}</p>
+                          <p className="flex items-center gap-1.5 font-semibold text-gray-800 dark:text-white">
+                            {g.descripcion}
+                            {!tabTipoMonto && (
+                              <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-gray-400 dark:bg-white/10 dark:text-gray-500">
+                                {g.tipo_monto === "variable" ? "Variable" : "Fijo"}
+                              </span>
+                            )}
+                          </p>
                           <p className="text-xs text-gray-400 dark:text-gray-500">
                             {nombreEntidad(g.entidad_id) ? `${nombreEntidad(g.entidad_id)} · ` : ""}
                             {nombreCategoria(g.categoria_id)}
@@ -490,11 +581,52 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                         </button>
                       </div>
                     </div>
-                    <p className="mt-2 text-right font-semibold text-gray-800 dark:text-white">
-                      {esPromedio && <span className="mr-1 text-xs font-normal text-gray-400 dark:text-gray-500">~</span>}
-                      {formatCLP(montoActual)}
-                    </p>
-                    {esPromedio && <p className="text-right text-[10.5px] text-gray-400 dark:text-gray-500">promedio móvil</p>}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      {/* Check rápido de pagado/pendiente de este mes — sin
+                          tener que ir al Calendario de pagos (ver
+                          pagoDe/marcarPagado/desmarcarPagado más arriba). Un
+                          solo tap: marca con el monto vigente de hoy, o saca
+                          el pago si ya estaba marcado. */}
+                      {(() => {
+                        const pago = pagoDe(g.id);
+                        const pagado = pago?.pagado ?? false;
+                        return (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              pagado && pago ? desmarcarPagado(pago.id) : marcarPagado(g);
+                            }}
+                            className={`flex shrink-0 items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[11px] font-semibold transition-colors ${
+                              pagado
+                                ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+                                : "bg-gray-50 text-gray-400 dark:bg-white/5 dark:text-gray-500"
+                            }`}
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill={pagado ? "currentColor" : "none"}
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              className="shrink-0"
+                            >
+                              <circle cx="12" cy="12" r="9" fill={pagado ? "currentColor" : "none"} className={pagado ? "" : "opacity-40"} />
+                              {pagado && <path d="m8.5 12.5 2.5 2.5 4.5-5" stroke="white" strokeLinecap="round" strokeLinejoin="round" />}
+                            </svg>
+                            {pagado ? "Pagado" : "Marcar pagado"}
+                          </button>
+                        );
+                      })()}
+                      <div className="text-right">
+                        <p className="font-semibold text-gray-800 dark:text-white">
+                          {esPromedio && <span className="mr-1 text-xs font-normal text-gray-400 dark:text-gray-500">~</span>}
+                          {formatCLP(montoActual)}
+                        </p>
+                        {esPromedio && <p className="text-[10.5px] text-gray-400 dark:text-gray-500">promedio móvil</p>}
+                      </div>
+                    </div>
                   </div>
                 )}
                 detalle={({ onClick }) => (
@@ -514,6 +646,12 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
                       </button>
                     </div>
                     <dl className="mt-3 space-y-1.5 text-xs">
+                      {!tabTipoMonto && (
+                        <div className="flex justify-between gap-3">
+                          <dt className="text-gray-400 dark:text-gray-500">Tipo</dt>
+                          <dd className="font-medium text-gray-700 dark:text-gray-200">{g.tipo_monto === "variable" ? "Monto variable" : "Monto fijo"}</dd>
+                        </div>
+                      )}
                       <div className="flex justify-between gap-3">
                         <dt className="text-gray-400 dark:text-gray-500">{esPromedio ? "Promedio móvil" : g.tipo_monto === "variable" ? "Monto estimado" : "Monto"}</dt>
                         <dd className="font-medium text-gray-700 dark:text-gray-200">{formatCLP(montoActual)}</dd>
@@ -571,7 +709,11 @@ export function GastosFijosLista({ tipoMonto: tabTipoMonto }: { tipoMonto: "fijo
         })}
         {lista.length === 0 && !mostrarForm && (
           <p className="text-center text-sm text-gray-400 dark:text-gray-500">
-            {tabTipoMonto === "fijo" ? "Aún no hay gastos de monto fijo." : "Aún no hay gastos de monto variable."}
+            {tabTipoMonto === "fijo"
+              ? "Aún no hay gastos de monto fijo."
+              : tabTipoMonto === "variable"
+              ? "Aún no hay gastos de monto variable."
+              : "Aún no hay gastos recurrentes."}
           </p>
         )}
       </div>

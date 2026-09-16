@@ -8,7 +8,35 @@ import { Card } from "@/components/Card";
 import { formatCLP, mesActualISO, nombreMes, primerDiaMesSiguiente } from "@/lib/format";
 import { promedioMovil } from "@/lib/promedioMovil";
 import { resumenGastosMes } from "@/lib/resumenGastos";
-import { Categoria, CompraVigente, GastoDiario, GastoFijo, MetaAhorroProgreso, Pago } from "@/lib/types";
+import { colorAnilloPresupuesto } from "@/lib/colorPresupuesto";
+import { Categoria, CompraVigente, GastoDiario, GastoFijo, MetaAhorroProgreso, Pago, PresupuestoCategoria } from "@/lib/types";
+
+// Anillo de progreso de presupuesto (Feature G, ronda 6 del rediseño): un
+// círculo SVG alrededor del ícono de la categoría, calcado de una captura
+// real de Not Pato (pestaña "Presupuestos") — el color cambia según cuánto
+// llevas gastado (ver lib/colorPresupuesto.ts), no según la categoría.
+function AnilloPresupuesto({ pct, color, size = 56, grosor = 4.5 }: { pct: number; color: string; size?: number; grosor?: number }) {
+  const r = (size - grosor) / 2;
+  const c = 2 * Math.PI * r;
+  const pctClamped = Math.min(100, Math.max(0, pct));
+  const dash = (pctClamped / 100) * c;
+  return (
+    <svg width={size} height={size} className="-rotate-90" viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth={grosor} className="stroke-gray-100 dark:stroke-white/10" />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={grosor}
+        strokeLinecap="round"
+        strokeDasharray={`${dash} ${c}`}
+        className="transition-[stroke-dasharray]"
+      />
+    </svg>
+  );
+}
 
 const COLORES = ["#111112", "#3A3A3D", "#6E6E72", "#9B9995", "#C9C7C2", "#E2584B", "#5DCB86", "#8A8A8D"];
 
@@ -35,17 +63,30 @@ export function PresupuestoContenido({ ocultarTitulo = false }: { ocultarTitulo?
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [metas, setMetas] = useState<MetaAhorroProgreso[]>([]);
+  const [presupuestos, setPresupuestos] = useState<PresupuestoCategoria[]>([]);
   const [cargando, setCargando] = useState(true);
+  // Ronda 8: Felipe reportó que acá (a diferencia de la tarjeta "Presupuesto
+  // por categoría" de Inicio, ver app/page.tsx) no había forma de AGREGAR un
+  // presupuesto nuevo — solo se veían los que ya existían. Mismo mini-form
+  // agregar/editar/quitar que ya usa esa tarjeta de Inicio, portado acá para
+  // que /presupuesto standalone (el que usa el sidebar de escritorio) y la
+  // pestaña "Presupuestos" del Resumen móvil también lo tengan.
+  const [nuevoPresupuestoCategoriaId, setNuevoPresupuestoCategoriaId] = useState("");
+  const [nuevoPresupuestoMonto, setNuevoPresupuestoMonto] = useState("");
+  const [editandoPresupuestoId, setEditandoPresupuestoId] = useState<string | null>(null);
+  const [editandoPresupuestoMonto, setEditandoPresupuestoMonto] = useState("");
+  const [guardandoPresupuesto, setGuardandoPresupuesto] = useState(false);
 
   useEffect(() => {
     async function cargar() {
-      const [{ data: c }, { data: gf }, { data: gd }, { data: cat }, { data: p }, { data: m }] = await Promise.all([
+      const [{ data: c }, { data: gf }, { data: gd }, { data: cat }, { data: p }, { data: m }, { data: pc }] = await Promise.all([
         supabase.from("vista_cuotas_mes_actual").select("*"),
         supabase.from("gastos_fijos").select("*").eq("activo", true),
         supabase.from("gastos_diarios").select("*").gte("fecha", mesActualISO()).lt("fecha", primerDiaMesSiguiente()),
         supabase.from("categorias").select("*"),
         supabase.from("pagos").select("*").eq("origen", "gasto_fijo"),
         supabase.from("vista_metas_ahorro_progreso").select("*").eq("activa", true).order("nombre"),
+        supabase.from("presupuestos_categoria").select("*"),
       ]);
       setCuotas((c as CompraVigente[]) ?? []);
       setGastosFijos((gf as GastoFijo[]) ?? []);
@@ -53,6 +94,7 @@ export function PresupuestoContenido({ ocultarTitulo = false }: { ocultarTitulo?
       setCategorias((cat as Categoria[]) ?? []);
       setPagos((p as Pago[]) ?? []);
       setMetas((m as MetaAhorroProgreso[]) ?? []);
+      setPresupuestos((pc as PresupuestoCategoria[]) ?? []);
       setCargando(false);
     }
     cargar();
@@ -73,8 +115,69 @@ export function PresupuestoContenido({ ocultarTitulo = false }: { ocultarTitulo?
   const restoTotal = restoCategorias.reduce((acc, d) => acc + d.value, 0);
   const pct = (valor: number) => (totalGastos > 0 ? `${Math.round((valor / totalGastos) * 1000) / 10}%` : "0%");
 
+  // Totales separados por tipo de pago (mismo criterio que el selector
+  // "Normal / Recurrente / Cuotas" de "Nuevo movimiento" — ver
+  // MovimientoRapido.tsx): "Normal" y "Cuotas" son compras (vista_cuotas_mes_
+  // actual ya trae la cuota vigente de este mes de cada una, sea de 1 sola
+  // cuota o de varias), separadas por su n_cuotas; "Recurrente" son los
+  // gastos_fijos activos. gastosDiarios queda fuera (no es un tipo de pago
+  // de "Nuevo movimiento", es la carga rápida de /gastos → Diarios).
+  const totalPagoUnico = cuotas.filter((c) => c.n_cuotas === 1).reduce((acc, c) => acc + Number(c.monto_cuota), 0);
+  const totalPagoCuotas = cuotas.filter((c) => c.n_cuotas > 1).reduce((acc, c) => acc + Number(c.monto_cuota), 0);
+  const totalPagoRecurrente = gastosFijos.reduce((acc, g) => acc + Number(g.monto_estimado), 0);
+  const totalPorTipoPago = totalPagoUnico + totalPagoCuotas + totalPagoRecurrente;
+
   const gastosVariables = gastosFijos.filter((g) => g.tipo_monto === "variable");
   const metasEnProgreso = metas.filter((m) => m.monto_actual < m.monto_objetivo).slice(0, 2);
+
+  // Gasto por categoría (mismas 3 fuentes que gastoPorCategoriaId de
+  // app/page.tsx: cuotas + gastos fijos + gastos diarios, sin
+  // transferencias), para los anillos de progreso de presupuesto de abajo.
+  const gastoPorCategoriaId: Record<string, number> = {};
+  cuotas.forEach((c) => {
+    if (!c.categoria_id) return;
+    gastoPorCategoriaId[c.categoria_id] = (gastoPorCategoriaId[c.categoria_id] ?? 0) + Number(c.monto_cuota);
+  });
+  gastosFijos.forEach((g) => {
+    if (!g.categoria_id) return;
+    gastoPorCategoriaId[g.categoria_id] = (gastoPorCategoriaId[g.categoria_id] ?? 0) + Number(g.monto_estimado);
+  });
+  gastosDiarios.forEach((d) => {
+    if (!d.categoria_id) return;
+    gastoPorCategoriaId[d.categoria_id] = (gastoPorCategoriaId[d.categoria_id] ?? 0) + Number(d.monto);
+  });
+  const categoriasConPresupuesto = presupuestos
+    .map((p) => ({ presupuesto: p, categoria: categorias.find((c) => c.id === p.categoria_id) ?? null }))
+    .filter((x): x is { presupuesto: PresupuestoCategoria; categoria: Categoria } => x.categoria != null)
+    .sort((a, b) => a.categoria.nombre.localeCompare(b.categoria.nombre));
+  const categoriasDisponiblesParaPresupuesto = categorias.filter((c) => !presupuestos.some((p) => p.categoria_id === c.id));
+
+  async function guardarPresupuesto(categoriaId: string, monto: number) {
+    if (!categoriaId || !(monto > 0)) return;
+    setGuardandoPresupuesto(true);
+    const { error } = await supabase
+      .from("presupuestos_categoria")
+      .upsert({ categoria_id: categoriaId, monto_mensual: monto }, { onConflict: "owner_id,categoria_id" });
+    if (!error) {
+      setPresupuestos((actual) => [...actual.filter((p) => p.categoria_id !== categoriaId), { id: crypto.randomUUID(), categoria_id: categoriaId, monto_mensual: monto }]);
+      setNuevoPresupuestoCategoriaId("");
+      setNuevoPresupuestoMonto("");
+      setEditandoPresupuestoId(null);
+    }
+    setGuardandoPresupuesto(false);
+  }
+
+  async function eliminarPresupuesto(categoriaId: string) {
+    setPresupuestos((actual) => actual.filter((p) => p.categoria_id !== categoriaId));
+    await supabase.from("presupuestos_categoria").delete().eq("categoria_id", categoriaId);
+  }
+
+  const totalPresupuestado = categoriasConPresupuesto.reduce((acc, { presupuesto }) => acc + Number(presupuesto.monto_mensual), 0);
+  const totalGastadoPresupuestado = categoriasConPresupuesto.reduce(
+    (acc, { categoria }) => acc + (gastoPorCategoriaId[categoria.id] ?? 0),
+    0
+  );
+  const pctPresupuestoUsado = totalPresupuestado > 0 ? Math.min(100, Math.round((totalGastadoPresupuestado / totalPresupuestado) * 100)) : 0;
 
   return (
     <div className="space-y-4 pb-10">
@@ -126,6 +229,160 @@ export function PresupuestoContenido({ ocultarTitulo = false }: { ocultarTitulo?
         )}
       </Card>
 
+      {
+        // Presupuestos por categoría con anillo de progreso (Feature G,
+        // ronda 6 del rediseño) — pedido explícito del usuario, calcado de
+        // una captura real de Not Pato (pestaña "Presupuestos"): un anillo
+        // alrededor del ícono de cada categoría que se llena y cambia de
+        // color (verde → amarillo → naranjo → rojo al excederse) según
+        // cuánto llevas gastado de lo presupuestado.
+        //
+        // Ronda 8: antes esta tarjeta entera se ocultaba si todavía no había
+        // ningún presupuesto creado — Felipe reportó "no hay botón para
+        // agregar un nuevo presupuesto" en esta pantalla (/presupuesto
+        // standalone de escritorio). Ahora la tarjeta siempre se muestra
+        // (con un mensaje si está vacía) y siempre trae el mini-form de
+        // agregar al final, más los controles de editar/quitar en cada
+        // categoría ya creada — mismo patrón que la tarjeta equivalente de
+        // Inicio (ver app/page.tsx, tarjetaPresupuestoCategorias).
+        <Card>
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">
+            {categoriasConPresupuesto.length > 0 ? `${formatCLP(totalPresupuestado)} presupuestado` : "Presupuesto por categoría"}
+          </p>
+          {categoriasConPresupuesto.length === 0 ? (
+            <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
+              Todavía no defines un presupuesto por categoría — agrega uno abajo para ver cuánto llevas gastado.
+            </p>
+          ) : (
+            <>
+              <div className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                <div className="h-full bg-brand-gradient" style={{ width: `${pctPresupuestoUsado}%` }} />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-gray-400 dark:text-gray-500">
+                <span>
+                  Gastado <span className="font-semibold text-gray-700 dark:text-gray-200">{formatCLP(totalGastadoPresupuestado)}</span>
+                </span>
+                <span>
+                  Disponible{" "}
+                  <span className="font-semibold text-gray-700 dark:text-gray-200">
+                    {formatCLP(Math.max(0, totalPresupuestado - totalGastadoPresupuestado))}
+                  </span>
+                </span>
+              </div>
+
+              <div className="mt-4 flex flex-wrap justify-around gap-x-2 gap-y-4">
+                {categoriasConPresupuesto.map(({ presupuesto, categoria }) => {
+                  const gastado = gastoPorCategoriaId[categoria.id] ?? 0;
+                  const sobrepasado = gastado > presupuesto.monto_mensual;
+                  const pct = presupuesto.monto_mensual > 0 ? (gastado / presupuesto.monto_mensual) * 100 : 0;
+                  const color = colorAnilloPresupuesto(gastado, presupuesto.monto_mensual);
+                  return (
+                    <div key={categoria.id} className="flex w-20 flex-col items-center gap-1 text-center">
+                      <div className="relative h-14 w-14">
+                        <AnilloPresupuesto pct={pct} color={color} />
+                        <span className="absolute inset-0 flex items-center justify-center text-lg">{categoria.icono || "🏷️"}</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs font-bold text-gray-800 dark:text-white">
+                        {formatCLP(sobrepasado ? gastado - presupuesto.monto_mensual : Math.max(0, presupuesto.monto_mensual - gastado))}
+                      </p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                        {sobrepasado ? "excedido" : "disponible"} de {formatCLP(presupuesto.monto_mensual)}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 space-y-2 border-t border-gray-50 pt-3 dark:border-white/10">
+                {categoriasConPresupuesto.map(({ presupuesto, categoria }) => {
+                  const editando = editandoPresupuestoId === categoria.id;
+                  return (
+                    <div key={categoria.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="flex min-w-0 items-center gap-1.5 truncate font-semibold text-gray-700 dark:text-gray-200">
+                        {categoria.icono ? `${categoria.icono} ` : ""}
+                        {categoria.nombre}
+                      </span>
+                      {editando ? (
+                        <span className="flex shrink-0 items-center gap-1">
+                          <input
+                            type="number"
+                            autoFocus
+                            value={editandoPresupuestoMonto}
+                            onChange={(e) => setEditandoPresupuestoMonto(e.target.value)}
+                            className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-right text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            disabled={guardandoPresupuesto}
+                            onClick={() => guardarPresupuesto(categoria.id, Number(editandoPresupuestoMonto))}
+                            className="text-[11px] font-semibold text-brand-from dark:text-white"
+                          >
+                            Guardar
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-gray-400 dark:text-gray-500">
+                          {formatCLP(presupuesto.monto_mensual)}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditandoPresupuestoId(categoria.id);
+                              setEditandoPresupuestoMonto(String(presupuesto.monto_mensual));
+                            }}
+                            aria-label={`Editar presupuesto de ${categoria.nombre}`}
+                            className="text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400"
+                          >
+                            ✎
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => eliminarPresupuesto(categoria.id)}
+                            aria-label={`Quitar presupuesto de ${categoria.nombre}`}
+                            className="text-gray-300 hover:text-red-400 dark:text-gray-600"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-gray-50 pt-3 dark:border-white/10">
+            <select
+              value={nuevoPresupuestoCategoriaId}
+              onChange={(e) => setNuevoPresupuestoCategoriaId(e.target.value)}
+              className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+            >
+              <option value="">+ Agregar categoría…</option>
+              {categoriasDisponiblesParaPresupuesto.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nombre}
+                </option>
+              ))}
+            </select>
+            <input
+              type="number"
+              value={nuevoPresupuestoMonto}
+              onChange={(e) => setNuevoPresupuestoMonto(e.target.value)}
+              placeholder="$ mensual"
+              className="w-24 rounded-lg border border-gray-200 px-2 py-1.5 text-xs dark:border-white/10 dark:bg-white/5 dark:text-white"
+            />
+            <button
+              type="button"
+              disabled={!nuevoPresupuestoCategoriaId || !nuevoPresupuestoMonto || guardandoPresupuesto}
+              onClick={() => guardarPresupuesto(nuevoPresupuestoCategoriaId, Number(nuevoPresupuestoMonto))}
+              className="shrink-0 rounded-lg bg-gray-800 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40 dark:bg-white dark:text-black"
+            >
+              Agregar
+            </button>
+          </div>
+        </Card>
+      }
+
       {totalGastos > 0 && (
         <Card>
           <p className="mb-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Fijo vs. variable</p>
@@ -141,6 +398,32 @@ export function PresupuestoContenido({ ocultarTitulo = false }: { ocultarTitulo?
               <span className="h-2 w-2 rounded-full bg-gray-300 dark:bg-gray-600" />
               Variable · {formatCLP(totalTipoVariable)}
             </span>
+          </div>
+        </Card>
+      )}
+
+      {totalPorTipoPago > 0 && (
+        <Card>
+          <p className="mb-3 text-sm font-semibold text-gray-600 dark:text-gray-300">Por tipo de pago</p>
+          <div className="space-y-2.5 text-sm">
+            {[
+              { label: "Pago único (normal)", valor: totalPagoUnico },
+              { label: "Pago recurrente", valor: totalPagoRecurrente },
+              { label: "Pago en cuotas", valor: totalPagoCuotas },
+            ].map((fila) => (
+              <div key={fila.label}>
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-gray-600 dark:text-gray-300">{fila.label}</span>
+                  <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(fila.valor)}</span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
+                  <div
+                    className="h-full bg-brand-gradient"
+                    style={{ width: `${totalPorTipoPago > 0 ? (fila.valor / totalPorTipoPago) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </Card>
       )}

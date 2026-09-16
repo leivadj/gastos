@@ -9,9 +9,10 @@ export function esAdmin(email?: string | null): boolean {
 // variable (que llevan al detalle "Hogar > Servicios básicos", una
 // sub-página sin ítem propio de navegación) y un resumen de metas de
 // ahorro. La gestión (alta/edición/baja) de todos los gastos vive en
-// /gastos — una sola pantalla con pestañas (Fijos, Variables, Cuotas,
-// Diarios) que reemplazó a las antiguas /gastos-fijos y /compras (ambas
-// rutas quedaron como redirect por si había accesos directos guardados) —
+// /gastos — una sola pantalla con pestañas (Normal, Recurrente, Cuotas —
+// misma taxonomía que "Nuevo movimiento") que reemplazó a las antiguas
+// /gastos-fijos y /compras (ambas rutas quedaron como redirect por si
+// había accesos directos guardados) —
 // agrupada en "Más", y también accesible con "Gestionar gastos" al fondo
 // de Presupuesto. "Auto" y "Salud" son gastos sueltos de carga rápida
 // (mismo patrón que "Diarios" de /gastos, ver DiariosLista.tsx) atados a
@@ -157,6 +158,18 @@ export const navItems = [
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
         <rect x="3" y="5" width="18" height="14" rx="2.2" />
         <path d="m3.5 6 8.5 6.5L20.5 6" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    href: "/compromisos",
+    label: "Compromisos",
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2.4 : 2}>
+        <rect x="3" y="7" width="18" height="13" rx="2.2" />
+        <path d="M3 11h18" strokeLinecap="round" />
+        <path d="M7 15.5h4" strokeLinecap="round" />
+        <path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" strokeLinecap="round" />
       </svg>
     ),
   },

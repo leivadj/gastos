@@ -43,3 +43,34 @@ export function nombreMesCorto(fechaISO: string): string {
   const fecha = new Date(`${fechaISO.slice(0, 7)}-01T00:00:00`);
   return new Intl.DateTimeFormat("es-CL", { month: "short" }).format(fecha).replace(".", "");
 }
+
+// "Domingo 13 de septiembre" — encabezado del dashboard de escritorio
+// (rediseño v2, mockup "Inicio"). Con mayúscula inicial porque
+// Intl.DateTimeFormat en es-CL devuelve el día de la semana en minúscula.
+export function fechaLargaHoy(): string {
+  const texto = new Intl.DateTimeFormat("es-CL", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(new Date());
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
+// Saludo según la hora del día, para el hero de "Inicio" en escritorio
+// (mismo criterio horario típico: madrugada/mañana/tarde/noche).
+export function saludoHora(): string {
+  const hora = new Date().getHours();
+  if (hora < 6) return "Buenas noches";
+  if (hora < 12) return "Buenos días";
+  if (hora < 20) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+// Abreviatura de mes en mayúsculas para la "credencial" de fecha del hero
+// (ej. "13" / "SEP").
+export function mesAbreviadoMayus(): string {
+  return new Intl.DateTimeFormat("es-CL", { month: "short" })
+    .format(new Date())
+    .replace(".", "")
+    .toUpperCase();
+}

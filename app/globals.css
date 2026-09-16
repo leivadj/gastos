@@ -53,9 +53,20 @@ html.dark body {
     opacity: 0;
     transform: translateY(6px) scale(0.995);
   }
+  /* "transform: none" en vez de "translateY(0) scale(1)": aunque el
+     resultado visual es idéntico, cualquier valor de transform DISTINTO de
+     "none" deja este contenedor (con "animation: ... both", que aplica el
+     estado final del keyframe para siempre) actuando como "containing
+     block" de sus descendientes position:fixed — así, cualquier hoja/modal
+     fixed dentro de una pantalla (el detalle de cuenta en /tarjetas, etc.)
+     quedaba encajonada dentro de esta caja en vez de cubrir la pantalla
+     completa, y además creaba un contexto de apilamiento propio que hacía
+     que el contenido de la página ganara por sobre el modal "+" del rail
+     de escritorio (que vive fuera de este wrapper, en DesktopSidebar). Con
+     "none" no se crea ese containing block y ambos bugs se resuelven. */
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
   }
 }
 .animate-entrada-pagina {

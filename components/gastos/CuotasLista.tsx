@@ -15,18 +15,33 @@ import { ParticipantesPicker } from "@/components/ParticipantesPicker";
 import { diaDelMes, formatCLP } from "@/lib/format";
 import { fechaPrimeraCuotaDesde } from "@/lib/cuotas";
 import { resolverMarca } from "@/lib/resolverMarca";
-import { Categoria, CategoriaGrupoPreferido, CompraVigente, Entidad, Grupo, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
+import { resolverPorcentajesEfectivos } from "@/lib/reparto";
+import { Categoria, CategoriaGrupoPreferido, CompraVigente, Entidad, Grupo, GrupoParticipante, ItemParticipante, Marca, Participante, Persona } from "@/lib/types";
 
-// Pestaña "Cuotas" de /gastos — antes /compras, pantalla propia. La cuota
+// Pestañas "Normal" y "Cuotas" de /gastos — antes una sola pantalla
+// (/compras) sin distinguir compras de un solo pago de compras en cuotas
+// reales; ambas viven en la misma tabla `compras` (`n_cuotas` es 1 para un
+// pago único). Felipe pidió que /gastos tenga solo 3 categorías (Normal/
+// Recurrente/Cuotas, la misma taxonomía que ya usa "Nuevo movimiento"), así
+// que este componente ahora se instancia dos veces con `modo` distinto: en
+// "una-vez" filtra a n_cuotas === 1 y oculta los campos de cuotas (siempre
+// se guarda como 1 pago); en "cuotas" filtra a n_cuotas > 1 y exige al
+// menos 2 (una compra de 1 cuota no es realmente "en cuotas"). La cuota
 // vigente se calcula sola cada mes, con la fecha de hoy (ver
 // vista_cuotas_vigentes en Supabase).
-export function CuotasLista() {
+export function CuotasLista({ modo }: { modo: "una-vez" | "cuotas" }) {
   const [compras, setCompras] = useState<CompraVigente[]>([]);
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  // Reparto de cada grupo (para congelarlo en item_participantes al guardar
+  // un ítem con grupo — ver migration_33_compromisos_fundacion.sql). Ya no se
+  // deja que el reparto de un ítem con grupo se resuelva en vivo contra el
+  // grupo: se copia una vez, al guardar, así un cambio de % más adelante no
+  // mueve retroactivamente lo que ya está cargado.
+  const [grupoParticipantesTodos, setGrupoParticipantesTodos] = useState<GrupoParticipante[]>([]);
   // "Esta categoría usa este grupo por defecto" (ver Grupos y
   // migration_26_reparto_por_categoria.sql) — categoria_id -> grupo_id.
   const [preferidoPorCategoria, setPreferidoPorCategoria] = useState<Record<string, string>>({});
@@ -38,7 +53,7 @@ export function CuotasLista() {
 
   const [descripcion, setDescripcion] = useState("");
   const [montoCuota, setMontoCuota] = useState("");
-  const [nCuotas, setNCuotas] = useState("1");
+  const [nCuotas, setNCuotas] = useState(modo === "cuotas" ? "2" : "1");
   // "¿En qué cuota vas?" reemplaza el antiguo campo "Fecha de la primera
   // cuota": casi nadie sabe esa fecha de memoria, pero sí en qué número de
   // cuota va. diaVencimiento es interno (no se pide en el formulario): al
@@ -64,7 +79,7 @@ export function CuotasLista() {
   const unicaPersona = personas.length === 1 ? personas[0] : null;
 
   async function cargarTodo() {
-    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: cgp }, { data: ip }] =
+    const [{ data: c }, { data: e }, { data: m }, { data: cat }, { data: p }, { data: gr }, { data: gp }, { data: cgp }, { data: ip }] =
       await Promise.all([
         supabase.from("vista_cuotas_vigentes").select("*").order("cuota_actual", { ascending: true }),
         supabase.from("entidades").select("*").order("nombre"),
@@ -72,6 +87,7 @@ export function CuotasLista() {
         supabase.from("categorias").select("*").order("nombre"),
         supabase.from("personas").select("*").eq("activo", true).order("nombre"),
         supabase.from("grupos").select("*").order("nombre"),
+        supabase.from("grupo_participantes").select("*"),
         supabase.from("categoria_grupo_preferido").select("*"),
         supabase.from("item_participantes").select("*").eq("origen", "compra"),
       ]);
@@ -81,6 +97,7 @@ export function CuotasLista() {
     setCategorias((cat as Categoria[]) ?? []);
     setPersonas((p as Persona[]) ?? []);
     setGrupos((gr as Grupo[]) ?? []);
+    setGrupoParticipantesTodos((gp as GrupoParticipante[]) ?? []);
     const mapaPreferido: Record<string, string> = {};
     ((cgp as CategoriaGrupoPreferido[]) ?? []).forEach((row) => {
       mapaPreferido[row.categoria_id] = row.grupo_id;
@@ -105,7 +122,7 @@ export function CuotasLista() {
     setEditandoId(null);
     setDescripcion("");
     setMontoCuota("");
-    setNCuotas("1");
+    setNCuotas(modo === "cuotas" ? "2" : "1");
     setCuotaActual("1");
     setDiaVencimiento(new Date().getDate());
     setEntidadId("");
@@ -150,6 +167,24 @@ export function CuotasLista() {
     setMostrarForm(true);
   }
 
+  // Filas a grabar en item_participantes para esta compra: si tiene grupo,
+  // se CONGELA el % efectivo del grupo tal cual está ahora mismo (en vez de
+  // dejar que el reparto de este ítem se resuelva en vivo contra el grupo
+  // para siempre) — así, si el % del grupo cambia más adelante, este ítem ya
+  // guardado no se mueve. grupo_id se sigue guardando en la compra (permite
+  // filtrar "esto es de tal grupo" y que la UI lo siga precargando al
+  // editar), pero el reparto real ya no depende de él.
+  function participantesAGuardar(): Participante[] {
+    if (grupoId) {
+      const idsActivos = new Set(personas.map((p) => p.id));
+      return resolverPorcentajesEfectivos(
+        grupoParticipantesTodos.filter((gp) => gp.grupo_id === grupoId),
+        idsActivos
+      ).map((p) => ({ persona_id: p.persona_id, porcentaje: p.porcentaje }));
+    }
+    return participantes;
+  }
+
   async function guardarParticipantes(compraId: string) {
     const { error: delError } = await supabase
       .from("item_participantes")
@@ -157,9 +192,10 @@ export function CuotasLista() {
       .eq("origen", "compra")
       .eq("origen_id", compraId);
     if (delError) throw delError;
-    if (!grupoId && participantes.length > 0) {
+    const aGuardar = participantesAGuardar();
+    if (aGuardar.length > 0) {
       const { error: insError } = await supabase.from("item_participantes").insert(
-        participantes.map((p) => ({ origen: "compra", origen_id: compraId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+        aGuardar.map((p) => ({ origen: "compra", origen_id: compraId, persona_id: p.persona_id, porcentaje: p.porcentaje }))
       );
       if (insError) throw insError;
     }
@@ -174,10 +210,14 @@ export function CuotasLista() {
     }
     setGuardando(true);
     try {
-      const nCuotasNum = Math.max(1, Number(nCuotas) || 1);
+      // En "una-vez" siempre es 1 pago, sin importar qué quedó cargado en
+      // el estado (los campos de cuotas ni se muestran en este modo). En
+      // "cuotas" se exige al menos 2 — 1 sola cuota no es una compra en
+      // cuotas, es un pago único (eso pertenece a la otra pestaña).
+      const nCuotasNum = modo === "una-vez" ? 1 : Math.max(2, Number(nCuotas) || 2);
       const montoCuotaNum = Number(montoCuota);
       // "En qué cuota vas" no puede pasarse de la cantidad total de cuotas.
-      const cuotaActualNum = Math.min(Math.max(1, Number(cuotaActual) || 1), nCuotasNum);
+      const cuotaActualNum = modo === "una-vez" ? 1 : Math.min(Math.max(1, Number(cuotaActual) || 1), nCuotasNum);
       const payload = {
         descripcion,
         // No se guarda un "monto total" que la persona tenga que calcular:
@@ -238,21 +278,27 @@ export function CuotasLista() {
     return nombres.join(", ");
   }
 
+  const lista = compras.filter((c) => (modo === "una-vez" ? c.n_cuotas === 1 : c.n_cuotas > 1));
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-xs text-gray-400 dark:text-gray-500">La cuota vigente se calcula sola cada mes, con la fecha de hoy.</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          {modo === "una-vez"
+            ? "Compras o pagos de una sola vez con tarjeta o cuenta (no diarios ni recurrentes)."
+            : "La cuota vigente se calcula sola cada mes, con la fecha de hoy."}
+        </p>
         <button
           onClick={() => (mostrarForm ? cancelarForm() : abrirFormNuevo())}
           className="shrink-0 rounded-full bg-brand-gradient px-4 py-2 text-sm font-semibold text-white"
         >
-          {mostrarForm ? "Cancelar" : "+ Nueva"}
+          {mostrarForm ? "Cancelar" : modo === "una-vez" ? "+ Nuevo" : "+ Nueva"}
         </button>
       </div>
 
       <Link
         href="/tarjetas"
-        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm dark:bg-gray-900 dark:shadow-none"
+        className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm shadow-sm dark:bg-neutral-900 dark:shadow-none"
       >
         <span className="text-gray-600 dark:text-gray-300">Gestionar tus tarjetas y cuentas</span>
         <span className="text-brand-from dark:text-white">→</span>
@@ -271,20 +317,58 @@ export function CuotasLista() {
                 placeholder="Ej: Refrigerador nuevo"
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            {modo === "cuotas" ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">N° de cuotas</label>
+                    <input
+                      required
+                      type="number"
+                      min={2}
+                      value={nCuotas}
+                      onChange={(e) => setNCuotas(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 dark:text-gray-400">Valor de la cuota</label>
+                    <input
+                      required
+                      type="number"
+                      min={1}
+                      value={montoCuota}
+                      onChange={(e) => setMontoCuota(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 dark:text-gray-400">¿En qué cuota vas?</label>
+                  <input
+                    required
+                    type="number"
+                    min={1}
+                    max={nCuotas || undefined}
+                    value={cuotaActual}
+                    onChange={(e) => setCuotaActual(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
+                  />
+                  <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    Si es una compra nueva, deja &quot;1&quot;. Si ya venías pagando, escribe en qué cuota vas hoy — no
+                    hace falta calcular la fecha de la primera cuota, se calcula sola.
+                  </p>
+                </div>
+                {nCuotas && montoCuota && (
+                  <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
+                    Total del crédito: {formatCLP(Number(nCuotas) * Number(montoCuota))} — aproximado, sin contar
+                    intereses u otros cargos que el banco sume aparte.
+                  </p>
+                )}
+              </>
+            ) : (
               <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400">N° de cuotas</label>
-                <input
-                  required
-                  type="number"
-                  min={1}
-                  value={nCuotas}
-                  onChange={(e) => setNCuotas(e.target.value)}
-                  className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-500 dark:text-gray-400">Valor de la cuota</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
                 <input
                   required
                   type="number"
@@ -294,28 +378,6 @@ export function CuotasLista() {
                   className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
                 />
               </div>
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 dark:text-gray-400">¿En qué cuota vas?</label>
-              <input
-                required
-                type="number"
-                min={1}
-                max={nCuotas || undefined}
-                value={cuotaActual}
-                onChange={(e) => setCuotaActual(e.target.value)}
-                className="w-full rounded-lg border border-gray-200 dark:border-white/10 px-3 py-2 text-sm dark:bg-white/5 dark:text-white"
-              />
-              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                Si es una compra nueva, deja &quot;1&quot;. Si ya venías pagando, escribe en qué cuota vas hoy — no
-                hace falta calcular la fecha de la primera cuota, se calcula sola.
-              </p>
-            </div>
-            {nCuotas && montoCuota && (
-              <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-brand-from dark:bg-white/10 dark:text-white">
-                Total del crédito: {formatCLP(Number(nCuotas) * Number(montoCuota))} — aproximado, sin contar
-                intereses u otros cargos que el banco sume aparte.
-              </p>
             )}
             <div>
               <label className="text-xs text-gray-500 dark:text-gray-400">Tarjeta / medio de pago</label>
@@ -433,13 +495,17 @@ export function CuotasLista() {
         </Card>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {compras.map((c) => {
+      {/* Felipe pidió que en la web el listado se vea "más estirado al
+          horizontal, no como cuadros" — antes esto armaba una grilla de
+          2-3 columnas en sm:/lg:; ahora queda siempre en una sola columna a
+          lo ancho completo, en cualquier tamaño de pantalla. */}
+      <div className="flex flex-col gap-3">
+        {lista.map((c) => {
           const activa = c.cuota_actual >= 1 && c.cuota_actual <= c.n_cuotas;
           const progreso = Math.min(100, Math.max(0, (c.cuota_actual / c.n_cuotas) * 100));
           const marcaItem = marcaDe(c.marca_id);
           const filasReparto = participantesPorItem[c.compra_id] ?? [];
-          const barraProgreso = (
+          const barraProgreso = modo === "cuotas" && (
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-100 dark:bg-white/10">
               <div className="h-full bg-brand-gradient" style={{ width: `${progreso}%` }} />
             </div>
@@ -476,9 +542,12 @@ export function CuotasLista() {
                     </div>
                     <div className="mt-3 flex items-center justify-between text-sm">
                       <span className="text-gray-500 dark:text-gray-400">
-                        {activa ? `Cuota ${c.cuota_actual} de ${c.n_cuotas}` : "Terminada"}
+                        {modo === "una-vez" ? "Pago único" : activa ? `Cuota ${c.cuota_actual} de ${c.n_cuotas}` : "Terminada"}
                       </span>
-                      <span className="font-semibold text-gray-800 dark:text-white">{formatCLP(c.monto_cuota)}/mes</span>
+                      <span className="font-semibold text-gray-800 dark:text-white">
+                        {formatCLP(c.monto_cuota)}
+                        {modo === "cuotas" && "/mes"}
+                      </span>
                     </div>
                     {barraProgreso}
                   </div>
@@ -500,21 +569,36 @@ export function CuotasLista() {
                       </button>
                     </div>
                     <dl className="mt-3 space-y-1.5 text-xs">
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400 dark:text-gray-500">Total del crédito (aprox.)</dt>
-                        <dd className="font-medium text-gray-700 dark:text-gray-200">{formatCLP(c.monto_total)}</dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400 dark:text-gray-500">Cuota</dt>
-                        <dd className="font-medium text-gray-700 dark:text-gray-200">
-                          {activa ? `${c.cuota_actual} de ${c.n_cuotas}` : `${c.n_cuotas} (terminada)`} ·{" "}
-                          {formatCLP(c.monto_cuota)}/mes
-                        </dd>
-                      </div>
-                      <div className="flex justify-between gap-3">
-                        <dt className="text-gray-400 dark:text-gray-500">Vence</dt>
-                        <dd className="font-medium text-gray-700 dark:text-gray-200">Día {diaDelMes(c.fecha_primera_cuota)} de cada mes</dd>
-                      </div>
+                      {modo === "cuotas" ? (
+                        <>
+                          <div className="flex justify-between gap-3">
+                            <dt className="text-gray-400 dark:text-gray-500">Total del crédito (aprox.)</dt>
+                            <dd className="font-medium text-gray-700 dark:text-gray-200">{formatCLP(c.monto_total)}</dd>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <dt className="text-gray-400 dark:text-gray-500">Cuota</dt>
+                            <dd className="font-medium text-gray-700 dark:text-gray-200">
+                              {activa ? `${c.cuota_actual} de ${c.n_cuotas}` : `${c.n_cuotas} (terminada)`} ·{" "}
+                              {formatCLP(c.monto_cuota)}/mes
+                            </dd>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <dt className="text-gray-400 dark:text-gray-500">Vence</dt>
+                            <dd className="font-medium text-gray-700 dark:text-gray-200">Día {diaDelMes(c.fecha_primera_cuota)} de cada mes</dd>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex justify-between gap-3">
+                            <dt className="text-gray-400 dark:text-gray-500">Monto</dt>
+                            <dd className="font-medium text-gray-700 dark:text-gray-200">{formatCLP(c.monto_total)}</dd>
+                          </div>
+                          <div className="flex justify-between gap-3">
+                            <dt className="text-gray-400 dark:text-gray-500">Día</dt>
+                            <dd className="font-medium text-gray-700 dark:text-gray-200">{diaDelMes(c.fecha_primera_cuota)} de este mes</dd>
+                          </div>
+                        </>
+                      )}
                       <div className="flex justify-between gap-3">
                         <dt className="text-gray-400 dark:text-gray-500">Tarjeta / medio de pago</dt>
                         <dd className="font-medium text-gray-700 dark:text-gray-200">{nombreEntidad(c.entidad_id)}</dd>
@@ -563,7 +647,11 @@ export function CuotasLista() {
             </Card>
           );
         })}
-        {compras.length === 0 && <p className="text-center text-sm text-gray-400 dark:text-gray-500">Aún no hay compras en cuotas.</p>}
+        {lista.length === 0 && (
+          <p className="text-center text-sm text-gray-400 dark:text-gray-500">
+            {modo === "una-vez" ? "Aún no hay pagos únicos registrados aquí." : "Aún no hay compras en cuotas."}
+          </p>
+        )}
       </div>
     </div>
   );

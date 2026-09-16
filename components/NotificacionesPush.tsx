@@ -12,7 +12,7 @@ type Estado = "cargando" | "no_soportado" | "ios_falta_instalar" | "inactivo" | 
 // se fija solo si ya hay una suscripción activa, y guarda/borra la fila en
 // push_subscriptions (ver migration_30_push_subscriptions.sql) bajo tu
 // propia cuenta (RLS).
-export function NotificacionesPush() {
+export function NotificacionesPush({ compacto = false }: { compacto?: boolean } = {}) {
   const [estado, setEstado] = useState<Estado>("cargando");
   const [error, setError] = useState("");
 
@@ -104,9 +104,14 @@ export function NotificacionesPush() {
 
   if (estado === "cargando") return null;
 
+  // "Compacto" (usada dentro de la sección "Configuración" de /mas, ronda 6
+  // del rediseño): sin su propio recuadro con borde — ya vive dentro de la
+  // lista de filas de esa sección, que pone el borde/separador por afuera.
+  const contenedor = compacto ? "py-3" : "mt-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10";
+
   if (estado === "no_soportado") {
     return (
-      <div className="mt-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10">
+      <div className={contenedor}>
         <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Notificaciones</span>
         <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Tu navegador no soporta notificaciones push.</p>
       </div>
@@ -115,7 +120,7 @@ export function NotificacionesPush() {
 
   if (estado === "ios_falta_instalar") {
     return (
-      <div className="mt-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10">
+      <div className={contenedor}>
         <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Notificaciones</span>
         <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
           Para recibir avisos en el iPhone, primero agregá esta app a tu pantalla de inicio (compartir → &quot;Agregar a pantalla de
@@ -129,7 +134,7 @@ export function NotificacionesPush() {
   const guardando = estado === "guardando";
 
   return (
-    <div className="mt-3 rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10">
+    <div className={contenedor}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Notificaciones</span>
         <button

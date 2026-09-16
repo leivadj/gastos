@@ -118,7 +118,7 @@ export function PersonalizarMenu({
     >
       <div
         data-open={abierto}
-        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-gray-900 dark:shadow-none sm:max-w-md sm:rounded-2xl"
+        className="panel-reveal max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-neutral-900 dark:shadow-none sm:max-w-md sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-2">
@@ -147,7 +147,7 @@ export function PersonalizarMenu({
                 setArrastrando(idx);
               }}
               onDragEnd={() => setArrastrando(null)}
-              className={`flex cursor-grab items-center gap-2.5 rounded-xl border border-gray-100 bg-white px-3 py-2.5 transition active:cursor-grabbing dark:border-white/10 dark:bg-gray-900 ${
+              className={`flex cursor-grab items-center gap-2.5 rounded-xl border border-gray-100 bg-white px-3 py-2.5 transition active:cursor-grabbing dark:border-white/10 dark:bg-neutral-900 ${
                 item.oculto ? "opacity-40" : ""
               } ${arrastrando === idx ? "ring-2 ring-brand-from/40" : ""}`}
             >

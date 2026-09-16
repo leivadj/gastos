@@ -2,66 +2,53 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ReactNode, useEffect, useMemo, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabaseClient";
-import { esAdmin as checkEsAdmin } from "@/components/navItems";
-import { EntidadAvatar } from "@/components/EntidadAvatar";
 import { MovimientoFab } from "@/components/MovimientoRapido";
-import { PersonalizarMenu } from "@/components/PersonalizarMenu";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { resolverMarca } from "@/lib/resolverMarca";
-import { Categoria, Entidad, Grupo, Marca, PreferenciasMenu } from "@/lib/types";
+import { useTheme, PreferenciaTema } from "@/lib/theme";
+import { Persona } from "@/lib/types";
 
-// Sidebar fijo de escritorio — reemplaza al antiguo header horizontal
-// (DesktopNav.tsx, eliminado). El celular no se toca: sigue usando
-// BottomNav + /mas tal cual (ver navItems.tsx), esta lista es una IA
-// pensada para escritorio, con más espacio disponible.
+// Rail de escritorio — calcado del mockup (Main.dc.html / InicioOscuro.dc.html
+// / ReportesWeb.dc.html / AdminWeb.dc.html): 84px de ancho, SOLO íconos (sin
+// texto), sin personalización. Reemplaza al sidebar anterior de 240px con
+// etiquetas + "Personalizar menú" + atajos dinámicos por cuenta/grupo/marca/
+// categoría — Felipe pidió calcar el mockup exacto y dejar lo que no está ahí
+// oculto (ver mockup-v2-decisiones.md, "Menú lateral (sidebar) de escritorio").
 //
-// Difiere de navItems.tsx a propósito en 2 lugares:
-//  - "Fijos" y "Compras en cuotas" son ítems propios acá (apuntan a
-//    /gastos?tab=fijos y /gastos?tab=cuotas) en vez de un único "Gastos",
-//    para que la barra lateral se lea como el resto de apps de este tipo —
-//    la pantalla de destino sigue siendo la misma (/gastos con pestañas),
-//    así que no hace falta ninguna pantalla nueva.
-//  - Calendario/Movimientos/Auto/Salud/Ingresos no vienen en el menú por
-//    defecto (ver ITEMS_OPCIONALES más abajo) — están ahí para no saturar
-//    la barra de entrada, pero desde "Personalizar menú" se pueden prender
-//    y sumar al lado de los demás. Admin sigue aparte (bloque propio más
-//    abajo, gateado por esAdmin): no es personalizable a propósito, la
-//    visibilidad ya la decide si la cuenta es admin o no.
-// `key` es la identidad ESTABLE de cada ítem para personalizar el menú (ver
-// PersonalizarMenu.tsx y migration_24_preferencias_menu.sql) — no se usa el
-// href porque dos ítems ("fijos"/"cuotas") comparten el mismo href base
-// (/gastos) con distinto query string. "mas" es el único ítem NO
-// personalizable (ni se oculta ni se reordena): es la puerta de salida a
-// todo lo demás, tiene que quedar siempre en el mismo lugar.
+// Los 8 destinos originales y su orden calcan los 4 artboards de escritorio
+// del mockup (mismo orden en los 4): Inicio, Cuentas, Gastos, Presupuesto,
+// Calendario, Movimientos, Reportes, y Personas — que en AdminWeb.dc.html
+// ese mismo puesto lo ocupa Admin, así que hasta la Ronda 10 acá alternaba
+// según esAdmin (mostrando Admin en vez de Personas para las 2 cuentas
+// admin), igual que ese artboard sugiere.
 //
-// Tipado explícito (en vez de dejar que TS infiera el tipo del array
-// literal): así ITEMS e ITEM_MAS comparten exactamente el mismo tipo con
-// `activo` opcional, y se pueden combinar con spread (`[...itemsFiltrados,
-// ITEM_MAS]`) sin que TypeScript se queje de que "activo" no existe en
-// alguno de los dos — cosa que si pasaba dejando que se infiriera solo.
+// Ronda 11: Felipe pidió eliminar el menú Admin del todo (no solo dejar de
+// enlazarlo) — con /admin retirado (redirige a /categorias, ver ese
+// archivo), el último puesto del rail vuelve a ser siempre "Personas" para
+// cualquier cuenta, sin distinción de admin.
 //
-// `ocultoPorDefecto` marca los ítems "opcionales" (ver ITEMS_OPCIONALES):
-// no vienen activados de fábrica, el usuario los suma a mano desde
-// "Personalizar menú" prendiendo su interruptor — ver aplicarPreferencias.
-type ItemMenu = {
+// Ronda 8: se agregó "Compromisos" al rail (después de Gastos), a pedido de
+// Felipe — deja de calcar el mockup al pie de la letra porque ya no tenía
+// sentido mantenerlo escondido en "Más" cuando lo usa seguido.
+//
+// "Gastos" apunta a /gastos (la pantalla con pestañas Fijos/Variables/Cuotas/
+// Diarios) en vez de separarlo en 2 accesos como hacía el sidebar anterior —
+// el mockup solo tiene un ícono para esto.
+type ItemRail = {
   key: string;
   href: string;
   label: string;
-  icon: (activo: boolean) => ReactNode;
-  activo?: (pathname: string) => boolean;
-  ocultoPorDefecto?: boolean;
+  icon: ReactNode;
 };
 
-const ITEMS: ItemMenu[] = [
+const ITEMS: ItemRail[] = [
   {
     key: "inicio",
     href: "/",
     label: "Inicio",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -71,8 +58,8 @@ const ITEMS: ItemMenu[] = [
     key: "cuentas",
     href: "/tarjetas",
     label: "Cuentas",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <rect x="3" y="6" width="18" height="13" rx="2.5" />
         <path d="M3 10h18" strokeLinecap="round" />
         <path d="M7 15h4" strokeLinecap="round" />
@@ -80,104 +67,51 @@ const ITEMS: ItemMenu[] = [
     ),
   },
   {
-    key: "presupuestos",
-    href: "/presupuesto",
-    label: "Presupuestos",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <path d="M12 3v9l7.5 4.3" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx="12" cy="12" r="9" />
-      </svg>
-    ),
-  },
-  {
-    key: "fijos",
-    href: "/gastos?tab=fijos",
-    label: "Fijos",
-    activo: (p: string) => p === "/gastos",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+    key: "gastos",
+    href: "/gastos",
+    label: "Gastos",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <rect x="4" y="3.5" width="16" height="17" rx="2" />
         <path d="M8 8h8M8 12h8M8 16h5" strokeLinecap="round" />
       </svg>
     ),
   },
   {
-    key: "metas",
-    href: "/metas-ahorro",
-    label: "Metas",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <circle cx="12" cy="12" r="8.5" />
-        <circle cx="12" cy="12" r="4" />
+    // Ronda 8: Felipe pidió que "Compromisos" salga del popover "Más" y
+    // quede en el rail principal, justo después de Gastos — antes vivía en
+    // ITEMS_MAS (ver comentario ahí abajo) por calcar el rail de 8 íconos
+    // exacto del mockup original, pero Felipe ahora prioriza encontrarlo
+    // directo sobre calcar ese mockup al pie de la letra.
+    key: "compromisos",
+    href: "/compromisos",
+    label: "Compromisos",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="3" y="7" width="18" height="13" rx="2.2" />
+        <path d="M3 11h18" strokeLinecap="round" />
+        <path d="M7 15.5h4" strokeLinecap="round" />
+        <path d="M8 7V5.5A2.5 2.5 0 0 1 10.5 3h3A2.5 2.5 0 0 1 16 5.5V7" strokeLinecap="round" />
       </svg>
     ),
   },
   {
-    key: "cuotas",
-    href: "/gastos?tab=cuotas",
-    label: "Compras en cuotas",
-    activo: () => false, // "Fijos" ya marca /gastos como activo; evita que ambos se iluminen a la vez
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <rect x="3.5" y="5" width="17" height="14" rx="2" />
-        <path d="M3.5 9.5h17" strokeLinecap="round" />
-        <path d="M7 14h4" strokeLinecap="round" />
+    key: "presupuesto",
+    href: "/presupuesto",
+    label: "Presupuesto",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <path d="M12 3v9l7.5 4.3" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="12" cy="12" r="9" />
       </svg>
     ),
   },
-  {
-    key: "reportes",
-    href: "/reportes",
-    label: "Reportes",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <rect x="4" y="12" width="4.5" height="8" rx="1.2" />
-        <rect x="10.2" y="7" width="4.5" height="13" rx="1.2" />
-        <rect x="16.4" y="3.5" width="4.5" height="16.5" rx="1.2" />
-      </svg>
-    ),
-  },
-  {
-    key: "personas",
-    href: "/personas",
-    label: "Personas",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <circle cx="9" cy="8" r="3" />
-        <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" strokeLinecap="round" />
-        <circle cx="17" cy="8.5" r="2.3" />
-        <path d="M20.5 18.3c0-2.3-1.7-4.1-4-4.6" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    key: "grupos",
-    href: "/grupos",
-    label: "Grupos",
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <rect x="3.5" y="4" width="17" height="6" rx="1.5" />
-        <rect x="3.5" y="14" width="7.5" height="6" rx="1.5" />
-        <rect x="13" y="14" width="7.5" height="6" rx="1.5" />
-      </svg>
-    ),
-  },
-];
-
-// Ítems que hoy solo se ven en "Más" (celular y el propio "Más" de esta
-// barra) pero se pueden sumar al menú lateral desde "Personalizar menú" —
-// mismos íconos que navItems.tsx, para que se vean igual que en el celular.
-// `ocultoPorDefecto: true` es lo que los mantiene afuera hasta que el
-// usuario los prenda a mano (ver aplicarPreferencias).
-const ITEMS_OPCIONALES: ItemMenu[] = [
   {
     key: "calendario",
     href: "/calendario-pagos",
     label: "Calendario",
-    ocultoPorDefecto: true,
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
         <path d="M3.5 9.5h17" strokeLinecap="round" />
         <path d="M8 3v3M16 3v3" strokeLinecap="round" />
@@ -188,44 +122,75 @@ const ITEMS_OPCIONALES: ItemMenu[] = [
     key: "movimientos",
     href: "/movimientos",
     label: "Movimientos",
-    ocultoPorDefecto: true,
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <path d="M4 8h13.5M14 4.5 17.5 8 14 11.5" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M20 16H6.5M10 12.5 6.5 16 10 19.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     ),
   },
   {
-    key: "auto",
-    href: "/auto",
-    label: "Auto",
-    ocultoPorDefecto: true,
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <path
-          d="M4 16v-3.5a2 2 0 0 1 1.2-1.8l1.3-3.4A2 2 0 0 1 8.4 6h7.2a2 2 0 0 1 1.9 1.3l1.3 3.4a2 2 0 0 1 1.2 1.8V16"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path d="M4 16h16" strokeLinecap="round" />
-        <circle cx="7.5" cy="16.5" r="1.5" />
-        <circle cx="16.5" cy="16.5" r="1.5" />
+    key: "reportes",
+    href: "/reportes",
+    label: "Reportes",
+    icon: (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <path d="M12 3.5 3.5 12l8.5 8.5 8.5-8.5z" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M12 8v4l3 1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+];
+
+// Rutas que en el mockup NO tienen ícono propio en el rail (Metas, Grupos,
+// Ingresos, Sugerencias) pero SÍ existen como pantallas completas del
+// rediseño — en celular viven dentro de "Más" (ver app/mas/page.tsx), pero
+// en escritorio, al calcar el rail de 8 íconos exacto del mockup, quedaron
+// sin ningún punto de entrada: ni ícono propio ni un "Más" que las
+// agrupara. Felipe reportó "los menus faltantes en la app" — este ítem
+// "Más" (mismo ícono de 4 cuadros que su versión móvil) es el arreglo: abre
+// un popover con estos destinos en vez de agregar más íconos sueltos al
+// rail (que dejaría de calcar el mockup).
+// "Compromisos" vivía acá también hasta la ronda 8, cuando se promovió al
+// rail principal (ver ITEMS más arriba).
+//
+// Ronda 11: Felipe pidió sacar "Auto" y "Salud" de acá — ya aparecen como
+// categoría de gasto (con su propio ícono/tile en Gastos, Reportes, etc.),
+// así que no hace falta que tengan también su propio destino de menú; y
+// agregar "Perfil" acá, además del avatar de abajo del rail que ya llevaba
+// a /mas — un punto de entrada más explícito que un círculo con iniciales.
+const ITEMS_MAS: ItemRail[] = [
+  {
+    key: "perfil",
+    href: "/mas",
+    label: "Perfil",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <circle cx="12" cy="8" r="3.5" />
+        <path d="M4.5 20c0-4 3.5-6.5 7.5-6.5s7.5 2.5 7.5 6.5" strokeLinecap="round" />
       </svg>
     ),
   },
   {
-    key: "salud",
-    href: "/salud",
-    label: "Salud",
-    ocultoPorDefecto: true,
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-        <path
-          d="M12 20s-7-4.35-9.5-8.5C.8 8.2 2.4 5 5.6 5c1.8 0 3.1 1 4.4 2.6C11.3 6 12.6 5 14.4 5c3.2 0 4.8 3.2 3.1 6.5C15 15.65 12 20 12 20Z"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+    key: "metas-ahorro",
+    href: "/metas-ahorro",
+    label: "Metas de ahorro",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <circle cx="12" cy="12" r="8.5" />
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    ),
+  },
+  {
+    key: "grupos",
+    href: "/grupos",
+    label: "Grupos",
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+        <rect x="3.5" y="4" width="17" height="6" rx="1.5" />
+        <rect x="3.5" y="14" width="7.5" height="6" rx="1.5" />
+        <rect x="13" y="14" width="7.5" height="6" rx="1.5" />
       </svg>
     ),
   },
@@ -233,9 +198,8 @@ const ITEMS_OPCIONALES: ItemMenu[] = [
     key: "ingresos",
     href: "/ingresos",
     label: "Ingresos",
-    ocultoPorDefecto: true,
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <path d="M4 16 9.5 10.5 13.5 14.5 20 8" strokeLinecap="round" strokeLinejoin="round" />
         <path d="M14.5 8H20v5.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -245,9 +209,8 @@ const ITEMS_OPCIONALES: ItemMenu[] = [
     key: "sugerencias",
     href: "/sugerencias",
     label: "Sugerencias",
-    ocultoPorDefecto: true,
-    icon: (a: boolean) => (
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
         <rect x="3" y="5" width="18" height="14" rx="2.2" />
         <path d="m3.5 6 8.5 6.5L20.5 6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
@@ -255,63 +218,64 @@ const ITEMS_OPCIONALES: ItemMenu[] = [
   },
 ];
 
-// Pool completo de ítems personalizables: los de fábrica + los opcionales.
-// "Más" no entra acá — no es personalizable, se agrega aparte al final. Ver
-// también itemsDinamicos más abajo (dentro de DesktopSidebar): agrega a este
-// mismo pool, en tiempo de ejecución, una entrada por cada cuenta/tarjeta
-// (entidades) y por cada grupo de reparto (grupos) que ya tenga cargados el
-// usuario — así "Falabella", "Paris", "Banco Estado" o "Hogar" se pueden
-// anclar al menú lateral desde "Personalizar menú" igual que Calendario o
-// Auto, sin que haya que codear cada una a mano (ver Novedades 2026-09-05).
-const ITEMS_TODOS: ItemMenu[] = [...ITEMS, ...ITEMS_OPCIONALES];
-
-const ITEM_MAS: ItemMenu = {
-  key: "mas",
-  href: "/mas",
-  label: "Más",
-  icon: (a: boolean) => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={a ? 2.4 : 2}>
-      <rect x="4" y="4" width="7" height="7" rx="1.8" />
-      <rect x="13" y="4" width="7" height="7" rx="1.8" />
-      <rect x="4" y="13" width="7" height="7" rx="1.8" />
-      <rect x="13" y="13" width="7" height="7" rx="1.8" />
+const ITEM_PERSONAS: ItemRail = {
+  key: "personas",
+  href: "/personas",
+  label: "Personas",
+  icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+      <circle cx="9" cy="9" r="3.2" />
+      <path d="M3.5 19c0-3 2.5-5 5.5-5s5.5 2 5.5 5" strokeLinecap="round" />
+      <circle cx="17.5" cy="8.5" r="2.4" />
+      <path d="M15.5 12.3c2.3.3 4 2 4 4.4" strokeLinecap="round" />
     </svg>
   ),
 };
 
-// Aplica la personalización guardada (orden + ocultos) sobre la lista base:
-// primero los ítems que están en `orden` (en ese orden), después cualquier
-// ítem nuevo que no estuviera guardado todavía (agregado al código después
-// de que la cuenta personalizó por última vez, o un opcional que todavía
-// nunca se guardó), y al final se sacan los ocultos. Un ítem "nuevo" con
-// `ocultoPorDefecto` (ver ITEMS_OPCIONALES) arranca oculto hasta que el
-// usuario lo prenda a mano y guarde — así sumar Calendario/Auto/etc. al
-// catálogo personalizable no hace que aparezcan solos en el menú de nadie.
-// "Más" no pasa por acá: se agrega siempre al final, aparte.
-function aplicarPreferencias(base: ItemMenu[], prefs: PreferenciasMenu | null): ItemMenu[] {
-  const orden = prefs?.orden ?? [];
-  const porKey = new Map(base.map((item) => [item.key, item]));
-  const ordenados = orden.map((k) => porKey.get(k)).filter((i): i is ItemMenu => !!i);
-  const yaIncluidos = new Set(orden);
-  const nuevos = base.filter((item) => !yaIncluidos.has(item.key));
-  const ocultos = new Set(prefs?.ocultos ?? []);
-  nuevos.forEach((item) => {
-    if (item.ocultoPorDefecto) ocultos.add(item.key);
-  });
-  return [...ordenados, ...nuevos].filter((item) => !ocultos.has(item.key));
+function IconoSol() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="4.5" />
+      <path d="M12 2.5v2.2M12 19.3v2.2M4.2 4.2l1.6 1.6M18.2 18.2l1.6 1.6M2.5 12h2.2M19.3 12h2.2M4.2 19.8l1.6-1.6M18.2 5.8l1.6-1.6" />
+    </svg>
+  );
 }
+function IconoLuna() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5Z" />
+    </svg>
+  );
+}
+function IconoAuto() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="12" rx="2" />
+      <path d="M8 20h8M12 16.5V20" />
+    </svg>
+  );
+}
+
+const ORDEN_TEMA: PreferenciaTema[] = ["light", "dark", "system"];
+const ICONO_TEMA: Record<PreferenciaTema, ReactNode> = { light: <IconoSol />, dark: <IconoLuna />, system: <IconoAuto /> };
+const LABEL_TEMA: Record<PreferenciaTema, string> = { light: "Claro", dark: "Oscuro", system: "Automático" };
 
 export function DesktopSidebar() {
   const pathname = usePathname();
   const [session, setSession] = useState<Session | null>(null);
-  const [prefs, setPrefs] = useState<PreferenciasMenu | null>(null);
-  const [mostrarPersonalizar, setMostrarPersonalizar] = useState(false);
-  // Para las entradas dinámicas del menú (una por cuenta/tarjeta y una por
-  // grupo de reparto) — ver itemsDinamicos más abajo y Novedades 2026-09-05.
-  const [entidades, setEntidades] = useState<Entidad[]>([]);
-  const [grupos, setGrupos] = useState<Grupo[]>([]);
-  const [marcas, setMarcas] = useState<Marca[]>([]);
-  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [personaSelf, setPersonaSelf] = useState<Persona | null>(null);
+  const { preferencia, setPreferencia } = useTheme();
+  const [masAbierto, setMasAbierto] = useState(false);
+  const refMas = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!masAbierto) return;
+    function onClick(e: MouseEvent) {
+      if (refMas.current && !refMas.current.contains(e.target as Node)) setMasAbierto(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [masAbierto]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -319,194 +283,150 @@ export function DesktopSidebar() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  async function cargarPreferencias() {
-    const { data } = await supabase.from("preferencias_menu").select("orden, ocultos").maybeSingle();
-    setPrefs(data ? { orden: data.orden ?? [], ocultos: data.ocultos ?? [] } : { orden: [], ocultos: [] });
-  }
-
-  async function cargarCatalogosDinamicos() {
-    const [{ data: e }, { data: g }, { data: m }, { data: c }] = await Promise.all([
-      supabase.from("entidades").select("*").order("nombre"),
-      supabase.from("grupos").select("*").order("nombre"),
-      supabase.from("marcas").select("*"),
-      supabase.from("categorias").select("*").order("nombre"),
-    ]);
-    setEntidades((e as Entidad[]) ?? []);
-    setGrupos((g as Grupo[]) ?? []);
-    setMarcas((m as Marca[]) ?? []);
-    setCategorias((c as Categoria[]) ?? []);
-  }
-
   useEffect(() => {
-    if (session) {
-      cargarPreferencias();
-      cargarCatalogosDinamicos();
-    }
+    if (!session) return;
+    supabase
+      .from("personas")
+      .select("*")
+      .eq("es_self", true)
+      .maybeSingle()
+      .then(({ data }) => setPersonaSelf((data as Persona) ?? null));
   }, [session]);
 
-  // Una entrada de menú por cada cuenta/tarjeta (ej. "Falabella", "Paris",
-  // "Banco Estado", "Caja de Compensación") y por cada grupo de reparto (ej.
-  // "Hogar") — apuntan a /entidad/[id] y /grupo/[id] (ver esas pantallas),
-  // que listan todo lo activo de esa cuenta o grupo con sus cuotas
-  // restantes y quién debe pagar cada ítem. Igual que Calendario/Auto, nacen
-  // ocultas (ocultoPorDefecto) hasta que el usuario las prenda a mano desde
-  // "Personalizar menú" — así tener 6 tarjetas cargadas no llena el menú de
-  // nadie solo. El logo/ícono sale del catálogo de marcas cuando la cuenta
-  // tiene una asociada (mismo criterio que EntidadAvatar en /tarjetas).
-  const itemsDinamicos = useMemo<ItemMenu[]>(() => {
-    const deEntidades: ItemMenu[] = entidades.map((e) => ({
-      key: `entidad:${e.id}`,
-      href: `/entidad/${e.id}`,
-      label: e.nombre,
-      ocultoPorDefecto: true,
-      icon: () => <EntidadAvatar entidad={e} marca={resolverMarca(e, marcas)} className="h-5 w-5 rounded-md" />,
-    }));
-    const deGrupos: ItemMenu[] = grupos.map((g) => ({
-      key: `grupo:${g.id}`,
-      href: `/grupo/${g.id}`,
-      label: g.nombre,
-      ocultoPorDefecto: true,
-      icon: () => <EntidadAvatar icono={g.icono} nombreFallback={g.nombre} className="h-5 w-5 rounded-md" />,
-    }));
-    // Además de las cuentas/tarjetas propias (entidades) de arriba, se puede
-    // anclar cualquier marca del catálogo compartido de tipo "casa comercial",
-    // "banco" o "caja de compensación" (ej. Ripley, Falabella, Santander, Los
-    // Andes) aunque la cuenta nunca la haya convertido en una entidad propia
-    // — apunta a /marca/[id], que lista los ítems cuyo marca_id (la marca del
-    // producto/servicio, no el medio de pago) coincide, sin importar con qué
-    // tarjeta se pagó cada uno. Ver distinción entidad_id vs. marca_id en
-    // schema.sql y Novedades 2026-09-05/2026-09-06.
-    const deMarcas: ItemMenu[] = marcas
-      .filter((m) => m.tipo === "casa_comercial" || m.tipo === "banco" || m.tipo === "caja_compensacion")
-      .map((m) => ({
-        key: `marca:${m.id}`,
-        href: `/marca/${m.id}`,
-        label: m.nombre,
-        ocultoPorDefecto: true,
-        icon: () => <EntidadAvatar marca={m} className="h-5 w-5 rounded-md" />,
-      }));
-    // Y también se puede anclar cualquier categoría del catálogo (ej.
-    // "Educación", "Salud") — apunta a /categoria/[id], que junta TODO lo
-    // categorizado así sin importar quién lo paga, con qué tarjeta ni en qué
-    // grupo se reparte (a diferencia de /grupo/[id], acá entidad/marca/grupo
-    // siguen siendo libres por ítem). Sin filtrar por tipo: a diferencia de
-    // las marcas, cualquier categoría es un destino válido para anclar. Ver
-    // Novedades 2026-09-06.
-    const deCategorias: ItemMenu[] = categorias.map((c) => ({
-      key: `categoria:${c.id}`,
-      href: `/categoria/${c.id}`,
-      label: c.nombre,
-      ocultoPorDefecto: true,
-      icon: () => <EntidadAvatar icono={c.icono} nombreFallback={c.nombre} className="h-5 w-5 rounded-md" />,
-    }));
-    return [...deEntidades, ...deGrupos, ...deMarcas, ...deCategorias];
-  }, [entidades, grupos, marcas, categorias]);
+  const todosLosItems = [...ITEMS, ITEM_PERSONAS];
 
-  const todosLosItems = useMemo(() => [...ITEMS_TODOS, ...itemsDinamicos], [itemsDinamicos]);
-
-  const esAdmin = checkEsAdmin(session?.user?.email);
-  const itemsOrdenados = [...aplicarPreferencias(todosLosItems, prefs), ITEM_MAS];
-
-  async function cerrarSesion() {
-    await supabase.auth.signOut();
+  function ciclarTema() {
+    const i = ORDEN_TEMA.indexOf(preferencia);
+    setPreferencia(ORDEN_TEMA[(i + 1) % ORDEN_TEMA.length]);
   }
 
+  const iniciales = personaSelf?.nombre
+    ? personaSelf.nombre
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((p) => p.charAt(0).toUpperCase())
+        .join("")
+    : "?";
+
   return (
-    <aside className="sticky top-0 flex h-screen w-60 shrink-0 flex-col border-r border-gray-100 bg-white px-4 py-5 dark:border-white/10 dark:bg-black">
-      <div className="mb-5 flex items-center gap-2.5 px-1">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-white">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4}>
-            <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </span>
-        <p className="text-sm font-bold leading-tight text-gray-800 dark:text-white">Gastos del Hogar</p>
+    <aside className="sticky top-0 flex h-screen w-[84px] shrink-0 flex-col items-center gap-1.5 border-r border-gray-100 bg-white py-6 dark:border-white/10 dark:bg-black">
+      <Link
+        href="/"
+        className="mb-4 flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-xl bg-brand-gradient text-white"
+        aria-label="Gastos del Hogar"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
+          <path d="M3 11.5 12 4l9 7.5" strokeLinecap="round" strokeLinejoin="round" />
+          <path d="M5.5 10v9a1 1 0 0 0 1 1H9a1 1 0 0 0 1-1v-4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 0 1 1h2.5a1 1 0 0 0 1-1v-9" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </Link>
+
+      {/* No está dibujado en el mockup (el rail del mockup no tiene "+"), pero
+          hace falta un punto de entrada para agregar movimientos en
+          escritorio — se agrega acá, junto al logo, en vez de quitar la
+          función. Abre la misma hoja "Nuevo movimiento" que el celular. */}
+      <div className="mb-1">
+        <MovimientoFab variante="rail" />
       </div>
 
-      <div className="mb-4">
-        <MovimientoFab variante="boton-lateral" />
-      </div>
-
-      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto">
-        {itemsOrdenados.map((item) => {
-          const [hrefBase] = item.href.split("?");
-          const active = item.activo ? item.activo(pathname) : pathname === hrefBase;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
-                active
-                  ? "bg-gray-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
-                  : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
-              }`}
-            >
-              <span className={active ? "text-brand-from dark:text-white" : "text-gray-400 dark:text-gray-500"}>{item.icon(active)}</span>
-              {item.label}
-            </Link>
-          );
-        })}
-        {esAdmin && (
+      {todosLosItems.map((item) => {
+        const active = item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(item.href + "/");
+        return (
           <Link
-            href="/admin"
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
-              pathname === "/admin"
-                ? "bg-gray-50 font-semibold text-brand-from dark:bg-white/10 dark:text-white"
-                : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
+            key={item.key}
+            href={item.href}
+            title={item.label}
+            aria-label={item.label}
+            className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl transition ${
+              active
+                ? // Mockup: el ítem activo del rail se ve con los colores
+                  // invertidos respecto al fondo de la página (cuadro
+                  // blanco/ícono negro en modo oscuro, cuadro negro/ícono
+                  // blanco en modo claro) — no el degradado de marca, que
+                  // solo se usa en botones de acción (+, Guardar, etc.).
+                  // Mismo patrón que ya usa el avatar de perfil más abajo.
+                  "bg-gray-800 text-white dark:bg-white dark:text-black"
+                : "text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
             }`}
           >
-            <span className={pathname === "/admin" ? "text-brand-from dark:text-white" : "text-gray-400 dark:text-gray-500"}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={pathname === "/admin" ? 2.4 : 2}>
-                <path d="M12 3.5 5 6.5v5c0 4.5 3 7.5 7 8.5 4-1 7-4 7-8.5v-5L12 3.5Z" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9.5 12 11 13.5 14.5 10" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            Admin
+            {item.icon}
           </Link>
-        )}
-      </nav>
+        );
+      })}
 
-      <button
-        onClick={() => setMostrarPersonalizar(true)}
-        className="mt-1 flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
-      >
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 7h10M18 7h2M4 17h2M10 17h10" />
-          <circle cx="16" cy="7" r="2.3" />
-          <circle cx="7" cy="17" r="2.3" />
-        </svg>
-        Personalizar menú
-      </button>
-
-      {/* Cuadro de perfil: mismo lugar que en /mas del celular (PerfilPropioCard),
-          pero acá vive siempre visible al fondo del Sidebar en vez de en su
-          propia pantalla, ya que en escritorio no hace falta un destino "Más"
-          separado para llegar al perfil. */}
-      <div className="mt-3 rounded-2xl border border-gray-100 p-3 dark:border-white/10">
-        <p className="truncate text-xs font-semibold text-gray-700 dark:text-gray-200">{session?.user?.email ?? "Cuenta"}</p>
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <span className="text-[11px] font-medium text-gray-400 dark:text-gray-500">Tema</span>
-          <ThemeToggle />
-        </div>
+      <div className="relative" ref={refMas}>
         <button
-          onClick={cerrarSesion}
-          className="mt-2 w-full rounded-lg border border-gray-200 py-1.5 text-[11px] font-medium text-gray-500 hover:border-red-200 hover:text-red-400 dark:border-white/10 dark:text-gray-400 dark:hover:border-red-400/40 dark:hover:text-red-400"
+          type="button"
+          title="Más"
+          aria-label="Más"
+          onClick={() => setMasAbierto((v) => !v)}
+          className={`flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-2xl transition ${
+            ITEMS_MAS.some((item) => pathname === item.href || pathname.startsWith(item.href + "/"))
+              ? "bg-gray-800 text-white dark:bg-white dark:text-black"
+              : "text-gray-400 hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+          }`}
         >
-          Cerrar sesión
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}>
+            <rect x="4" y="4" width="7" height="7" rx="1.8" />
+            <rect x="13" y="4" width="7" height="7" rx="1.8" />
+            <rect x="4" y="13" width="7" height="7" rx="1.8" />
+            <rect x="13" y="13" width="7" height="7" rx="1.8" />
+          </svg>
         </button>
+
+        {masAbierto && (
+          <div className="absolute bottom-0 left-full z-40 ml-2 w-52 rounded-2xl border border-gray-100 bg-white p-1.5 shadow-2xl dark:border-white/10 dark:bg-neutral-900">
+            {ITEMS_MAS.map((item) => {
+              const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              return (
+                <Link
+                  key={item.key}
+                  href={item.href}
+                  onClick={() => setMasAbierto(false)}
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-gray-50 text-gray-800 dark:bg-white/10 dark:text-white"
+                      : "text-gray-500 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <span className="shrink-0 text-gray-400 dark:text-gray-500">{item.icon}</span>
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {mostrarPersonalizar && (
-        <PersonalizarMenu
-          items={todosLosItems}
-          prefs={prefs}
-          onClose={() => setMostrarPersonalizar(false)}
-          onGuardado={(nuevo) => {
-            setPrefs(nuevo);
-            setMostrarPersonalizar(false);
-          }}
-        />
-      )}
+      <div className="flex-1" />
+
+      <button
+        type="button"
+        title={`Tema: ${LABEL_TEMA[preferencia]} (clic para cambiar)`}
+        aria-label="Cambiar tema"
+        onClick={ciclarTema}
+        className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-2xl text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 dark:text-gray-500 dark:hover:bg-white/5 dark:hover:text-gray-300"
+      >
+        {ICONO_TEMA[preferencia]}
+      </button>
+
+      {/* Antes esto abría un popover con el email + "Cerrar sesión" — ahora
+          navega directo al Perfil (mismo destino que el avatar del mockup),
+          igual que en el header de Inicio en celular. "Cerrar sesión" ya
+          vive en el propio Perfil (ver PerfilPropioCard.tsx), así que no se
+          perdió esa función, solo dejó de estar duplicada acá.
+          BUG reportado por Felipe: esto apuntaba a /personas (gestión de
+          "otras personas" para repartos) en vez de a su propio perfil —
+          "Tu perfil" vive en /mas (arriba de todo, ver PerfilPropioCard). */}
+      <Link
+        href="/mas"
+        aria-label="Ir a tu perfil"
+        title="Tu perfil"
+        className="mt-1 flex h-9 w-9 items-center justify-center rounded-full bg-gray-800 text-[12.5px] font-bold text-white transition hover:opacity-90 dark:bg-white dark:text-black"
+      >
+        {iniciales}
+      </Link>
     </aside>
   );
 }

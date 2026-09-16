@@ -18,6 +18,11 @@ export interface Categoria {
   // "Supermercado" -> "supermercado", así se ofrecen Jumbo/Líder/etc.).
   // null = no se sugiere ninguna.
   tipo_marca_sugerido: TipoMarca | null;
+  // migration_36_color_categoria.sql. Color propio de la categoría (ej. en
+  // las barras verticales de "Presupuesto por categoría" y los anillos de
+  // Presupuesto). null = se usa el color determinístico por nombre de
+  // lib/avatarColor.ts (colorFor), no un valor elegido a mano.
+  color: string | null;
 }
 
 export interface Entidad {
@@ -37,6 +42,11 @@ export interface Entidad {
   // tarjeta que el usuario sube (ej. una captura del diseño de su banco) —
   // si existe, se usa como fondo en vez del degradado.
   color_hex: string | null;
+  // Color hex opcional para el texto/íconos superpuestos en la cara de la
+  // tarjeta — null = blanco (el de siempre). Ver
+  // migration_35_color_texto_tarjeta.sql. Pensado para tarjetas con
+  // color/imagen de fondo muy claros donde el texto blanco no se lee.
+  color_texto: string | null;
   imagen_fondo_url: string | null;
   // Saldo actual, editado a mano por el usuario (null = todavía no lo puso).
   saldo: number | null;
@@ -44,31 +54,27 @@ export interface Entidad {
   // esto puesto, /tarjetas calcula solo el cupo disponible. null = todavía
   // no lo puso. Ver migration_28_cupo_tarjetas.sql.
   cupo: number | null;
+  // Últimos 4 dígitos de la tarjeta/cuenta, para reconocerla de un vistazo
+  // (ej. "•••• 5344") — opcional, texto (no número: puede empezar con "0").
+  // Ver migration_32_ultimos_digitos.sql.
+  ultimos_digitos: string | null;
+  // De quién es esta tarjeta/cuenta (el titular no necesariamente es quien
+  // debe asumir el gasto — eso lo define "Asignar a" en cada movimiento). null
+  // = sin titular asignado (no se agrupa bajo nadie en Compromisos). Ver
+  // migration_33_compromisos_fundacion.sql.
+  titular_persona_id: string | null;
 }
 
-export type TipoMarca =
-  | "banco"
-  | "casa_comercial"
-  | "caja_compensacion"
-  | "autopista"
-  | "telecom"
-  | "servicio_basico"
-  | "supermercado"
-  | "transporte"
-  | "compras_online"
-  | "delivery"
-  | "suscripcion"
-  // Auto y Salud (ver migration_25_marcas_auto_salud.sql) — a diferencia de
-  // los demás tipos, estos dos se agrupan de a varios por categoría (Auto:
-  // bencina+mecanico+repuestos; Salud: centro_medico+farmacia), por eso el
-  // selector de /auto y /salud usa MarcaAgrupadaPicker en vez de
-  // MarcaSugeridaPicker (pensado para UN tipo por categoría).
-  | "bencina"
-  | "mecanico"
-  | "repuestos"
-  | "centro_medico"
-  | "farmacia"
-  | "otro";
+// Hasta migration_39_tipos_marca_libres.sql, esto era una unión cerrada de
+// 17 valores fijos (Banco/Casa comercial/Supermercado/...), calcada de un
+// `check` de la base de datos — Felipe reportó que al crear una categoría
+// nueva (ej. "Mascotas") no había forma de que apareciera como opción "Tipo"
+// al crear una marca, porque la lista de tipos nunca podía crecer. Ahora es
+// texto libre: app/admin/page.tsx sigue ofreciendo los 17 de siempre como
+// catálogo base (con sus labels en español), más "+ Nuevo tipo…" para
+// agregar uno propio, que queda disponible de inmediato para categorías Y
+// marcas — ver ese archivo para la lista base y el generador de labels.
+export type TipoMarca = string;
 
 export interface Marca {
   id: string;
@@ -83,6 +89,11 @@ export interface Grupo {
   id: string;
   nombre: string;
   icono: string | null;
+  // Marca el grupo que representa a "Hogar" en Compromisos — a lo más uno por
+  // cuenta (índice único parcial). false para cualquier otro grupo de reparto
+  // que el usuario cree (ej. uno para dividir Falabella con alguien). Ver
+  // migration_33_compromisos_fundacion.sql.
+  es_principal: boolean;
 }
 
 // Persona participante de un grupo o de un item suelto, con su % (o null =
@@ -327,6 +338,11 @@ export interface MetaAhorroProgreso {
 // centro médico, farmacia...), ver migration_25_marcas_auto_salud.sql;
 // "Diarios" de /gastos no lo usa. `grupo_id` es opcional (null = sin
 // reparto, como siempre) — ver migration_27_reparto_gastos_diarios.sql.
+// `entidad_id` es opcional (null = efectivo/sin cuenta, el comportamiento de
+// siempre) — ver migration_37_entidad_gastos_diarios.sql. Se agregó porque
+// /sugerencias confirma TODO acá (también las compras con tarjeta real que
+// llegan del correo del banco), no solo los diarios en efectivo cargados a
+// mano.
 export interface GastoDiario {
   id: string;
   descripcion: string;
@@ -334,7 +350,25 @@ export interface GastoDiario {
   categoria_id: string | null;
   marca_id: string | null;
   grupo_id: string | null;
+  entidad_id: string | null;
   fecha: string;
+}
+
+// Una regla de categorización aprendida (ver
+// migration_38_reglas_categorizacion.sql y /reglas-categorizacion): "cuando
+// el texto del correo se parece a `patron`, sugerir esta categoría (y de
+// paso la marca/cuenta, si también se aprendieron)". `patron` se guarda
+// normalizado (mayúsculas, sin espacios de sobra). `veces_usada` es solo
+// para ordenar "más usadas" primero en la pantalla.
+export interface ReglaCategorizacion {
+  id: string;
+  patron: string;
+  categoria_id: string;
+  marca_id: string | null;
+  entidad_id: string | null;
+  veces_usada: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // Personalización del menú lateral de escritorio (DesktopSidebar.tsx): una
@@ -345,6 +379,17 @@ export interface GastoDiario {
 export interface PreferenciasMenu {
   orden: string[];
   ocultos: string[];
+}
+
+// Objetivo mensual de gasto por categoría (ver migration_31_presupuesto_
+// categorias.sql) — para las barras "gasto vs. presupuesto" de Inicio. No es
+// por mes calendario: es el objetivo recurrente de esa categoría (como
+// monto_estimado en GastoFijo), se compara siempre contra el mes que se esté
+// viendo.
+export interface PresupuestoCategoria {
+  id: string;
+  categoria_id: string;
+  monto_mensual: number;
 }
 
 export type TipoDocumentoAuto = "permiso_circulacion" | "revision_tecnica" | "seguro" | "otro";
@@ -358,4 +403,53 @@ export interface DocumentoAuto {
   nombre: string;
   fecha_vencimiento: string;
   notas: string | null;
+}
+
+// Preferencias de "Mi perfil" (Ronda 9, pedido de Felipe: "Vista principal",
+// "Inicio del mes" y "Balance") — una fila por usuario (owner_id es la
+// llave primaria, ver migration_40_preferencias_usuario.sql). No existe
+// fila todavía para nadie que no haya entrado a configurar algo: en ese
+// caso se usa PREFERENCIAS_DEFECTO (lib/preferenciasUsuario.ts), que
+// reproduce EXACTO el comportamiento de siempre (día 1, todas las cuentas
+// no-tarjeta-crédito suman al balance, pestaña "Resumen" primero).
+export interface PreferenciasUsuario {
+  owner_id: string;
+  // Día del mes en que arranca tu ciclo (1-28). 1 = como siempre (mes
+  // calendario). Hoy solo lo usa Inicio (balance/ingresos/gastos del
+  // resumen) — /movimientos, /reportes, /tarjetas y el calendario de
+  // "Actividad del mes" siguen agrupando por mes calendario (día 1) sin
+  // importar este valor; ver lib/cicloMes.ts.
+  dia_inicio_mes: number;
+  // Qué cuentas suman al "Balance"/"Apertura del mes" de Inicio (antes
+  // siempre sumaba TODO menos tarjetas de crédito — eso sigue siendo lo que
+  // pasa por defecto con estos 3 en true/true/false).
+  balance_incluye_debito: boolean;
+  balance_incluye_efectivo: boolean;
+  // A diferencia de débito/efectivo (que suman el saldo), una tarjeta de
+  // crédito no tiene "saldo" en el mismo sentido — esto suma su CUPO
+  // DISPONIBLE (cupo - usado) en vez de un saldo.
+  balance_incluye_cupo_tc: boolean;
+  // Qué pestaña de Inicio (celular) se abre primero.
+  pestana_inicio_defecto: "resumen" | "ingresos" | "presupuesto";
+  // Orden de las 3 tarjetas de la pestaña "Resumen" (celular): "categoria"
+  // (dona de gastos por categoría), "presupuesto_categorias" (barras de
+  // presupuesto) y "actividad_mes" (calendario). En escritorio no hay
+  // pestañas, pero el mismo orden decide si "Presupuesto por categoría" o
+  // "Cuentas y tarjetas" va primero en la fila de abajo.
+  orden_resumen: string[];
+  updated_at: string;
+}
+
+// Una solicitud de logo (Ronda 9, "Sugerir un logo" — distinto del panel de
+// admin en /admin, que sube el logo; esto es para que cualquier usuario
+// PIDA el logo de una marca que todavía no lo tiene). Ver
+// migration_41_solicitudes_logo.sql. `estado` pasa a "resuelta" cuando el
+// admin sube el logo y la marca listo (o decide que no corresponde).
+export interface SolicitudLogo {
+  id: string;
+  owner_id: string;
+  marca_id: string;
+  nota: string | null;
+  estado: "pendiente" | "resuelta";
+  created_at: string;
 }

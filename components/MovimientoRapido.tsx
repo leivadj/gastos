@@ -1,14 +1,33 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabaseClient";
-import { EntidadPicker } from "@/components/EntidadPicker";
+import { CategoriaPicker } from "@/components/CategoriaPicker";
 import { MarcaSugeridaPicker } from "@/components/MarcaSugeridaPicker";
 import { ParticipantesPicker } from "@/components/ParticipantesPicker";
-import { TIPO_CORTO } from "@/components/TarjetaVisual";
+import { colorFor } from "@/lib/avatarColor";
 import { mensajeError } from "@/lib/supabaseError";
 import { Categoria, Entidad, Grupo, Marca, Participante, Persona } from "@/lib/types";
+
+const ETIQUETA_TIPO_ENTIDAD: Record<Entidad["tipo"], string> = {
+  efectivo: "Efectivo",
+  tarjeta_credito: "Crédito",
+  tarjeta_debito: "Débito",
+  linea_credito: "Línea de crédito",
+  credito_hipotecario: "Hipotecario",
+  transferencia: "Transferencia",
+};
+
+// Resta `meses` meses a una fecha ISO ("YYYY-MM-DD"), preservando el día.
+// Se usa para reconstruir fecha_primera_cuota cuando la compra que se está
+// ingresando ya lleva cuotas pagadas (ver "N° de cuota actual" más abajo):
+// si hoy es la cuota 3, la primera cuota fue hace 2 meses.
+function restarMeses(fechaISO: string, meses: number): string {
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const fecha = new Date(y, m - 1 - meses, d);
+  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+}
 
 // Avisa a cualquier pantalla que esté escuchando (dashboard, /gastos,
 // /ingresos...) que se guardó un movimiento rápido, para que refresque sus
@@ -19,88 +38,25 @@ function avisarGuardado(tipo: "gasto" | "ingreso" | "transferencia") {
 }
 
 const hoyISO = () => new Date().toISOString().slice(0, 10);
-
-function IconoGasto() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
-      <path d="M12 3.5v17M8 7h5.5a2.5 2.5 0 0 1 0 5H10a2.5 2.5 0 0 0 0 5h6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+function horaCorta() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
-function IconoIngreso() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
-      <path d="M12 19V5M6 11l6-6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function IconoTransferencia() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
-      <path d="M17 7 21 11l-4 4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M3 11h18" strokeLinecap="round" />
-      <path d="M7 21 3 17l4-4" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M21 17H3" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconoCuotas() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
-      <rect x="3.5" y="5" width="17" height="14" rx="2" />
-      <path d="M3.5 9.5h17" strokeLinecap="round" />
-      <path d="M7 14h4" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconoPagoFijo() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2}>
-      <rect x="3.5" y="4.5" width="17" height="16" rx="2.5" />
-      <path d="M3.5 9.5h17" strokeLinecap="round" />
-      <path d="M8 3v3M16 3v3" strokeLinecap="round" />
-    </svg>
-  );
+function fechaChipLabel(fecha: string) {
+  const [, m, d] = fecha.split("-");
+  const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  return `${Number(d)} ${meses[Number(m) - 1]} · ${horaCorta()}`;
 }
 
-type ModalActivo = "gasto" | "ingreso" | "transferencia" | null;
-
-// Hoja inferior compartida por los 3 formularios rápidos.
-function HojaInferior({ titulo, onClose, children }: { titulo: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/40 px-0 sm:items-center sm:px-4" onClick={onClose}>
-      <div
-        className="max-h-[90vh] w-full overflow-y-auto rounded-t-2xl bg-white p-5 shadow-xl dark:bg-gray-900 dark:shadow-none sm:max-w-md sm:rounded-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-bold text-gray-800 dark:text-white">{titulo}</h2>
-          <button onClick={onClose} className="rounded-full p-1 text-gray-400 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-white/10">
-            ✕
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
-export function MovimientoFab({
-  variante = "flotante",
-}: {
-  // "en-nav": el botón vive dentro de la barra inferior del celular.
-  // "flotante": botón circular fijo abajo a la derecha (sin usar por ahora,
-  // en escritorio el punto de entrada es "boton-lateral" en el Sidebar).
-  // "boton-lateral": botón con etiqueta "+ Nuevo movimiento" dentro del
-  // Sidebar de escritorio (ver DesktopSidebar.tsx) — mismo menú y mismos 3
-  // formularios (Gasto/Ingreso/Transferencia) que las otras variantes, más
-  // 2 atajos de navegación a "Compra en cuotas" y "Pago fijo" (esos dos
-  // tienen formularios más largos que ya viven en /gastos, así que acá solo
-  // se navega ahí en vez de duplicar esa lógica en un modal).
-  variante?: "flotante" | "en-nav" | "boton-lateral";
-}) {
+// Botón "+" — en el celular vive dentro de la barra inferior (variante
+// "en-nav"), en escritorio es el ícono superior del rail (variante "rail",
+// ver DesktopSidebar.tsx). Las dos abren exactamente la misma hoja de
+// "Nuevo movimiento" (mockup pág. AgregarGasto.dc.html): ya no hay un menú
+// intermedio de burbujas Transferencia/Ingreso/Gasto — el mockup abre la
+// hoja directo, con Gasto/Ingreso como segmentado adentro y "Transferencia"
+// como una opción más dentro del selector de cuenta (ver FormMovimiento).
+export function MovimientoFab({ variante = "en-nav" }: { variante?: "en-nav" | "rail" }) {
   const [abierto, setAbierto] = useState(false);
-  const [modal, setModal] = useState<ModalActivo>(null);
 
   const [entidades, setEntidades] = useState<Entidad[]>([]);
   const [marcas, setMarcas] = useState<Marca[]>([]);
@@ -127,105 +83,23 @@ export function MovimientoFab({
     cargarCatalogos();
   }, []);
 
-  function abrir(m: Exclude<ModalActivo, null>) {
-    setAbierto(false);
-    setModal(m);
-  }
-
-  // "en-nav": el botón vive DENTRO de la barra inferior (como en el mockup),
-  // en vez de flotar encima del contenido y taparlo. "flotante": el botón
-  // clásico fijo abajo a la derecha. "boton-lateral": el menú se abre hacia
-  // abajo, alineado a la izquierda del botón (vive dentro del Sidebar, no
-  // tiene sentido centrarlo ni pegarlo al piso de la pantalla).
-  const menuAbierto = abierto && (
-    <div
-      className={
-        variante === "en-nav"
-          ? "absolute bottom-full left-1/2 z-30 mb-3 flex -translate-x-1/2 flex-col items-center gap-2"
-          : variante === "boton-lateral"
-            ? "absolute left-0 top-full z-30 mt-2 flex w-full flex-col gap-1.5"
-            : "mb-3 flex flex-col items-end gap-2"
-      }
-    >
-      {variante === "boton-lateral" && (
-        <>
-          <Link
-            href="/gastos?tab=cuotas"
-            onClick={() => setAbierto(false)}
-            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
-              <IconoCuotas />
-            </span>
-            Compra en cuotas
-          </Link>
-          <Link
-            href="/gastos?tab=fijos"
-            onClick={() => setAbierto(false)}
-            className="flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
-              <IconoPagoFijo />
-            </span>
-            Pago fijo
-          </Link>
-        </>
-      )}
-      <button
-        onClick={() => abrir("transferencia")}
-        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
-        style={{ animationDelay: "120ms" }}
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
-          <IconoTransferencia />
-        </span>
-        Transferencia
-      </button>
-      <button
-        onClick={() => abrir("ingreso")}
-        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
-        style={{ animationDelay: "60ms" }}
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
-          <IconoIngreso />
-        </span>
-        Ingreso
-      </button>
-      <button
-        onClick={() => abrir("gasto")}
-        className={`animate-pop-resorte flex items-center gap-2.5 whitespace-nowrap rounded-xl bg-white py-2 pl-3 pr-3 text-sm font-medium text-gray-700 shadow-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-100 dark:shadow-none dark:hover:bg-gray-700 ${variante === "boton-lateral" ? "" : "rounded-full pl-4"}`}
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200">
-          <IconoGasto />
-        </span>
-        Gasto
-      </button>
-    </div>
-  );
-
   const boton =
-    variante === "boton-lateral" ? (
+    variante === "rail" ? (
       <button
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => setAbierto(true)}
         aria-label="Nuevo movimiento"
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-brand-gradient py-2.5 text-sm font-semibold text-white shadow-sm transition-transform active:scale-[0.98]"
+        title="Nuevo movimiento"
+        className="flex h-[42px] w-[42px] items-center justify-center rounded-2xl bg-brand-gradient text-white shadow-sm transition active:scale-95"
       >
-        <span className={`text-lg leading-none transition-transform duration-200 ${abierto ? "rotate-45" : ""}`}>+</span>
-        Nuevo movimiento
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
       </button>
     ) : (
       <button
-        onClick={() => setAbierto((v) => !v)}
+        onClick={() => setAbierto(true)}
         aria-label="Agregar movimiento"
-        className={
-          variante === "en-nav"
-            ? `-mt-7 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl ring-4 ring-white transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                abierto ? "rotate-45" : ""
-              }`
-            : `flex h-14 w-14 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] ${
-                abierto ? "rotate-45" : ""
-              }`
-        }
+        className="-mt-7 flex h-12 w-12 items-center justify-center rounded-full bg-brand-gradient text-2xl font-light text-white shadow-xl ring-4 ring-white transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] dark:ring-black"
       >
         +
       </button>
@@ -234,42 +108,39 @@ export function MovimientoFab({
   return (
     <>
       {variante === "en-nav" ? (
-        <div className="relative flex flex-1 flex-col items-center justify-end pb-2.5">
-          {menuAbierto}
-          {boton}
-        </div>
-      ) : variante === "boton-lateral" ? (
-        <div className="relative">
-          {boton}
-          {menuAbierto}
-        </div>
+        <div className="relative flex flex-1 flex-col items-center justify-end pb-2.5">{boton}</div>
       ) : (
-        <div className="fixed bottom-6 right-4 z-30">
-          {menuAbierto}
-          {boton}
-        </div>
+        boton
       )}
 
-      {abierto && <div className="fixed inset-0 z-20" onClick={() => setAbierto(false)} />}
-
-      {modal === "gasto" && (
-        <FormGasto
+      {abierto && (
+        <FormMovimiento
           entidades={entidades}
           marcas={marcas}
           categorias={categorias}
           personas={personas}
           grupos={grupos}
-          onClose={() => setModal(null)}
+          onClose={() => setAbierto(false)}
           onCatalogoActualizado={cargarCatalogos}
         />
       )}
-      {modal === "ingreso" && <FormIngreso personas={personas} onClose={() => setModal(null)} />}
-      {modal === "transferencia" && <FormTransferencia entidades={entidades} onClose={() => setModal(null)} />}
     </>
   );
 }
 
-function FormGasto({
+type Tipo = "gasto" | "ingreso";
+type TipoPago = "normal" | "recurrente" | "cuotas";
+
+// Hoja única "Nuevo movimiento" — calcada de AgregarGasto.dc.html (estados A
+// y B). Segmentado Gasto/Ingreso arriba; el selector de cuenta (chip
+// "CuentaRUT") abre un dropdown con Efectivo + cuentas reales + una opción
+// "Transferencia entre mis cuentas" al fondo (Felipe: "transferencia dentro
+// del selector de cuentas, ahí veo si es entre mis cuentas o a terceros" —
+// una transferencia A TERCEROS sigue siendo un Gasto normal con el nombre de
+// la persona en la descripción, por eso no tiene un modo propio: el esquema
+// real no distingue "a quién" en un gasto, solo en item_participantes/grupos
+// que reparten el gasto entre personas DE LA CUENTA, no terceros externos).
+export function FormMovimiento({
   entidades,
   marcas,
   categorias,
@@ -286,209 +157,283 @@ function FormGasto({
   onClose: () => void;
   onCatalogoActualizado: () => void | Promise<void>;
 }) {
+  const [tipo, setTipo] = useState<Tipo>("gasto");
+  const [modoTransferencia, setModoTransferencia] = useState(false);
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [fecha, setFecha] = useState(hoyISO());
+  const [entidadId, setEntidadId] = useState("");
+  const [entidadDestinoId, setEntidadDestinoId] = useState("");
   const [categoriaId, setCategoriaId] = useState("");
   const [marcaId, setMarcaId] = useState("");
-  const [entidadId, setEntidadId] = useState("");
-  const [fecha, setFecha] = useState(hoyISO());
-  const [grupoId, setGrupoId] = useState("");
-  // Si en la cuenta solo hay una persona activa, se le asigna sola sin
-  // mostrar el selector (ver el mismo patrón en components/gastos/CuotasLista.tsx).
+  const [selectorAbierto, setSelectorAbierto] = useState<"origen" | "destino" | null>(null);
+
   const unicaPersona = personas.length === 1 ? personas[0] : null;
-  const [participantes, setParticipantes] = useState<Participante[]>(
-    unicaPersona ? [{ persona_id: unicaPersona.id, porcentaje: null }] : []
-  );
+  const activas = personas;
+  const [tipoPago, setTipoPago] = useState<TipoPago>("normal");
+  const [numeroCuotas, setNumeroCuotas] = useState("2");
+  const [cuotaInicial, setCuotaInicial] = useState("1");
+  const [compartir, setCompartir] = useState(false);
+  const [participantesManual, setParticipantesManual] = useState<Participante[]>([]);
+  const [personaIngresoId, setPersonaIngresoId] = useState(unicaPersona?.id ?? "");
+
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
 
   const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId) ?? null;
   const marcaSeleccionada = marcas.find((m) => m.id === marcaId) ?? null;
-  const grupoSeleccionado = grupos.find((g) => g.id === grupoId) ?? null;
+  // "Tú" es la primera persona activa — igual de arbitrario que el mockup,
+  // que muestra "Felipe (tú)" primero en ese orden.
+  const yo = activas[0] ?? null;
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    setGuardando(true);
-    try {
+  function nombreEntidad(id: string): string {
+    if (!id) return "Efectivo · sin tarjeta";
+    return entidades.find((e) => e.id === id)?.nombre ?? "Efectivo · sin tarjeta";
+  }
+
+  // Cuando hay dos cuentas con el mismo nombre (ej. dos "Banco Estado", una
+  // débito y otra crédito), Felipe no podía distinguirlas en "Pagar con" —
+  // se agrega el tipo entre paréntesis solo para esos nombres repetidos.
+  const nombresRepetidos = new Set(
+    Object.entries(
+      entidades.reduce<Record<string, number>>((acc, e) => {
+        acc[e.nombre] = (acc[e.nombre] ?? 0) + 1;
+        return acc;
+      }, {})
+    )
+      .filter(([, count]) => count > 1)
+      .map(([nombre]) => nombre)
+  );
+
+  function iconoCuenta() {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2.5" y="6" width="19" height="13" rx="2.5" />
+        <path d="M2.5 10h19" />
+      </svg>
+    );
+  }
+
+  // Antes era un menú "absolute" anidado dentro del formulario con scroll
+  // (overflow-y-auto): al desplegarse cerca del fondo de la hoja quedaba
+  // cortado (no cabía) y, al no tener su propio fondo, se confundía
+  // visualmente con la hoja "Nuevo movimiento" que queda detrás. Ahora es un
+  // overlay "fixed" de pantalla completa (mismo patrón que el resto de las
+  // hojas de la app) con su propio fondo oscuro + difuminado, así siempre
+  // cabe entero y se nota claramente que es una ventana aparte, por encima.
+  //
+  // BUG encontrado y arreglado (Felipe: "al elegir una tarjeta, no me deja,
+  // solo deja la opción efectivo"): este dropdown se cierra solo al hacer
+  // clic en su propio fondo oscuro (onClick de abajo + stopPropagation en el
+  // panel blanco) — eso ya basta para "cerrar al hacer clic afuera". Pero
+  // ADEMÁS existía un listener global de "mousedown" en el documento (en
+  // FormMovimiento) que cerraba el selector si el clic caía fuera de un
+  // `ref` puesto en el botón disparador. Como este dropdown vive portado a
+  // <body> (createPortal), un clic en "Paris" o "Banco Estado" caía FUERA de
+  // ese ref (el ref solo envuelve el botón, no el portal) — el listener lo
+  // detectaba como "clic afuera" en el mousedown y cerraba el menú ANTES de
+  // que el click en la tarjeta llegara a dispararse, así que la elección
+  // nunca se aplicaba y quedaba pegado en "Efectivo" (el valor inicial). Se
+  // quitó ese listener redundante (y el ref que solo servía para él) — el
+  // cierre por backdrop de acá abajo ya cubre el mismo caso sin este bug.
+  function DropdownCuentas({ valor, onElegir, onTransferencia }: { valor: string; onElegir: (id: string) => void; onTransferencia?: () => void }) {
+    // createPortal: este dropdown se abre DENTRO de la hoja "Nuevo
+    // movimiento", que a su vez ya está portada a <body> (ver más abajo) —
+    // pero antes de que ese cambio existiera este overlay quedaba anidado
+    // en el árbol normal de React y podía terminar detrás de contenido de la
+    // página en escritorio (mismo bug de stacking que /tarjetas y
+    // /movimientos, ver los comentarios ahí). Se porta también acá, directo
+    // a <body>, para no depender de dónde quede montada la hoja que lo abre.
+    return createPortal(
+      <div
+        className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4"
+        onClick={() => setSelectorAbierto(null)}
+      >
+        <div
+          className="max-h-[70vh] w-full overflow-y-auto rounded-t-3xl border border-gray-100 bg-white p-1.5 pb-[max(env(safe-area-inset-bottom),0.375rem)] shadow-2xl dark:border-white/10 dark:bg-neutral-900 sm:max-w-sm sm:rounded-3xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <p className="px-3 pb-1.5 pt-2 text-[10.5px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Pagar con</p>
+          <button
+            type="button"
+            onClick={() => onElegir("")}
+            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm ${
+              valor === "" ? "bg-gray-50 font-semibold dark:bg-white/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
+            }`}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 7.5v9M9 9.8h4.2a1.9 1.9 0 1 1 0 3.8H10a1.9 1.9 0 1 0 0 3.8H15" />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1 truncate">
+              Efectivo <span className="text-gray-400 dark:text-gray-500">· sin tarjeta</span>
+            </span>
+            {valor === "" && (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                <path d="m4 12 5 5L20 6" />
+              </svg>
+            )}
+          </button>
+          {entidades.map((e) => (
+            <button
+              type="button"
+              key={e.id}
+              onClick={() => onElegir(e.id)}
+              className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm ${
+                valor === e.id ? "bg-gray-50 font-semibold dark:bg-white/10" : "hover:bg-gray-50 dark:hover:bg-white/5"
+              }`}
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                {iconoCuenta()}
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {e.nombre}
+                {nombresRepetidos.has(e.nombre) && (
+                  <span className="text-gray-400 dark:text-gray-500"> ({ETIQUETA_TIPO_ENTIDAD[e.tipo]})</span>
+                )}
+              </span>
+              {valor === e.id && (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m4 12 5 5L20 6" />
+                </svg>
+              )}
+            </button>
+          ))}
+          {onTransferencia && (
+            <>
+              <div className="my-1 h-px bg-gray-100 dark:bg-white/10" />
+              <button
+                type="button"
+                onClick={onTransferencia}
+                className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-white/5"
+              >
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 3 21 7l-4 4" />
+                    <path d="M21 7H9a4 4 0 0 0-4 4v1" />
+                    <path d="M7 21 3 17l4-4" />
+                    <path d="M3 17h12a4 4 0 0 0 4-4v-1" />
+                  </svg>
+                </span>
+                Transferencia entre mis cuentas
+              </button>
+            </>
+          )}
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  // Genera la lista de participantes a guardar en item_participantes. Si
+  // "Compartir gasto" está apagado (o solo hay una persona en la cuenta), el
+  // gasto queda 100% asignado a "tú" — igual que antes. Si está prendido, se
+  // usa lo que el usuario armó en ParticipantesPicker (puede incluir 2 o más
+  // personas, con % editable o en blanco = partes iguales del resto).
+  function participantesParaGuardar(): Participante[] {
+    if (activas.length <= 1) return [];
+    if (compartir && participantesManual.length > 0) return participantesManual;
+    return yo ? [{ persona_id: yo.id, porcentaje: null }] : [];
+  }
+
+  async function guardarGasto() {
+    const descripcionFinal = descripcion.trim() || marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Gasto";
+    const participantes = participantesParaGuardar();
+
+    // "Recurrente" (se repite todos los meses) no es una compra en cuotas —
+    // va a gastos_fijos, la misma tabla que alimenta /gastos → Fijos y el
+    // Calendario de pagos. dia_mes_pago sale del día de la fecha elegida.
+    if (tipoPago === "recurrente") {
+      const dia = Number(fecha.slice(8, 10)) || 1;
       const payload = {
-        descripcion: descripcion.trim() || marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Gasto",
-        monto_total: Number(monto),
-        n_cuotas: 1,
-        fecha_primera_cuota: fecha,
+        descripcion: descripcionFinal,
+        monto_estimado: Number(monto),
+        dia_mes_pago: dia,
+        tipo_monto: "fijo" as const,
+        activo: true,
         entidad_id: entidadId || null,
         categoria_id: categoriaId || null,
         marca_id: marcaId || null,
-        grupo_id: grupoId || null,
+        grupo_id: null as string | null,
       };
-      const { data, error: dbError } = await supabase.from("compras").insert(payload).select().single();
+      const { data, error: dbError } = await supabase.from("gastos_fijos").insert(payload).select().single();
       if (dbError) throw dbError;
-      // Mismo reparto que usa Cuotas: si no se eligió un grupo (que ya trae
-      // su propio reparto) y hay personas asignadas, se guardan en
-      // item_participantes — así "Personas"/"Reportes" lo cuentan bien.
-      if (!grupoId && participantes.length > 0 && data) {
+      if (participantes.length > 0 && data) {
         const { error: partError } = await supabase.from("item_participantes").insert(
-          participantes.map((p) => ({ origen: "compra", origen_id: data.id, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+          participantes.map((p) => ({ origen: "gasto_fijo", origen_id: data.id, persona_id: p.persona_id, porcentaje: p.porcentaje }))
         );
         if (partError) throw partError;
       }
       avisarGuardado("gasto");
-      onClose();
-    } catch (err) {
-      setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
-    } finally {
-      setGuardando(false);
+      return;
     }
+
+    const nCuotas = tipoPago === "cuotas" ? Math.max(1, Number(numeroCuotas) || 1) : 1;
+    // Si ya se venían pagando cuotas antes de registrar esta compra (ej. se
+    // está ingresando ahora pero ya va en la cuota 3), la primera cuota fue
+    // (N-1) meses antes de la fecha elegida — así cuotaActualEn() la sitúa
+    // correctamente en el mes en curso sin tener que reeditar nada después.
+    const cuotaInicialClamp = tipoPago === "cuotas" ? Math.min(Math.max(1, Number(cuotaInicial) || 1), nCuotas) : 1;
+    const payload = {
+      descripcion: descripcionFinal,
+      monto_total: Number(monto),
+      n_cuotas: nCuotas,
+      fecha_primera_cuota: cuotaInicialClamp > 1 ? restarMeses(fecha, cuotaInicialClamp - 1) : fecha,
+      entidad_id: entidadId || null,
+      categoria_id: categoriaId || null,
+      marca_id: marcaId || null,
+      grupo_id: null as string | null,
+    };
+    const { data, error: dbError } = await supabase.from("compras").insert(payload).select().single();
+    if (dbError) throw dbError;
+    if (participantes.length > 0 && data) {
+      const { error: partError } = await supabase.from("item_participantes").insert(
+        participantes.map((p) => ({ origen: "compra", origen_id: data.id, persona_id: p.persona_id, porcentaje: p.porcentaje }))
+      );
+      if (partError) throw partError;
+    }
+    avisarGuardado("gasto");
   }
 
-  return (
-    <HojaInferior titulo="+ Gasto" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
-          <input
-            required
-            autoFocus
-            type="number"
-            min={1}
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            placeholder="0"
-            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Categoría</label>
-          <select
-            value={categoriaId}
-            onChange={(e) => {
-              const nueva = categorias.find((c) => c.id === e.target.value) ?? null;
-              if (nueva?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
-              setCategoriaId(e.target.value);
-            }}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          >
-            <option value="">—</option>
-            {categorias.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.icono ? `${c.icono} ` : ""}
-                {c.nombre}
-              </option>
-            ))}
-          </select>
-        </div>
-        {categoriaSeleccionada?.tipo_marca_sugerido && (
-          <div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)</label>
-            <div className="mt-1">
-              <MarcaSugeridaPicker
-                marcas={marcas}
-                tipo={categoriaSeleccionada.tipo_marca_sugerido}
-                value={marcaId}
-                onChange={setMarcaId}
-                onCatalogoActualizado={onCatalogoActualizado}
-              />
-            </div>
-          </div>
-        )}
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Descripción (opcional)</label>
-          <input
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder={marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Ej: Supermercado"}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Cuenta</label>
-          <div className="mt-1">
-            <EntidadPicker entidades={entidades} marcas={marcas} value={entidadId} onChange={setEntidadId} onCatalogoActualizado={onCatalogoActualizado} />
-          </div>
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
-          <input
-            required
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        {personas.length > 1 && (
-          <div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">Asignar a</label>
-            <select
-              value={grupoId}
-              onChange={(e) => setGrupoId(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-            >
-              <option value="">— Elegir personas —</option>
-              {grupos.map((g) => (
-                <option key={g.id} value={g.id}>
-                  Grupo {g.nombre}
-                </option>
-              ))}
-            </select>
-            {grupoSeleccionado ? (
-              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                El reparto lo define el grupo &quot;{grupoSeleccionado.nombre}&quot;. Para cambiarlo, ve a Grupos.
-              </p>
-            ) : (
-              <div className="mt-2">
-                <ParticipantesPicker
-                  personas={personas}
-                  value={participantes}
-                  onChange={setParticipantes}
-                  montoTotal={monto ? Number(monto) : undefined}
-                />
-              </div>
-            )}
-          </div>
-        )}
-        {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={guardando}
-          className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {guardando ? "Guardando…" : "Guardar gasto"}
-        </button>
-        <p className="text-center text-[11px] text-gray-400 dark:text-gray-500">
-          ¿Es en cuotas? Créalo desde Cuotas para repartirlo en varios meses.
-        </p>
-      </form>
-    </HojaInferior>
-  );
-}
+  async function guardarIngreso() {
+    const mes = `${fecha.slice(0, 7)}-01`;
+    const payload = {
+      persona_id: personaIngresoId || null,
+      monto: Number(monto),
+      mes,
+      descripcion: descripcion.trim() || null,
+    };
+    const { error: dbError } = await supabase.from("ingresos").insert(payload);
+    if (dbError) throw dbError;
+    avisarGuardado("ingreso");
+  }
 
-function FormIngreso({ personas, onClose }: { personas: Persona[]; onClose: () => void }) {
-  const [monto, setMonto] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [fecha, setFecha] = useState(hoyISO());
-  // Igual que en FormGasto: con una sola persona en la cuenta no tiene
-  // sentido preguntar de quién es el ingreso, se asigna sola.
-  const unicaPersona = personas.length === 1 ? personas[0] : null;
-  const [personaId, setPersonaId] = useState(unicaPersona?.id ?? "");
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState("");
+  async function guardarTransferencia() {
+    if (entidadId && entidadDestinoId && entidadId === entidadDestinoId) {
+      throw new Error("La cuenta de origen y destino no pueden ser la misma.");
+    }
+    const payload = {
+      monto: Number(monto),
+      cuenta_origen_id: entidadId || null,
+      cuenta_destino_id: entidadDestinoId || null,
+      fecha,
+      notas: descripcion.trim() || null,
+    };
+    const { error: dbError } = await supabase.from("transferencias").insert(payload);
+    if (dbError) throw dbError;
+    avisarGuardado("transferencia");
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError("");
     setGuardando(true);
     try {
-      const mes = `${fecha.slice(0, 7)}-01`;
-      const payload = {
-        persona_id: personaId || null,
-        monto: Number(monto),
-        mes,
-        descripcion: descripcion.trim() || null,
-      };
-      const { error: dbError } = await supabase.from("ingresos").insert(payload);
-      if (dbError) throw dbError;
-      avisarGuardado("ingreso");
+      if (modoTransferencia) await guardarTransferencia();
+      else if (tipo === "ingreso") await guardarIngreso();
+      else await guardarGasto();
       onClose();
     } catch (err) {
       setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
@@ -497,11 +442,65 @@ function FormIngreso({ personas, onClose }: { personas: Persona[]; onClose: () =
     }
   }
 
-  return (
-    <HojaInferior titulo="+ Ingreso" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
+  const titulo = modoTransferencia ? "Transferencia entre cuentas" : "Nuevo movimiento";
+
+  // createPortal: se monta como hijo directo de <body> (mismo motivo que
+  // /tarjetas y /movimientos, ver los comentarios ahí) — antes esta hoja se
+  // abría desde el "+" del rail de escritorio (dentro de <aside> en
+  // DesktopSidebar.tsx) o de la barra inferior, y sin portal podía terminar
+  // por detrás de contenido de la página (ej. las tarjetas de "Personas"),
+  // en vez de siempre por encima de todo.
+  //
+  // "sm:max-w-lg lg:max-w-xl" (antes "sm:max-w-md" en todos los tamaños):
+  // en escritorio hay espacio de sobra y este formulario no es un mockup de
+  // celular estirado — se le da más aire horizontal en vez de dejarlo
+  // angosto y muy alto.
+  return createPortal(
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50 px-0 backdrop-blur-sm sm:items-center sm:px-4" onClick={onClose}>
+      <form
+        onSubmit={handleSubmit}
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-white p-5 pb-10 shadow-xl dark:bg-[#111113] dark:text-white sm:max-h-[85vh] sm:max-w-lg sm:rounded-3xl sm:pb-5 lg:max-w-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-bold text-gray-800 dark:text-white">{titulo}</h2>
+          <button
+            type="button"
+            onClick={modoTransferencia ? () => setModoTransferencia(false) : onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:text-gray-500 dark:hover:bg-white/10"
+            aria-label={modoTransferencia ? "Volver" : "Cerrar"}
+          >
+            ✕
+          </button>
+        </div>
+
+        {!modoTransferencia && (
+          <div className="mb-4 flex gap-1 rounded-2xl bg-gray-100 p-1 text-sm dark:bg-white/10">
+            {(["gasto", "ingreso"] as Tipo[]).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTipo(t)}
+                className={`flex-1 rounded-xl py-2 font-semibold capitalize transition-colors ${
+                  tipo === t ? "bg-white text-gray-800 shadow-sm dark:bg-[#F2F2F0] dark:text-black" : "text-gray-500 dark:text-gray-400"
+                }`}
+              >
+                {t === "gasto" ? "Gasto" : "Ingreso"}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="mb-1 flex items-center gap-2">
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+              tipo === "gasto" || modoTransferencia ? "bg-gasto/10 text-gasto" : "bg-ingreso/10 text-ingreso"
+            }`}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round">
+              {tipo === "gasto" || modoTransferencia ? <path d="M5 12h14" /> : <path d="M12 19V5M6 11l6-6 6 6" />}
+            </svg>
+          </span>
           <input
             required
             autoFocus
@@ -509,36 +508,200 @@ function FormIngreso({ personas, onClose }: { personas: Persona[]; onClose: () =
             min={1}
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
-            placeholder="0"
-            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-white"
+            placeholder="$0"
+            className={`w-full bg-transparent text-3xl font-bold outline-none ${
+              tipo === "gasto" || modoTransferencia ? "text-gasto" : "text-ingreso"
+            }`}
           />
         </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Descripción (opcional)</label>
-          <input
-            value={descripcion}
-            onChange={(e) => setDescripcion(e.target.value)}
-            placeholder="Ej: Sueldo, bono, venta…"
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
+
+        {!modoTransferencia && tipo === "gasto" && (
+          <>
+            <p className="mb-2 mt-4 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Tipo de pago</p>
+            <div className="flex gap-1 rounded-2xl bg-gray-100 p-1 text-xs dark:bg-white/10">
+              {(
+                [
+                  { key: "normal", label: "Normal" },
+                  { key: "recurrente", label: "Recurrente" },
+                  { key: "cuotas", label: "Cuotas" },
+                ] as { key: TipoPago; label: string }[]
+              ).map((op) => (
+                <button
+                  key={op.key}
+                  type="button"
+                  onClick={() => setTipoPago(op.key)}
+                  className={`flex-1 rounded-xl py-2 font-semibold transition-colors ${
+                    tipoPago === op.key ? "bg-white text-gray-800 shadow-sm dark:bg-[#F2F2F0] dark:text-black" : "text-gray-500 dark:text-gray-400"
+                  }`}
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+              {tipoPago === "normal" && "Un solo pago, no se repite."}
+              {tipoPago === "recurrente" && "Se repite todos los meses (arriendo, suscripción, etc.)."}
+              {tipoPago === "cuotas" && "Compra en cuotas — indica cuántas cuotas."}
+            </p>
+            {tipoPago === "cuotas" && (
+              <div className="mt-2 flex gap-2">
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min={2}
+                    required
+                    value={numeroCuotas}
+                    onChange={(e) => setNumeroCuotas(e.target.value)}
+                    placeholder="N° de cuotas"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium dark:border-white/10 dark:bg-white/5"
+                  />
+                  <p className="mt-1 px-1 text-[10.5px] text-gray-400 dark:text-gray-500">N° de cuotas</p>
+                </div>
+                <div className="flex-1">
+                  <input
+                    type="number"
+                    min={1}
+                    max={Math.max(1, Number(numeroCuotas) || 1)}
+                    required
+                    value={cuotaInicial}
+                    onChange={(e) => setCuotaInicial(e.target.value)}
+                    placeholder="N° de cuota actual"
+                    className="w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-2.5 text-sm font-medium dark:border-white/10 dark:bg-white/5"
+                  />
+                  <p className="mt-1 px-1 text-[10.5px] text-gray-400 dark:text-gray-500">Va en la cuota N°</p>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        <input
+          value={descripcion}
+          onChange={(e) => setDescripcion(e.target.value)}
+          placeholder={modoTransferencia ? "Nota (opcional)" : marcaSeleccionada?.nombre || categoriaSeleccionada?.nombre || "Descripción"}
+          className="mt-3 w-full rounded-2xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium dark:border-white/10 dark:bg-white/5"
+        />
+        {!modoTransferencia && (
+          <p className="mt-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+            ¿Es una transferencia a un tercero? Descríbelo acá, ej. &quot;Transferencia a Marianela&quot;.
+          </p>
+        )}
+
+        <div className="mt-3 flex gap-2">
+          <div className="relative flex shrink-0 items-center gap-1.5 rounded-2xl border border-gray-200 bg-gray-50 px-3.5 py-2.5 text-xs font-semibold dark:border-white/10 dark:bg-white/5">
+            {fechaChipLabel(fecha)}
+            <input
+              type="date"
+              required
+              value={fecha}
+              onChange={(e) => setFecha(e.target.value)}
+              className="absolute inset-0 cursor-pointer opacity-0"
+              aria-label="Fecha"
+            />
+          </div>
+          {!modoTransferencia && tipo === "gasto" && (
+            <div className="relative min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => setSelectorAbierto(selectorAbierto === "origen" ? null : "origen")}
+                className="flex w-full items-center justify-between gap-2 rounded-2xl border border-gray-300 bg-gray-50 px-3.5 py-2.5 text-xs font-semibold dark:border-white/20 dark:bg-white/5"
+              >
+                <span className="truncate">{nombreEntidad(entidadId)}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {selectorAbierto === "origen" && (
+                <DropdownCuentas
+                  valor={entidadId}
+                  onElegir={(id) => {
+                    setEntidadId(id);
+                    setSelectorAbierto(null);
+                  }}
+                  onTransferencia={() => {
+                    setModoTransferencia(true);
+                    setSelectorAbierto(null);
+                  }}
+                />
+              )}
+            </div>
+          )}
         </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
-          <input
-            required
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        {personas.length > 1 && (
-          <div>
-            <label className="text-xs text-gray-500 dark:text-gray-400">¿De quién?</label>
+        {!modoTransferencia && tipo === "gasto" && (
+          <p className="mt-1.5 px-1 text-[11px] text-gray-400 dark:text-gray-500">Toca para elegir tarjeta, cuenta o efectivo</p>
+        )}
+
+        {modoTransferencia && (
+          <div className="mt-3 space-y-2">
+            <div className="relative">
+              <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Desde</p>
+              <button
+                type="button"
+                onClick={() => setSelectorAbierto(selectorAbierto === "origen" ? null : "origen")}
+                className="flex w-full items-center justify-between gap-2 rounded-2xl border border-gray-300 bg-gray-50 px-3.5 py-2.5 text-sm font-semibold dark:border-white/20 dark:bg-white/5"
+              >
+                <span className="truncate">{nombreEntidad(entidadId)}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {selectorAbierto === "origen" && <DropdownCuentas valor={entidadId} onElegir={(id) => { setEntidadId(id); setSelectorAbierto(null); }} />}
+            </div>
+            <div className="relative">
+              <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Hacia</p>
+              <button
+                type="button"
+                onClick={() => setSelectorAbierto(selectorAbierto === "destino" ? null : "destino")}
+                className="flex w-full items-center justify-between gap-2 rounded-2xl border border-gray-300 bg-gray-50 px-3.5 py-2.5 text-sm font-semibold dark:border-white/20 dark:bg-white/5"
+              >
+                <span className="truncate">{nombreEntidad(entidadDestinoId)}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m6 9 6 6 6-6" />
+                </svg>
+              </button>
+              {selectorAbierto === "destino" && <DropdownCuentas valor={entidadDestinoId} onElegir={(id) => { setEntidadDestinoId(id); setSelectorAbierto(null); }} />}
+            </div>
+            <p className="px-1 text-[11px] text-gray-400 dark:text-gray-500">No mueve el saldo de las cuentas automáticamente todavía — queda como registro.</p>
+          </div>
+        )}
+
+        {!modoTransferencia && tipo === "gasto" && (
+          <>
+            <p className="mb-2 mt-4 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">Categoría</p>
+            <CategoriaPicker
+              categorias={categorias}
+              value={categoriaId}
+              onChange={(id) => {
+                const nueva = categorias.find((c) => c.id === id) ?? null;
+                if (nueva?.tipo_marca_sugerido !== categoriaSeleccionada?.tipo_marca_sugerido) setMarcaId("");
+                setCategoriaId(id);
+              }}
+              onCatalogoActualizado={onCatalogoActualizado}
+            />
+            {categoriaSeleccionada?.tipo_marca_sugerido && (
+              <div className="mt-2">
+                <p className="mb-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  ¿Cuál {categoriaSeleccionada.nombre.toLowerCase()}? (opcional)
+                </p>
+                <MarcaSugeridaPicker
+                  marcas={marcas}
+                  tipo={categoriaSeleccionada.tipo_marca_sugerido}
+                  value={marcaId}
+                  onChange={setMarcaId}
+                  onCatalogoActualizado={onCatalogoActualizado}
+                />
+              </div>
+            )}
+          </>
+        )}
+
+        {!modoTransferencia && tipo === "ingreso" && activas.length > 1 && (
+          <div className="mt-4">
+            <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">¿De quién?</p>
             <select
-              value={personaId}
-              onChange={(e) => setPersonaId(e.target.value)}
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
+              value={personaIngresoId}
+              onChange={(e) => setPersonaIngresoId(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
             >
               <option value="">—</option>
               {personas.map((p) => (
@@ -549,133 +712,67 @@ function FormIngreso({ personas, onClose }: { personas: Persona[]; onClose: () =
             </select>
           </div>
         )}
-        {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
+
+        {!modoTransferencia && tipo === "gasto" && activas.length > 1 && (
+          <>
+            <label className="mt-4 flex items-center justify-between gap-2 rounded-2xl border border-gray-200 px-3.5 py-3 dark:border-white/10">
+              <span className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-gray-200">
+                <span
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  style={{ backgroundColor: colorFor(yo?.nombre ?? "") }}
+                >
+                  {(yo?.nombre ?? "?").slice(0, 2).toUpperCase()}
+                </span>
+                Compartir gasto
+              </span>
+              <input
+                type="checkbox"
+                checked={compartir}
+                onChange={(e) => setCompartir(e.target.checked)}
+                className="h-5 w-5 accent-gray-800 dark:accent-white"
+              />
+            </label>
+
+            {compartir && (
+              <div className="mt-3">
+                <p className="mb-1 px-1 text-[11px] font-bold uppercase tracking-wide text-gray-400 dark:text-gray-500">¿Con quién se reparte?</p>
+                <ParticipantesPicker
+                  personas={activas}
+                  value={participantesManual}
+                  onChange={setParticipantesManual}
+                  montoTotal={monto ? Number(monto) : undefined}
+                />
+                <p className="mt-1 px-1 text-[11px] text-gray-400 dark:text-gray-500">
+                  Elige a las personas y, si no es en partes iguales, edita el % de cada una.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        {error && <p className="mt-3 text-xs text-red-500 dark:text-red-400">{error}</p>}
+
+        {/* Al enfocar el input de monto/descripción en iPhone, Safari muestra
+            su propia barra de accesorios del teclado (flechas ◀▶ + "Listo")
+            justo encima del teclado — no es parte de esta app y no se puede
+            ocultar desde CSS/JS, pero si tapaba este botón era porque no
+            había espacio para hacerle scroll por encima (el formulario
+            terminaba justo en el borde). El scroll-mb reserva ese margen al
+            hacer scroll-into-view y el pb-10/pb-28 del form de arriba deja
+            aire real debajo para poder subirlo del todo. */}
         <button
           type="submit"
           disabled={guardando}
-          className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+          style={{ scrollMarginBottom: "140px" }}
+          className="mt-5 flex w-full items-center justify-center gap-2 rounded-full bg-gray-900 py-3.5 text-sm font-bold text-white disabled:opacity-50 dark:bg-white dark:text-black"
         >
-          {guardando ? "Guardando…" : "Guardar ingreso"}
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round">
+            <path d="m4 12 5 5L20 6" />
+          </svg>
+          {guardando ? "Guardando…" : modoTransferencia ? "Guardar transferencia" : tipo === "gasto" ? "Guardar movimiento" : "Guardar ingreso"}
         </button>
       </form>
-    </HojaInferior>
-  );
-}
-
-function FormTransferencia({ entidades, onClose }: { entidades: Entidad[]; onClose: () => void }) {
-  const [monto, setMonto] = useState("");
-  const [origenId, setOrigenId] = useState("");
-  const [destinoId, setDestinoId] = useState("");
-  const [fecha, setFecha] = useState(hoyISO());
-  const [notas, setNotas] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [error, setError] = useState("");
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError("");
-    if (origenId && destinoId && origenId === destinoId) {
-      setError("La cuenta de origen y destino no pueden ser la misma.");
-      return;
-    }
-    setGuardando(true);
-    try {
-      const payload = {
-        monto: Number(monto),
-        cuenta_origen_id: origenId || null,
-        cuenta_destino_id: destinoId || null,
-        fecha,
-        notas: notas.trim() || null,
-      };
-      const { error: dbError } = await supabase.from("transferencias").insert(payload);
-      if (dbError) throw dbError;
-      avisarGuardado("transferencia");
-      onClose();
-    } catch (err) {
-      setError(mensajeError(err) || "No se pudo guardar. Intenta de nuevo.");
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  return (
-    <HojaInferior titulo="↔ Transferencia" onClose={onClose}>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Monto</label>
-          <input
-            required
-            autoFocus
-            type="number"
-            min={1}
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            placeholder="0"
-            className="w-full rounded-lg border border-gray-200 px-3 py-3 text-2xl font-bold text-gray-800 dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Desde</label>
-          <select value={origenId} onChange={(e) => setOrigenId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
-            <option value="">—</option>
-            {entidades.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nombre} · {TIPO_CORTO[e.tipo]}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Hacia</label>
-          <select value={destinoId} onChange={(e) => setDestinoId(e.target.value)} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white">
-            <option value="">—</option>
-            {entidades.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nombre} · {TIPO_CORTO[e.tipo]}
-              </option>
-            ))}
-          </select>
-          {(() => {
-            const destino = entidades.find((e) => e.id === destinoId);
-            if (destino?.tipo !== "tarjeta_credito" || destino.cupo == null) return null;
-            return (
-              <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                Esto se descuenta del cupo usado de &quot;{destino.nombre}&quot; — así pagás la tarjeta desde tu
-                banco y liberás cupo (ver /tarjetas).
-              </p>
-            );
-          })()}
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Fecha</label>
-          <input
-            required
-            type="date"
-            value={fecha}
-            onChange={(e) => setFecha(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400">Nota (opcional)</label>
-          <input
-            value={notas}
-            onChange={(e) => setNotas(e.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-white/5 dark:text-white"
-          />
-        </div>
-        {error && <p className="text-xs text-red-500 dark:bg-red-950/40 dark:text-red-400">{error}</p>}
-        <button
-          type="submit"
-          disabled={guardando}
-          className="w-full rounded-lg bg-brand-gradient py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-        >
-          {guardando ? "Guardando…" : "Guardar transferencia"}
-        </button>
-        <p className="text-center text-[11px] text-gray-400 dark:text-gray-500">
-          No mueve el saldo de las cuentas automáticamente todavía — queda como registro.
-        </p>
-      </form>
-    </HojaInferior>
+    </div>,
+    document.body
   );
 }
